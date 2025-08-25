@@ -1,20 +1,38 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import RootNavigator from "./navigation/RootNavigator";
+import { ThemeProvider } from "./components/ThemeProvider";
+
+SplashScreen.preventAutoHideAsync(); // keep splash up while fonts load
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    // Manrope weights
+    "Manrope-Thin": require("./assets/fonts/manrope-thin.otf"),
+    "Manrope-Light": require("./assets/fonts/manrope-light.otf"),
+    "Manrope-Regular": require("./assets/fonts/manrope-regular.otf"),
+    "Manrope-Medium": require("./assets/fonts/manrope-medium.otf"),
+    "Manrope-SemiBold": require("./assets/fonts/manrope-semibold.otf"),
+    "Manrope-Bold": require("./assets/fonts/manrope-bold.otf"),
+    "Manrope-ExtraBold": require("./assets/fonts/manrope-extrabold.otf"),
+    // Oleo Script
+    "OleoScript-Regular": require("./assets/fonts/OleoScript-Regular.ttf"),
+    "OleoScript-Bold": require("./assets/fonts/OleoScript-Bold.ttf"),
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <ThemeProvider>
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
