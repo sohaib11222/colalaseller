@@ -14,6 +14,8 @@ import { StatusBar } from "expo-status-bar";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 import StoreProfileModal from "../../components/StoreProfileModal"; // <-- NEW
+import { useNavigation } from '@react-navigation/native';
+
 
 
 const { width } = Dimensions.get("window");
@@ -57,6 +59,7 @@ const PROMO_DEFAULT = require("../../assets/Frame 253.png");
 
 export default function StoreHomeScreen() {
   const { theme } = useTheme();
+  const navigation = useNavigation(); // <-- NEW
   const [profileVisible, setProfileVisible] = useState(false);   // <-- NEW
 
 
@@ -90,7 +93,9 @@ export default function StoreHomeScreen() {
               </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.bellBtn}>
+          <TouchableOpacity onPress={()=>navigation.navigate('ChatNavigator',{
+            screen: "Notification",
+          })} style={styles.bellBtn}>
             <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
           </TouchableOpacity>
         </View>
@@ -109,6 +114,9 @@ export default function StoreHomeScreen() {
               <ThemedText style={styles.viewProfileText}>View Profile</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
+            onPress={()=>navigation.navigate('ChatNavigator',{
+              screen: "StoreBuilder",
+            })}
               style={[styles.storeBuilderBtn, { backgroundColor: theme.colors.primary }]}
             >
               <ThemedText style={styles.storeBuilderText}>Store Builder</ThemedText>
@@ -149,10 +157,14 @@ export default function StoreHomeScreen() {
 
           {/* action buttons */}
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}>
+            <TouchableOpacity onPress={()=>navigation.navigate('ChatNavigator', {
+              screen: "AddProduct",
+            })} style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}>
               <ThemedText style={styles.actionBtnText}>Add Product</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#000" }]}>
+            <TouchableOpacity  onPress={()=>navigation.navigate('ChatNavigator', {
+              screen: "AddService",
+            })} style={[styles.actionBtn, { backgroundColor: "#000" }]}>
               <ThemedText style={styles.actionBtnText}>Add Service</ThemedText>
             </TouchableOpacity>
           </View>

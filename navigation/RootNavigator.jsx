@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import AuthNavigator from "./AuthNavigator";
 import MainNavigator from "./MainNavigator"; // Ensure this is imported correctly
 import ChatNavigator from "./ChatNavigator"; // Ensure this is imported correctly
+import SettingsNavigator from "./SettingsNavigator";
 
 const Stack = createNativeStackNavigator();
 
@@ -15,6 +16,7 @@ export default function RootNavigator() {
       <Stack.Screen name="Auth" component={AuthNavigator} />
       <Stack.Screen name="MainNavigator" component={MainNavigator} />
       <Stack.Screen name="ChatNavigator" component={ChatNavigator} />
+      <Stack.Screen name="SettingsNavigator" component={SettingsNavigator} />
       
     </Stack.Navigator>
   );

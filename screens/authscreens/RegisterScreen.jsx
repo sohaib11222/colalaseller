@@ -132,7 +132,7 @@ export default function RegisterStoreScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.primary700 }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: "#B91919" }]}>
       <ScrollView>
         {/* Top banner */}
         <Image source={require("../../assets/registermain1.png")} style={styles.topBanner} resizeMode="cover" />

@@ -36,56 +36,59 @@ const SettingsScreen = () => {
   const cartCount = 2;
   const notifCount = 3;
 
+  const IMG_SUB_ACTIVE = require('../../../assets/Group 115.png');
+
+
   // Main section (match screenshot)
   const menuMain = [
     { key: 'myProducts', label: 'My Products', img: require('../../../assets/Vector.png'), leftColor: '#E53E3E' },
-    { key: 'analytics', label: 'Analytics', img: require('../../../assets/Vector (1).png'), leftColor: '#4C3EE5' },
+    { key: 'analytics', label: 'Analytics', img: require('../../../assets/Vector (11).png'), leftColor: '#E53EE2' },
     {
       key: 'subscriptions',
       label: 'Subscriptions',
-      img: require('../../../assets/Vector (2).png'),
-      leftColor: '#22A06B',
-      badgeText: 'Subscription Active',
-      badgeColor: '#22C55E',
+      img: require('../../../assets/Vector (12).png'),
+      leftColor: '#62E53E',
+       badgeImg: IMG_SUB_ACTIVE,
     },
-    { key: 'promoted', label: 'Promoted Products', img: require('../../../assets/Vector (3).png'), leftColor: '#E5863E' },
-    { key: 'coupons', label: 'Manage Coupons/ Points', img: require('../../../assets/Vector (4).png'), leftColor: '#F59E0B' },
-    { key: 'announcements', label: 'Announcements', img: require('../../../assets/Vector (5).png'), leftColor: '#0EA5E9' },
-    { key: 'reviews', label: 'Reviews', img: require('../../../assets/Star copy 2.png'), leftColor: '#4C3EE5' },
-    { key: 'referrals', label: 'Referrals', img: require('../../../assets/Users.png'), leftColor: '#8B5CF6' },
-    { key: 'support', label: 'Support', img: require('../../../assets/Question.png'), leftColor: '#3EC9E5' },
-    { key: 'faqs', label: 'FAQs', img: require('../../../assets/Vector (6).png'), leftColor: '#9CA3AF' },
+    { key: 'promoted', label: 'Promoted Products', img: require('../../../assets/ChartLineUp.png'), leftColor: '#26A19F' },
+    { key: 'coupons', label: 'Manage Coupons/ Points', img: require('../../../assets/Vector (4).png'), leftColor: '#E5683E' },
+    { key: 'announcements', label: 'Announcements', img: require('../../../assets/Vector (14).png'), leftColor: '#3E86E5' },
+    { key: 'reviews', label: 'Reviews', img: require('../../../assets/Star copy 2.png'), leftColor: '#E53E41' },
+    { key: 'referrals', label: 'Referrals', img: require('../../../assets/Users.png'), leftColor: '#4C3EE5' },
+    { key: 'support', label: 'Support', img: require('../../../assets/Headset.png'), leftColor: '#E5863E' },
+    { key: 'faqs', label: 'FAQs', img: require('../../../assets/Question.png'), leftColor: '#3EC9E5' },
   ];
 
   // Others (match screenshot)
   const menuOthers = [
-    { key: 'sellerLeaderboard', label: 'Seller Leaderboard', img: require('../../../assets/Vector (5).png'), leftColor: '#0EA5E9' },
-    { key: 'savedCards', label: 'Saved Cards', img: require('../../../assets/Vector (1).png'), leftColor: '#4C3EE5' },
-    { key: 'accessControl', label: 'Account Access Control', img: require('../../../assets/Vector (2).png'), leftColor: '#22A06B' },
+    { key: 'sellerLeaderboard', label: 'Seller Leaderboard', img: require('../../../assets/Vector (5).png'), leftColor: '#fff' },
+    { key: 'savedCards', label: 'Saved Cards', img: require('../../../assets/CreditCard.png'), leftColor: '#fff' },
+    { key: 'accessControl', label: 'Account Access Control', img: require('../../../assets/Vector (15).png'), leftColor: '#fff' },
   ];
 
   const onPressRow = (key) => {
     // Wire up to your settings navigator screens
     const map = {
       myProducts: ['SettingsNavigator', { screen: 'MyProducts' }],
-      analytics: ['SettingsNavigator', { screen: 'Analytics' }],
-      subscriptions: ['SettingsNavigator', { screen: 'Subscriptions' }],
-      promoted: ['SettingsNavigator', { screen: 'PromotedProducts' }],
-      coupons: ['SettingsNavigator', { screen: 'ManageCoupons' }],
-      announcements: ['SettingsNavigator', { screen: 'Announcements' }],
-      reviews: ['SettingsNavigator', { screen: 'MyReviews' }],
+      analytics: ['ChatNavigator', { screen: 'Analytics' }],
+      subscriptions: ['ChatNavigator', { screen: 'Subscription' }],
+      promoted: ['ChatNavigator', { screen: 'PromotedProducts' }],
+      coupons: ['ChatNavigator', { screen: 'Coupons' }],
+      announcements: ['ChatNavigator', { screen: 'Announcements' }],
+      reviews: ['ChatNavigator', { screen: 'MyReviews' }],
       referrals: ['SettingsNavigator', { screen: 'Referrals' }],
-      support: ['SettingsNavigator', { screen: 'Support' }],
-      faqs: ['SettingsNavigator', { screen: 'FAQs' }],
+      support: ['ChatNavigator', { screen: 'Support' }],
+      faqs: ['ChatNavigator', { screen: 'FAQs' }],
 
       sellerLeaderboard: ['SettingsNavigator', { screen: 'SellerLeaderboard' }],
-      savedCards: ['SettingsNavigator', { screen: 'SavedCards' }],
-      accessControl: ['SettingsNavigator', { screen: 'AccountAccessControl' }],
+      savedCards: ['ChatNavigator', { screen: 'SavedCards' }],
+      accessControl: ['ChatNavigator', { screen: 'AccessControl' }],
 
-      wallet: ['SettingsNavigator', { screen: 'ShoppingWallet' }],
-      holdingWallet: ['SettingsNavigator', { screen: 'EscrowWallet' }],
+  
+      wallet: ['ChatNavigator', { screen: 'ShoppingWallet' }],
+      holdingWallet: ['ChatNavigator', { screen: 'EscrowWallet' }],
       editProfile: ['SettingsNavigator', { screen: 'EditProfile' }],
-      shopUpgrade: ['SettingsNavigator', { screen: 'ShopUpgrade' }],
+      shopUpgrade: ['ChatNavigator', { screen: 'UpgradeStore' }],
     };
 
     const route = map[key];
@@ -169,6 +172,7 @@ const SettingsScreen = () => {
               label={item.label}
               img={item.img}
               leftColor={item.leftColor}
+              badgeImg={item.badgeImg}    
               onPress={() => onPressRow(item.key)}
               badgeText={item.badgeText}
               badgeColor={item.badgeColor || C.success}
@@ -226,23 +230,24 @@ const OptionPillCard = ({
   textColor = '#101318',
   badgeText,
   badgeColor = '#22C55E',
+  badgeImg,              // 👈 NEW
   C,
 }) => {
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.pillWrap}>
-      {/* Left colored rail */}
       <View style={[styles.pillLeft, { backgroundColor: leftColor }]}>
         <Image source={img} style={styles.pillIcon} resizeMode="contain" />
       </View>
 
-      {/* White card body */}
       <View style={[styles.pillBody, { backgroundColor: C.white, borderColor: C.border }]}>
         <ThemedText style={[styles.pillLabel, { color: textColor }]} numberOfLines={1}>
           {label}
         </ThemedText>
 
-        {/* Optional right badge (e.g., Subscriptions Active) */}
-        {badgeText ? (
+        {/* 👇 image tag takes precedence */}
+        {badgeImg ? (
+          <Image source={badgeImg} style={{ height: 22, aspectRatio: 3.7, marginRight: 8, width:undefined }} />
+        ) : badgeText ? (
           <View style={[styles.badgePill, { backgroundColor: badgeColor + '22', borderColor: badgeColor }]}>
             <ThemedText style={[styles.badgePillText, { color: badgeColor }]}>{badgeText}</ThemedText>
           </View>
@@ -253,6 +258,7 @@ const OptionPillCard = ({
     </TouchableOpacity>
   );
 };
+
 
 /* ---------------- styles ---------------- */
 const styles = StyleSheet.create({

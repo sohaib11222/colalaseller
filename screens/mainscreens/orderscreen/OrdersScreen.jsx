@@ -11,8 +11,8 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import ThemedText from "../../components/ThemedText";
-import { useTheme } from "../../components/ThemeProvider";
+import ThemedText from "../../../components/ThemedText";
+import { useTheme } from "../../../components/ThemeProvider";
 
 const SAMPLE_ORDERS = [
   { id: "o1", customer: "Adewale Faizah", items: 2, total: 9999990, status: "new" },
@@ -59,11 +59,11 @@ const OrdersScreen = ({ navigation }) => {
       activeOpacity={0.85}
       style={[styles.row, { backgroundColor: C.card, borderColor: C.line }]}
       onPress={() =>
-        navigation?.navigate?.("SettingsNavigator", { screen: "OrderDetails", params: { orderId: item.id } })
+        navigation?.navigate?.("ChatNavigator", { screen: "SingleOrderDetails", params: { orderId: item.id } })
       }
     >
       <View style={[styles.leftIcon, { backgroundColor: "#FDECEC" }]}>
-        <Ionicons name="cart-outline" size={22} color={C.primary} />
+        <Ionicons name="cart-outline" size={22} color={C.primary} /> 
       </View>
 
       <View style={{ flex: 1 }}>

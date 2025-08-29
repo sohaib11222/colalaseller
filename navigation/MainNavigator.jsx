@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HomeScreen from "../screens/mainscreens/HomeScreen";
 import FeedScreen from "../screens/mainscreens/FeedScreen";
 import ChatScreen from "../screens/mainscreens/chatscreens/ChatScreen";
-import StoreScreen from "../screens/mainscreens/OrdersScreen";
+import StoreScreen from "../screens/mainscreens/orderscreen/OrdersScreen";
 import SettingsScreen from "../screens/mainscreens/settingsscreens/SettingsScreen";
 
 const Tab = createBottomTabNavigator();
