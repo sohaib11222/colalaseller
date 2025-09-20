@@ -7,6 +7,10 @@ import { ThemeProvider } from "./components/ThemeProvider";
 
 SplashScreen.preventAutoHideAsync(); // keep splash up while fonts load
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     // Manrope weights
@@ -30,9 +34,11 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <QueryClientProvider client={queryClient}>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }
