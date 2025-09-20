@@ -21,6 +21,7 @@ import SubscriptionScreen from "../screens/mainscreens/settingsscreens/Subscript
 import PromotedProductsScreen from "../screens/mainscreens/settingsscreens/PromotedProductsScreen";
 import StoreBuilderScreen from "../screens/mainscreens/StoreBuilderScreen";
 import NotificationsScreen from "../screens/mainscreens/NotificationsScreen";
+import ServiceDetailsScreen from "../screens/mainscreens/settingsscreens/ServiceDetailsScreen";
 
 // import RegisterScreen from "../screens/RegisterScreen";
 
@@ -51,6 +52,7 @@ export default function ChatNavigator() {
       <Stack.Screen name="PromotedProducts" component={PromotedProductsScreen} />
       <Stack.Screen name="StoreBuilder" component={StoreBuilderScreen} />
       <Stack.Screen name="Notification" component={NotificationsScreen} />
+      <Stack.Screen name="ServiceDetails" component={ServiceDetailsScreen} />
 
 
 
