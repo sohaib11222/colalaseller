@@ -205,7 +205,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred during registration. Please try again."
+        "An error occurred during registration. Please try again."
       );
     },
   });
@@ -232,7 +232,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while uploading media. Please try again."
+        "An error occurred while uploading media. Please try again."
       );
     },
   });
@@ -251,7 +251,7 @@ export default function RegisterStoreScreen() {
         Alert.alert(
           "Error",
           data.message ||
-            "Failed to save categories and social links. Please try again."
+          "Failed to save categories and social links. Please try again."
         );
       }
     },
@@ -260,7 +260,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while saving data. Please try again."
+        "An error occurred while saving data. Please try again."
       );
     },
   });
@@ -287,7 +287,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while saving business details. Please try again."
+        "An error occurred while saving business details. Please try again."
       );
     },
   });
@@ -314,7 +314,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while uploading documents. Please try again."
+        "An error occurred while uploading documents. Please try again."
       );
     },
   });
@@ -333,7 +333,7 @@ export default function RegisterStoreScreen() {
         Alert.alert(
           "Error",
           data.message ||
-            "Failed to save physical store information. Please try again."
+          "Failed to save physical store information. Please try again."
         );
       }
     },
@@ -342,7 +342,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while saving store information. Please try again."
+        "An error occurred while saving store information. Please try again."
       );
     },
   });
@@ -369,7 +369,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while uploading utility bill. Please try again."
+        "An error occurred while uploading utility bill. Please try again."
       );
     },
   });
@@ -393,7 +393,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while saving theme. Please try again."
+        "An error occurred while saving theme. Please try again."
       );
     },
   });
@@ -425,7 +425,7 @@ export default function RegisterStoreScreen() {
       Alert.alert(
         "Error",
         error.message ||
-          "An error occurred while completing registration. Please try again."
+        "An error occurred while completing registration. Please try again."
       );
     },
   });
@@ -499,12 +499,12 @@ export default function RegisterStoreScreen() {
     Object.entries(links).forEach(([type, url]) => {
       if (url.trim()) {
         let formattedUrl = url.trim();
-        
+
         // Add protocol if missing
         if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
           formattedUrl = 'https://' + formattedUrl;
         }
-        
+
         socialLinks.push({ type, url: formattedUrl });
       }
     });
@@ -611,8 +611,8 @@ export default function RegisterStoreScreen() {
         type === "banner"
           ? [16, 6]
           : type === "ninSlip" || type === "cacCert"
-          ? [16, 9]
-          : [1, 1],
+            ? [16, 9]
+            : [1, 1],
       quality: 0.85,
     });
     if (!res.canceled && res.assets?.[0]?.uri) {
@@ -1043,7 +1043,11 @@ export default function RegisterStoreScreen() {
                 <>
                   <PickerRow
                     label={addressValue ? "Address added" : "Add Store Address"}
-                    onPress={() => setShowAddress(true)}
+                    onPress={() =>
+                      navigation.navigate("StoreAddress", {
+                        onPickAddress: (addr) => setAddressValue(`${addr.address}`),
+                      })
+                    }
                     filled={!!addressValue}
                   />
                   <PickerRow
@@ -1052,7 +1056,11 @@ export default function RegisterStoreScreen() {
                         ? "Delivery pricing set"
                         : "Add Delivery pricing"
                     }
-                    onPress={() => setShowDelivery(true)}
+                    onPress={() =>
+                      navigation.navigate("DeliveryDetails", {
+                        // onPickAddress: (addr) => setAddressValue(`${addr.address}`),
+                      })
+                    }
                     filled={!!deliveryValue}
                   />
 
