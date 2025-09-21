@@ -46,7 +46,10 @@ const LoginScreen = () => {
           navigation.replace("MainNavigator");
         } catch (storageError) {
           console.error("Error storing auth data:", storageError);
-          Alert.alert("Error", "Login successful but failed to save data. Please try again.");
+          Alert.alert(
+            "Error",
+            "Login successful but failed to save data. Please try again."
+          );
         }
       } else {
         Alert.alert("Error", data.message || "Login failed. Please try again.");
@@ -54,13 +57,16 @@ const LoginScreen = () => {
     },
     onError: (error) => {
       console.error("Login error:", error);
-      Alert.alert("Error", error.message || "An error occurred during login. Please try again.");
+      Alert.alert(
+        "Error",
+        error.message || "An error occurred during login. Please try again."
+      );
     },
   });
 
   // Check if form is valid
   const isFormValid = email.trim() !== "" && password.trim() !== "";
-  
+
   // Check if login is in progress
   const isLoading = loginMutation.isPending;
 
@@ -146,7 +152,7 @@ const LoginScreen = () => {
             onPress={handleLogin}
             style={[
               styles.loginButton,
-              (!isFormValid || isLoading) && styles.loginButtonDisabled
+              (!isFormValid || isLoading) && styles.loginButtonDisabled,
             ]}
             disabled={!isFormValid || isLoading}
           >
@@ -215,7 +221,7 @@ const styles = StyleSheet.create({
   },
   topImage: {
     width: "100%",
-    height: 400,
+    height: 380,
     resizeMode: "cover",
   },
   card: {
