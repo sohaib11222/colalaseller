@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,25 +9,80 @@ import {
   Dimensions,
   SafeAreaView,
   ScrollView,
-} from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-import ThemedText from '../../components/ThemedText';
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation } from "@react-navigation/native";
+import ThemedText from "../../components/ThemedText";
 
-const { height } = Dimensions.get('window');
+const { height } = Dimensions.get("window");
+
+//Code Related to the integration
+import { useMutation } from "@tanstack/react-query";
+import { login } from "../../utils/mutations/auth";
+import { useAuth } from "../../contexts/AuthContext";
 
 const LoginScreen = () => {
   const navigation = useNavigation();
+  const { login: authLogin } = useAuth();
 
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: login,
+    onSuccess: async (data) => {
+      // Handle successful login
+      if (data.status === "success") {
+        try {
+          // Store token and user data using AuthContext
+          await authLogin(data.data.token, data.data.user);
+          console.log("Login successful:", data.data);
+          Alert.alert("Success", data.message || "Login successful!");
+          navigation.replace("MainNavigator");
+        } catch (storageError) {
+          console.error("Error storing auth data:", storageError);
+          Alert.alert("Error", "Login successful but failed to save data. Please try again.");
+        }
+      } else {
+        Alert.alert("Error", data.message || "Login failed. Please try again.");
+      }
+    },
+    onError: (error) => {
+      console.error("Login error:", error);
+      Alert.alert("Error", error.message || "An error occurred during login. Please try again.");
+    },
+  });
+
+  // Check if form is valid
+  const isFormValid = email.trim() !== "" && password.trim() !== "";
+  
+  // Check if login is in progress
+  const isLoading = loginMutation.isPending;
+
+  // Handle login
+  const handleLogin = () => {
+    if (!isFormValid) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    loginMutation.mutate({
+      email: email.trim(),
+      password: password.trim(),
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         {/* Top Image Banner */}
         <Image
-          source={require('../../assets/mainimage.png')} // Replace with your combined top image
+          source={require("../../assets/mainimage.png")} // Replace with your combined top image
           style={styles.topImage}
         />
 
@@ -38,27 +93,47 @@ const LoginScreen = () => {
 
           {/* Email Field */}
           <View style={styles.inputWrapper}>
-            <MaterialIcons name="email" size={20} color="#999" style={styles.icon} />
+            <MaterialIcons
+              name="email"
+              size={20}
+              color="#999"
+              style={styles.icon}
+            />
             <TextInput
               placeholder="Enter email address"
               placeholderTextColor="#999"
               style={styles.input}
               keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
 
           {/* Password Field */}
           <View style={styles.inputWrapper}>
-            <MaterialIcons name="lock" size={20} color="#999" style={styles.icon} />
+            <MaterialIcons
+              name="lock"
+              size={20}
+              color="#999"
+              style={styles.icon}
+            />
             <TextInput
               placeholder="Enter password"
               placeholderTextColor="#999"
               style={styles.input}
               secureTextEntry={!passwordVisible}
+              value={password}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
-            <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)}>
+            <TouchableOpacity
+              onPress={() => setPasswordVisible(!passwordVisible)}
+            >
               <Ionicons
-                name={passwordVisible ? 'eye-off' : 'eye'}
+                name={passwordVisible ? "eye-off" : "eye"}
                 size={20}
                 color="#999"
                 style={styles.icon}
@@ -67,13 +142,29 @@ const LoginScreen = () => {
           </View>
 
           {/* Login Button */}
-          <TouchableOpacity onPress={()=>navigation.replace('MainNavigator')} style={styles.loginButton}>
-            <ThemedText style={styles.loginText}>Login</ThemedText>
+          <TouchableOpacity
+            onPress={handleLogin}
+            style={[
+              styles.loginButton,
+              (!isFormValid || isLoading) && styles.loginButtonDisabled
+            ]}
+            disabled={!isFormValid || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <ThemedText style={styles.loginText}>Login</ThemedText>
+            )}
           </TouchableOpacity>
 
           {/* Create Account Button */}
-          <TouchableOpacity onPress={()=>navigation.navigate('Register')} style={styles.createAccountButton}>
-            <ThemedText style={styles.createAccountText}>Create Account</ThemedText>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Register")}
+            style={styles.createAccountButton}
+          >
+            <ThemedText style={styles.createAccountText}>
+              Create Account
+            </ThemedText>
           </TouchableOpacity>
 
           {/* Links */}
@@ -81,14 +172,14 @@ const LoginScreen = () => {
             <TouchableOpacity>
               <ThemedText style={styles.linkText}>Continue as guest</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity onPress={()=>navigation.navigate('ForgotPass')}>
+            <TouchableOpacity onPress={() => navigation.navigate("ForgotPass")}>
               <ThemedText style={styles.linkText}>Forgot Password ?</ThemedText>
             </TouchableOpacity>
           </View>
 
           {/* Gradient Bottom Box */}
           <LinearGradient
-            colors={['#F90909', '#920C5F']}
+            colors={["#F90909", "#920C5F"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.bottomGradient}
@@ -99,13 +190,13 @@ const LoginScreen = () => {
             <View style={styles.storeButtons}>
               <TouchableOpacity style={{ marginLeft: -100 }}>
                 <Image
-                  source={require('../../assets/image 58.png')} // Replace with actual App Store badge
+                  source={require("../../assets/image 58.png")} // Replace with actual App Store badge
                   style={styles.storeImage}
                 />
               </TouchableOpacity>
               <TouchableOpacity style={{ marginRight: 10 }}>
                 <Image
-                  source={require('../../assets/image 57.png')} // Replace with actual Play Store badge
+                  source={require("../../assets/image 57.png")} // Replace with actual Play Store badge
                   style={styles.storeImage}
                 />
               </TouchableOpacity>
@@ -120,16 +211,16 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#D5232C',
+    backgroundColor: "#D5232C",
   },
   topImage: {
-    width: '100%',
+    width: "100%",
     height: 400,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
   card: {
     flex: 1,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: "#F9F9F9",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 24,
@@ -137,92 +228,95 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#D5232C',
-    textAlign: 'center',
+    fontWeight: "600",
+    color: "#D5232C",
+    textAlign: "center",
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    textAlign: 'center',
-    color: '#888',
+    textAlign: "center",
+    color: "#888",
     marginBottom: 24,
   },
   inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 57,
     marginBottom: 14,
-    elevation:1
+    elevation: 1,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: "#000",
   },
   icon: {
     marginHorizontal: 6,
   },
   loginButton: {
-    backgroundColor: '#E53E3E',
+    backgroundColor: "#E53E3E",
     paddingVertical: 16,
     borderRadius: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 14,
   },
+  loginButtonDisabled: {
+    backgroundColor: "#ccc",
+    opacity: 0.6,
+  },
   loginText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '400',
+    fontWeight: "400",
   },
   createAccountButton: {
-    backgroundColor: '#EBEBEB',
+    backgroundColor: "#EBEBEB",
     paddingVertical: 16,
     borderRadius: 15,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 15,
   },
   createAccountText: {
-    color: '#666',
+    color: "#666",
     fontSize: 14,
   },
   rowLinks: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 6,
     marginTop: 10,
     marginBottom: 20,
   },
   linkText: {
-    color: '#D5232C',
+    color: "#D5232C",
     fontSize: 14,
   },
   bottomGradient: {
     borderRadius: 16,
     padding: 16,
     paddingLeft: 0,
-    alignItems: 'center',
+    alignItems: "center",
   },
   sellerText: {
-    color: '#fff',
-    fontSize: 14,
+    color: "#fff",
+    fontSize: 13,
     marginLeft: -30,
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   storeButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start'
+    flexDirection: "row",
+    justifyContent: "flex-start",
   },
   storeImage: {
     width: 100,
     height: 30,
     borderRadius: 15,
-    resizeMode: 'contain',
-
+    resizeMode: "contain",
   },
 });
 

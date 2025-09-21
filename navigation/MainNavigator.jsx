@@ -1,6 +1,13 @@
 // navigation/MainNavigator.jsx
 import React from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Platform,
+} from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -81,7 +88,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
                   style={styles.homeBadge}
                   activeOpacity={0.9}
                 >
-                  <Image source={TAB_ICONS[route.name]} style={[styles.homeIcon, { tintColor: "#fff" }]} />
+                  <Image
+                    source={TAB_ICONS[route.name]}
+                    style={[styles.homeIcon, { tintColor: "#fff" }]}
+                  />
                   <Text style={styles.homeLabel}>Home</Text>
                 </TouchableOpacity>
               </View>
@@ -99,7 +109,10 @@ function CustomTabBar({ state, descriptors, navigation }) {
                 style={styles.tabBtn}
                 activeOpacity={0.8}
               >
-                <Image source={TAB_ICONS[route.name]} style={[styles.icon, { tintColor: color }]} />
+                <Image
+                  source={TAB_ICONS[route.name]}
+                  style={[styles.icon, { tintColor: color }]}
+                />
                 <Text style={[styles.label, { color }]} numberOfLines={1}>
                   {route.name}
                 </Text>
@@ -116,7 +129,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
 export default function MainNavigator() {
   return (
     <Tab.Navigator
-      initialRouteName="Home"          // always start on Home (even if it's in the middle)
+      initialRouteName="Home" // always start on Home (even if it's in the middle)
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -144,8 +157,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     backgroundColor: COLOR.barBg,
     borderRadius: 18,
-    borderTopRightRadius:10,
-    borderTopLeftRadius:10,
+    borderTopRightRadius: 10,
+    borderTopLeftRadius: 10,
     paddingTop: 10,
     paddingHorizontal: 8,
     flexDirection: "row",

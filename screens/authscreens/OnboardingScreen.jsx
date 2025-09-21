@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import {
   View,
@@ -17,9 +17,21 @@ import ThemedText from "../../components/ThemedText";
 const { width, height } = Dimensions.get("window");
 
 const features = [
-  { id: 1, image: require("../../assets/Rectangle 157.png"), text: "Shop from variety of unique stores nationwide across several categories" },
-  { id: 2, image: require("../../assets/Rectangle 157 (1).png"), text: "Chat and communicate easily with stores via the in‑app chat" },
-  { id: 3, image: require("../../assets/Rectangle 157 (2).png"), text: "Personalized social feeds to see latest posts from stores across Colala" },
+  {
+    id: 1,
+    image: require("../../assets/Rectangle 157.png"),
+    text: "Shop from variety of unique stores nationwide across several categories",
+  },
+  {
+    id: 2,
+    image: require("../../assets/Rectangle 157 (1).png"),
+    text: "Chat and communicate easily with stores via the in‑app chat",
+  },
+  {
+    id: 3,
+    image: require("../../assets/Rectangle 157 (2).png"),
+    text: "Personalized social feeds to see latest posts from stores across Colala",
+  },
 ];
 
 export default function OnboardingScreen() {
@@ -46,8 +58,12 @@ export default function OnboardingScreen() {
         </ThemedText>
 
         <View style={styles.brandRow}>
-          <ThemedText font="oleo" style={styles.brand}>COLALA</ThemedText>
-          <ThemedText font="oleo" style={styles.mall}>mall</ThemedText>
+          <ThemedText font="oleo" style={styles.brand}>
+            COLALA
+          </ThemedText>
+          <ThemedText font="oleo" style={styles.mall}>
+            mall
+          </ThemedText>
         </View>
 
         <ThemedText style={styles.subtitle}>Why Choose Colala ?</ThemedText>
@@ -58,7 +74,7 @@ export default function OnboardingScreen() {
           contentContainerStyle={{ paddingRight: 8 }}
           style={{ marginBottom: 16 }}
         >
-          {features.map(item => (
+          {features.map((item) => (
             <View key={item.id} style={styles.featureCard}>
               <Image source={item.image} style={styles.featureImage} />
               <ThemedText style={styles.featureText}>{item.text}</ThemedText>
@@ -67,7 +83,7 @@ export default function OnboardingScreen() {
         </ScrollView>
 
         <TouchableOpacity
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => navigation.navigate("Login")}
           activeOpacity={0.9}
           style={styles.proceedBtn}
         >
@@ -89,7 +105,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     width,
-    height: Math.max(280, height * 0.90),
+    height: Math.max(280, height * 0.9),
   },
 
   card: {
@@ -126,15 +142,15 @@ const styles = StyleSheet.create({
   },
 
   brand: {
-    fontSize: 80,
-    marginTop:10,
+    fontSize: 70,
+    marginTop: 10,
     lineHeight: 62,
     color: "#E53E3E",
   },
 
   mall: {
     marginLeft: 8,
-    fontSize: 50,
+    fontSize: 40,
     color: "#E53E3E",
   },
 
@@ -148,7 +164,7 @@ const styles = StyleSheet.create({
   featureCard: {
     width: width * 0.54,
     backgroundColor: "#ffffff",
-    height:243,
+    height: 243,
     borderRadius: 18,
     marginRight: 14,
     overflow: "hidden", // ensure image has no padding/bleed

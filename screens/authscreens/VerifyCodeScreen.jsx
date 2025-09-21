@@ -7,67 +7,147 @@ import {
   StyleSheet,
   Image,
   SafeAreaView,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import ThemedText from '../../components/ThemedText'; // 👈 import ThemedText
+import { useNavigation, useRoute } from '@react-navigation/native';
+import ThemedText from '../../components/ThemedText';
+
+//Code Related to the integration
+import { useMutation } from "@tanstack/react-query";
+import { verifyOtp } from "../../utils/mutations/auth"; 
+
 
 const VerifyCodeScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const [code, setCode] = useState('');
   const [timer, setTimer] = useState(59);
 
+  // Get email from previous screen
+  const email = route.params?.email || '';
+
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimer(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // Verify OTP mutation
+  const verifyOtpMutation = useMutation({
+    mutationFn: verifyOtp,
+    onSuccess: (data) => {
+      if (data.status === "success") {
+        Alert.alert("Success", data.message || "Code verified successfully!");
+        navigation.navigate('NewPass', { email: email, otp: code.trim() });
+      } else {
+        Alert.alert("Error", data.message || "Invalid verification code. Please try again.");
+      }
+    },
+    onError: (error) => {
+      console.error("Verify OTP error:", error);
+      Alert.alert("Error", error.message || "An error occurred. Please try again.");
+    },
+  });
+
+  // Check if form is valid
+  const isFormValid = code.trim().length >= 4; // Assuming OTP is at least 4 digits
+  
+  // Check if request is in progress
+  const isLoading = verifyOtpMutation.isPending;
+
   const handleProceed = () => {
-    navigation.navigate('NewPass')
+    if (!isFormValid) {
+      Alert.alert("Error", "Please enter the verification code");
+      return;
+    }
+
+    if (!email) {
+      Alert.alert("Error", "Email not found. Please start the process again.");
+      navigation.navigate('ForgotPass');
+      return;
+    }
+
+    verifyOtpMutation.mutate({
+      email: email,
+      otp: code.trim(),
+    });
   };
 
   const handlePaste = () => {
-    // You can implement Clipboard.getStringAsync() if using Expo
+    // Implement Clipboard.getStringAsync() if using Expo
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Image source={require('../../assets/forgotmain.png')} style={styles.backgroundImage} />
-
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <Ionicons name="chevron-back" size={26} color="#fff" fontWeight="400" />
-      </TouchableOpacity>
-
-      <View style={styles.card}>
-        <ThemedText style={styles.title}>Reset Password</ThemedText>
-        <ThemedText style={styles.subtitle}>Reset you password via your registered email</ThemedText>
-
-        <View style={styles.inputWrapper}>
-          <TextInput
-            style={styles.inputCode}
-            placeholder="Enter Code"
-            placeholderTextColor="#999"
-            value={code}
-            onChangeText={setCode}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Image
+            source={require('../../assets/forgotmain.png')}
+            style={styles.backgroundImage}
           />
-          <TouchableOpacity onPress={handlePaste} style={styles.pasteButton}>
-            <ThemedText style={styles.pasteText}>Paste</ThemedText>
+
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={26} color="#fff" fontWeight="400" />
           </TouchableOpacity>
-        </View>
 
-        <ThemedText style={styles.timerText}>
-          You can resend code in{" "}
-          <ThemedText style={styles.timerCountdown}>
-            00:{timer < 10 ? `0${timer}` : timer}
-          </ThemedText>
-        </ThemedText>
+          <View style={styles.card}>
+            <ThemedText style={styles.title}>Reset Password</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              Reset you password via your registered email
+            </ThemedText>
 
-        <TouchableOpacity style={styles.button} onPress={handleProceed}>
-          <ThemedText style={styles.buttonText}>Proceed</ThemedText>
-        </TouchableOpacity>
-      </View>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.inputCode}
+                placeholder="Enter Code"
+                placeholderTextColor="#999"
+                value={code}
+                onChangeText={setCode}
+                keyboardType="number-pad"
+                returnKeyType="done"
+                maxLength={6}
+              />
+              <TouchableOpacity onPress={handlePaste} style={styles.pasteButton}>
+                <ThemedText style={styles.pasteText}>Paste</ThemedText>
+              </TouchableOpacity>
+            </View>
+
+            <ThemedText style={styles.timerText}>
+              You can resend code in{' '}
+              <ThemedText style={styles.timerCountdown}>
+                00:{timer < 10 ? `0${timer}` : timer}
+              </ThemedText>
+            </ThemedText>
+
+            <TouchableOpacity 
+              style={[
+                styles.button,
+                (!isFormValid || isLoading) && styles.buttonDisabled
+              ]} 
+              onPress={handleProceed}
+              disabled={!isFormValid || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <ThemedText style={styles.buttonText}>Proceed</ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -77,7 +157,7 @@ export default VerifyCodeScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#B91919',
+    backgroundColor: '#F9F9F9',
   },
   backgroundImage: {
     position: 'absolute',
@@ -137,14 +217,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     backgroundColor: '#fff',
-    borderColor:"#E53E3E",
-    borderWidth:0.7,
+    borderColor: '#E53E3E',
+    borderWidth: 0.7,
     borderRadius: 10,
   },
   pasteText: {
     color: '#E53E3E',
     fontWeight: '400',
-    fontSize:10
+    fontSize: 10,
   },
   timerText: {
     marginTop: 10,
@@ -160,6 +240,10 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingVertical: 18,
     alignItems: 'center',
+  },
+  buttonDisabled: {
+    backgroundColor: '#ccc',
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',

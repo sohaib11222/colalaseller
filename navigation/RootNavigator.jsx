@@ -17,7 +17,6 @@ export default function RootNavigator() {
       <Stack.Screen name="MainNavigator" component={MainNavigator} />
       <Stack.Screen name="ChatNavigator" component={ChatNavigator} />
       <Stack.Screen name="SettingsNavigator" component={SettingsNavigator} />
-      
     </Stack.Navigator>
   );
 }
