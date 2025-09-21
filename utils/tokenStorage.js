@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = '@auth_token';
 const USER_KEY = '@user_data';
+const ONBOARDING_TOKEN_KEY = '@onboarding_token';
+const STORE_ID_KEY = '@store_id';
 
 // Token storage functions
 export const storeToken = async (token) => {
@@ -88,6 +90,95 @@ export const clearAuthData = async () => {
     console.log('Auth data cleared successfully');
   } catch (error) {
     console.error('Error clearing auth data:', error);
+    throw error;
+  }
+};
+
+// Onboarding token storage functions
+export const storeOnboardingToken = async (token) => {
+  try {
+    await AsyncStorage.setItem(ONBOARDING_TOKEN_KEY, token);
+    console.log('Onboarding token stored successfully');
+  } catch (error) {
+    console.error('Error storing onboarding token:', error);
+    throw error;
+  }
+};
+
+export const getOnboardingToken = async () => {
+  try {
+    const token = await AsyncStorage.getItem(ONBOARDING_TOKEN_KEY);
+    return token;
+  } catch (error) {
+    console.error('Error getting onboarding token:', error);
+    return null;
+  }
+};
+
+export const removeOnboardingToken = async () => {
+  try {
+    await AsyncStorage.removeItem(ONBOARDING_TOKEN_KEY);
+    console.log('Onboarding token removed successfully');
+  } catch (error) {
+    console.error('Error removing onboarding token:', error);
+    throw error;
+  }
+};
+
+// Store ID storage functions
+export const storeStoreId = async (storeId) => {
+  try {
+    await AsyncStorage.setItem(STORE_ID_KEY, storeId.toString());
+    console.log('Store ID stored successfully');
+  } catch (error) {
+    console.error('Error storing store ID:', error);
+    throw error;
+  }
+};
+
+export const getStoreId = async () => {
+  try {
+    const storeId = await AsyncStorage.getItem(STORE_ID_KEY);
+    return storeId ? parseInt(storeId) : null;
+  } catch (error) {
+    console.error('Error getting store ID:', error);
+    return null;
+  }
+};
+
+export const removeStoreId = async () => {
+  try {
+    await AsyncStorage.removeItem(STORE_ID_KEY);
+    console.log('Store ID removed successfully');
+  } catch (error) {
+    console.error('Error removing store ID:', error);
+    throw error;
+  }
+};
+
+// Combined onboarding data functions
+export const storeOnboardingData = async (token, storeId) => {
+  try {
+    await Promise.all([
+      storeOnboardingToken(token),
+      storeStoreId(storeId)
+    ]);
+    console.log('Onboarding data stored successfully');
+  } catch (error) {
+    console.error('Error storing onboarding data:', error);
+    throw error;
+  }
+};
+
+export const clearOnboardingData = async () => {
+  try {
+    await Promise.all([
+      removeOnboardingToken(),
+      removeStoreId()
+    ]);
+    console.log('Onboarding data cleared successfully');
+  } catch (error) {
+    console.error('Error clearing onboarding data:', error);
     throw error;
   }
 };

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken } from './tokenStorage';
+import { getToken, getOnboardingToken } from './tokenStorage';
 
 // Custom Error Class for API errors
 class ApiError extends Error {
@@ -72,4 +72,10 @@ const apiCallWithAuth = async (url, method, data) => {
   return apiCall(url, method, data, token);
 };
 
-export { apiCall, apiCallWithAuth, ApiError };
+// Enhanced API call function that automatically includes onboarding token
+const apiCallWithOnboardingAuth = async (url, method, data) => {
+  const token = await getOnboardingToken();
+  return apiCall(url, method, data, token);
+};
+
+export { apiCall, apiCallWithAuth, apiCallWithOnboardingAuth, ApiError };

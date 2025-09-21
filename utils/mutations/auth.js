@@ -1,17 +1,6 @@
 import { apiCall } from "../customApiCall";
 import { API_ENDPOINTS } from "../../apiConfig";
 
-// Start Seller Onboarding
-// payload = {
-//   store_name: "My Store",
-//   store_email: "store1@example.com",
-//   store_phone: "+2348012345678",
-//   store_location: "Lagos, Nigeria",
-//   password: "password123",
-//   referral_code: "REF123"
-// }
-export const startOnboarding = async (payload) =>
-  await apiCall(API_ENDPOINTS.AUTH.StartOnboarding, "POST", payload);
 
 export const forgetPassword = async (payload) =>
   // payload = { email: "hmstech11@gmail.com" }

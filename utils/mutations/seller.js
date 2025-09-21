@@ -1,6 +1,19 @@
 import { apiCall } from "../customApiCall";
 import { API_ENDPOINTS } from "../../apiConfig";
 
+
+// Start Seller Onboarding
+// payload = {
+//   store_name: "My Store",
+//   store_email: "store1@example.com",
+//   store_phone: "+2348012345678",
+//   store_location: "Lagos, Nigeria",
+//   password: "password123",
+//   referral_code: "REF123"
+// }
+export const startOnboarding = async (payload) =>
+  await apiCall(API_ENDPOINTS.AUTH.StartOnboarding, "POST", payload);
+
 // Level 1 - Profile & Media
 // payload = FormData with keys: profile_image(file), banner_image(file)
 export const uploadProfileMedia = async (payload, token) =>
@@ -9,6 +22,7 @@ export const uploadProfileMedia = async (payload, token) =>
 // Level 1 - Categories & Social
 // payload = { categories: [1, 2], social_links: [{ type: "facebook", url: "https://fb.com/store" }] }
 export const setCategoriesSocial = async (payload, token) =>
+
   await apiCall(API_ENDPOINTS.SELLER.CategoriesSocial, "POST", payload, token);
 
 // Level 2 - Business Details
