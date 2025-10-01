@@ -93,7 +93,7 @@ function CreatePostModal({ visible, onClose, onPost }) {
     setImages((prev) => prev.filter((u) => u !== uri));
   };
 
-  
+
 
   const submit = () => {
     onPost?.({
@@ -213,12 +213,25 @@ function FeedHeader({ C }) {
       <View style={styles.headerTopRow}>
         <ThemedText font="oleo" style={styles.headerTitle}>Social Feed</ThemedText>
         <View style={styles.headerIcons}>
-          <TouchableOpacity>
-            <Ionicons name="cart-outline" size={22} color={C.primary} style={styles.icon} />
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Ionicons name="notifications-outline" size={22} color={C.primary} style={styles.icon} />
-          </TouchableOpacity>
+
+          <View style={styles.iconRow}>
+
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("ChatNavigator", {
+                  screen: "Notification",
+                })
+              }
+              style={[styles.iconButton, styles.iconPill]}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+            >
+              <Image
+                source={require("../../assets/bell-icon.png")}
+                style={styles.iconImg}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -638,10 +651,10 @@ export default function FeedScreen() {
                 style={[
                   styles.tabBtn,
                   { backgroundColor: "#fff", borderWidth: 1, borderColor: "#EEE" },
-                  tab === "all" && { borderColor: C.primary, backgroundColor: C.primary   },
+                  tab === "all" && { borderColor: C.primary, backgroundColor: C.primary },
                 ]}
               >
-                <ThemedText style={[styles.tabTxt, { color: tab === "all" ?  "#fff"  : "#6C727A",   }]}>
+                <ThemedText style={[styles.tabTxt, { color: tab === "all" ? "#fff" : "#6C727A", }]}>
                   All Posts
                 </ThemedText>
               </TouchableOpacity>
@@ -784,4 +797,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
+   iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });

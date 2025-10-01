@@ -76,7 +76,7 @@ export default function ChatListScreen({ navigation }) {
           <View style={[styles.badge, { backgroundColor: C.primary }]}>
             <ThemedText style={styles.badgeText}>{item.unread}</ThemedText>
           </View>
-        ) : <View style={{ height: 18 }} /> }
+        ) : <View style={{ height: 18 }} />}
       </View>
     </TouchableOpacity>
   );
@@ -89,12 +89,24 @@ export default function ChatListScreen({ navigation }) {
         <View style={styles.headerRow}>
           <ThemedText font="oleo" style={styles.headerTitle}>Chats</ThemedText>
           <View style={styles.headerIcons}>
-            <TouchableOpacity style={styles.headerBtn}>
-              <Ionicons name="cart-outline" size={18} color={C.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn}>
-              <Ionicons name="notifications-outline" size={18} color={C.primary} />
-            </TouchableOpacity>
+            <View style={styles.iconRow}>
+
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate("ChatNavigator", {
+                    screen: "Notification",
+                  })
+                }
+                style={[styles.iconButton, styles.iconPill]}
+                accessibilityRole="button"
+                accessibilityLabel="Open notifications"
+              >
+                <Image
+                  source={require("../../../assets/bell-icon.png")}
+                  style={styles.iconImg}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -185,4 +197,16 @@ const styles = StyleSheet.create({
   ddOverlay: { position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.01)" },
   ddCard: { position: "absolute", top: Platform.OS === "ios" ? 120 : 130, right: 16, backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", borderWidth: 1, width: 160, elevation: 3 },
   ddItem: { height: 44, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
+   iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });

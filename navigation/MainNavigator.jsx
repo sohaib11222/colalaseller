@@ -24,7 +24,7 @@ const TAB_ICONS = {
   Feed: require("../assets/video-play.png"),
   Chat: require("../assets/message-text.png"),
   Home: require("../assets/home.png"),
-  Stores: require("../assets/shopping-cart.png"),
+  Orders: require("../assets/shopping-cart.png"),
   Settings: require("../assets/setting.png"),
 };
 
@@ -139,7 +139,7 @@ export default function MainNavigator() {
       <Tab.Screen name="Feed" component={FeedScreen} />
       <Tab.Screen name="Chat" component={ChatScreen} />
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Stores" component={StoreScreen} />
+      <Tab.Screen name="Orders" component={StoreScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

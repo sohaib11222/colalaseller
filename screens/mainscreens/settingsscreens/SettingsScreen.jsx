@@ -48,7 +48,7 @@ const SettingsScreen = () => {
       label: 'Subscriptions',
       img: require('../../../assets/Vector (12).png'),
       leftColor: '#62E53E',
-       badgeImg: IMG_SUB_ACTIVE,
+      badgeImg: IMG_SUB_ACTIVE,
     },
     { key: 'promoted', label: 'Promoted Products', img: require('../../../assets/ChartLineUp.png'), leftColor: '#26A19F' },
     { key: 'coupons', label: 'Manage Coupons/ Points', img: require('../../../assets/Vector (4).png'), leftColor: '#E5683E' },
@@ -84,7 +84,7 @@ const SettingsScreen = () => {
       savedCards: ['ChatNavigator', { screen: 'SavedCards' }],
       accessControl: ['ChatNavigator', { screen: 'AccessControl' }],
 
-  
+
       wallet: ['ChatNavigator', { screen: 'ShoppingWallet' }],
       holdingWallet: ['ChatNavigator', { screen: 'EscrowWallet' }],
       editProfile: ['SettingsNavigator', { screen: 'EditProfile' }],
@@ -104,23 +104,23 @@ const SettingsScreen = () => {
           <ThemedText font="oleo" style={[styles.headerTitle, { color: C.white }]}>
             Settings
           </ThemedText>
-          <View style={styles.headerIcons}>
-            <HeaderIconCircle>
-              <Ionicons name="cart-outline" size={18} color={C.primary} />
-              {cartCount > 0 && (
-                <View style={[styles.headerBadge, { backgroundColor: C.primary, borderColor: C.white }]}>
-                  <ThemedText style={styles.headerBadgeText}>{cartCount}</ThemedText>
-                </View>
-              )}
-            </HeaderIconCircle>
-            <HeaderIconCircle>
-              <Ionicons name="notifications-outline" size={18} color={C.primary} />
-              {notifCount > 0 && (
-                <View style={[styles.headerBadge, { backgroundColor: C.primary, borderColor: C.white }]}>
-                  <ThemedText style={styles.headerBadgeText}>{notifCount}</ThemedText>
-                </View>
-              )}
-            </HeaderIconCircle>
+          <View style={styles.iconRow}>
+
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("ChatNavigator", {
+                  screen: "Notification",
+                })
+              }
+              style={[styles.iconButton, styles.iconPill]}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+            >
+              <Image
+                source={require("../../../assets/bell-icon.png")}
+                style={styles.iconImg}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -172,7 +172,7 @@ const SettingsScreen = () => {
               label={item.label}
               img={item.img}
               leftColor={item.leftColor}
-              badgeImg={item.badgeImg}    
+              badgeImg={item.badgeImg}
               onPress={() => onPressRow(item.key)}
               badgeText={item.badgeText}
               badgeColor={item.badgeColor || C.success}
@@ -201,13 +201,13 @@ const SettingsScreen = () => {
           label="Logout"
           img={require('../../../assets/Vector (6).png')}
           leftColor="#fff"
-          onPress={() => {}}
+          onPress={() => { }}
           textColor={C.danger}
           C={C}
         />
 
         {/* Delete Account */}
-        <TouchableOpacity style={[styles.disabledBtn, { borderColor: C.border, backgroundColor: C.light }]} onPress={() => {}}>
+        <TouchableOpacity style={[styles.disabledBtn, { borderColor: C.border, backgroundColor: C.light }]} onPress={() => { }}>
           <ThemedText style={styles.disabledText}>Delete Account</ThemedText>
         </TouchableOpacity>
       </ScrollView>
@@ -246,7 +246,7 @@ const OptionPillCard = ({
 
         {/* 👇 image tag takes precedence */}
         {badgeImg ? (
-          <Image source={badgeImg} style={{ height: 22, aspectRatio: 3.7, marginRight: 8, width:undefined }} />
+          <Image source={badgeImg} style={{ height: 22, aspectRatio: 3.7, marginRight: 8, width: undefined }} />
         ) : badgeText ? (
           <View style={[styles.badgePill, { backgroundColor: badgeColor + '22', borderColor: badgeColor }]}>
             <ThemedText style={[styles.badgePillText, { color: badgeColor }]}>{badgeText}</ThemedText>
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 8 : 2,
     paddingBottom: 6,
   },
-  headerTitle: { flex: 1, fontSize: 24, fontWeight: '400' },
+  headerTitle: { flex: 1, fontSize: 22, fontWeight: '400' },
   headerIcons: { flexDirection: 'row', gap: 12 },
   headerIconCircle: {
     width: 36,
@@ -308,12 +308,12 @@ const styles = StyleSheet.create({
 
   /* Profile */
   profileRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 12 },
-  profileImg: { width: 48, height: 48, borderRadius: 24, marginRight: 12, borderWidth: 2 },
+  profileImg: { width: 61, height: 61, borderRadius: 35, marginRight: 12, borderWidth: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
-  name: { fontSize: 16.5, fontWeight: '800' },
+  name: { fontSize: 14.5, fontWeight: '800' },
   verifyPill: { marginLeft: 8, backgroundColor: '#FACC15', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  locationText: { fontSize: 12, marginRight: 4, opacity: 0.95 },
+  locationText: { fontSize: 10, marginRight: 4, opacity: 0.95 },
 
   /* Wallet card + holding bar */
   walletCard: {
@@ -325,8 +325,8 @@ const styles = StyleSheet.create({
   },
   walletLabel: { fontSize: 12, marginBottom: 4, opacity: 0.9, paddingBottom: 15 },
   walletAmount: { fontSize: 26, fontWeight: '900', letterSpacing: 0.2, paddingBottom: 25 },
-  viewWalletBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, marginTop: 45 },
-  viewWalletText: { fontSize: 12, color: '#fff', fontWeight: '700' },
+  viewWalletBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginTop: 45 },
+  viewWalletText: { fontSize: 10, color: '#fff', fontWeight: '700' },
   holdingBar: {
     opacity: 0.95,
     borderBottomRightRadius: 20,
@@ -336,13 +336,13 @@ const styles = StyleSheet.create({
     marginTop: -10,
     zIndex: 1,
   },
-  holdingText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' },
+  holdingText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 
   /* Primary button */
   primaryBtn: {
     marginHorizontal: 16,
     marginTop: 14,
-    paddingVertical: 14,
+    paddingVertical: 17,
     borderRadius: 15,
     alignItems: 'center',
   },
@@ -358,8 +358,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    // shadowOffset: { width: 0, height: 2 },
+    // elevation: 2,
   },
   pillLeft: {
     position: 'absolute',
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     zIndex: 1,
   },
-  pillLabel: { flex: 1, fontSize: 16, fontWeight: '500' },
+  pillLabel: { flex: 1, fontSize: 14, fontWeight: '500' },
 
   badgePill: {
     borderRadius: 999,
@@ -417,6 +417,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   disabledText: { color: '#A1A8B0', fontWeight: '700' },
+   iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });
 
 export default SettingsScreen;

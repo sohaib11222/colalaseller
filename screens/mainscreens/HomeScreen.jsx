@@ -93,11 +93,24 @@ export default function StoreHomeScreen() {
               </View>
             </View>
           </View>
-          <TouchableOpacity onPress={()=>navigation.navigate('ChatNavigator',{
-            screen: "Notification",
-          })} style={styles.bellBtn}>
-            <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
-          </TouchableOpacity>
+          <View style={styles.iconRow}>
+
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("ChatNavigator", {
+                  screen: "Notification",
+                })
+              }
+              style={[styles.iconButton, styles.iconPill]}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+            >
+              <Image
+                source={require("../../assets/bell-icon.png")}
+                style={styles.iconImg}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* main card that floats over header */}
@@ -114,9 +127,9 @@ export default function StoreHomeScreen() {
               <ThemedText style={styles.viewProfileText}>View Profile</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
-            onPress={()=>navigation.navigate('ChatNavigator',{
-              screen: "StoreBuilder",
-            })}
+              onPress={() => navigation.navigate('ChatNavigator', {
+                screen: "StoreBuilder",
+              })}
               style={[styles.storeBuilderBtn, { backgroundColor: theme.colors.primary }]}
             >
               <ThemedText style={styles.storeBuilderText}>Store Builder</ThemedText>
@@ -157,12 +170,12 @@ export default function StoreHomeScreen() {
 
           {/* action buttons */}
           <View style={styles.actionsRow}>
-            <TouchableOpacity onPress={()=>navigation.navigate('ChatNavigator', {
+            <TouchableOpacity onPress={() => navigation.navigate('ChatNavigator', {
               screen: "AddProduct",
             })} style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}>
               <ThemedText style={styles.actionBtnText}>Add Product</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity  onPress={()=>navigation.navigate('ChatNavigator', {
+            <TouchableOpacity onPress={() => navigation.navigate('ChatNavigator', {
               screen: "AddService",
             })} style={[styles.actionBtn, { backgroundColor: "#000" }]}>
               <ThemedText style={styles.actionBtnText}>Add Service</ThemedText>
@@ -361,4 +374,10 @@ const styles = StyleSheet.create({
   orderName: { fontWeight: "700", color: "#1A1A1A" },
   orderItems: { color: "#8B8B8B", fontSize: 12 },
   orderPrice: { fontWeight: "800" },
+   iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });

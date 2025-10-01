@@ -74,8 +74,8 @@ export default function UpgradeStoreScreen({ navigation }) {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <ThemedText style={{ fontWeight: "800", color: C.text, fontSize: 15 }}>{`Level ${lv.level}`}</ThemedText>
                   {lv.current ? (
-                    <View style={[styles.badge, { backgroundColor: C.primary + "22", borderColor: C.primary }]}>
-                      <ThemedText style={{ color: C.primary, fontWeight: "800", fontSize: 11 }}>Current Level</ThemedText>
+                    <View style={[styles.badge, { backgroundColor: "#E53E3E", borderColor: C.primary }]}>
+                      <ThemedText style={{ color: "#fff", fontWeight: "800", fontSize: 10 }}>Current Level</ThemedText>
                     </View>
                   ) : null}
                 </View>
@@ -86,7 +86,7 @@ export default function UpgradeStoreScreen({ navigation }) {
                     <ThemedText style={{ color: C.primary, fontWeight: "800", marginTop: 2 }}>{lv.completion}%</ThemedText>
                   </View>
                   <View style={[styles.percentBubble, { borderColor: C.primary }]}>
-                    <ThemedText style={{ color: C.primary, fontWeight: "800", fontSize: 12 }}>{lv.completion}%</ThemedText>
+                    <ThemedText style={{ color: C.primary, fontWeight: "800", fontSize: 6 }}>{lv.completion}%</ThemedText>
                   </View>
                 </View>
 
@@ -793,11 +793,11 @@ const styles = StyleSheet.create({
   stepDot: { width: DOT, height: DOT, borderRadius: DOT / 2, borderWidth: 2, alignItems: "center", justifyContent: "center" },
 
   card: {
-    flex: 1, borderRadius: 16, borderWidth: 1, padding: 14,
+    flex: 1, borderRadius: 16, borderWidth: 1, padding: 14, width:330,
     shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 2,
   },
-  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
-  percentBubble: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  badge: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, marginTop:-18, marginRight:-14, },
+  percentBubble: { width: 25, height: 25, borderRadius: 23, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   cta: { height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", marginTop: 16 },
 
   levelBox: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 },
