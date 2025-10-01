@@ -80,7 +80,7 @@ const SettingsScreen = () => {
       support: ['ChatNavigator', { screen: 'Support' }],
       faqs: ['ChatNavigator', { screen: 'FAQs' }],
 
-      sellerLeaderboard: ['SettingsNavigator', { screen: 'SellerLeaderboard' }],
+      sellerLeaderboard: ['ChatNavigator', { screen: 'SellerLeaderBoard' }],
       savedCards: ['ChatNavigator', { screen: 'SavedCards' }],
       accessControl: ['ChatNavigator', { screen: 'AccessControl' }],
 
