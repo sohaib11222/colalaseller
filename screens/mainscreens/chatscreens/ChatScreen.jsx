@@ -122,7 +122,7 @@ export default function ChatListScreen({ navigation }) {
               returnKeyType="search"
             />
             <TouchableOpacity style={styles.camBtn}>
-              <MaterialCommunityIcons name="camera-outline" size={20} color={C.text} />
+              {/* <MaterialCommunityIcons name="camera-outline" size={20} color={C.text} /> */}
             </TouchableOpacity>
           </View>
 
@@ -175,24 +175,33 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "400" },
+  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "400" },
   headerIcons: { flexDirection: "row", gap: 10 },
   headerBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 
   searchRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  searchBox: { flex: 1, borderRadius: 15, paddingHorizontal: 10, height: 50, flexDirection: "row", alignItems: "center" },
+  searchBox: { flex: 1, borderRadius: 15, paddingHorizontal: 10, height: 60, flexDirection: "row", alignItems: "center" },
   searchInput: { flex: 1, fontSize: 14 },
   camBtn: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 
   dropBtn: { height: 50, minWidth: 120, paddingHorizontal: 12, borderRadius: 15, borderWidth: 1, backgroundColor: "#fff", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 
   card: { flexDirection: "row", alignItems: "center", marginHorizontal: 12, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 15, elevation: 0.3 },
-  avatar: { width: 46, height: 46, borderRadius: 23, marginRight: 12 },
-  name: { fontSize: 14, fontWeight: "700" },
-  preview: { fontSize: 12, marginTop: 2 },
+ avatar: { width: 53, height: 53, borderRadius: 35, marginRight: 12 },
+  name: { fontSize: 14, fontWeight: "700", color: "#000" },
+  preview: { fontSize: 11, color: "#6C727A", marginTop: 10 },
   rightCol: { alignItems: "flex-end", gap: 6 },
-  badge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  badgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  time: { fontSize: 9, color: "#9BA0A6" },
+ badge: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 15,
+    backgroundColor: "#EF534E",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: { color: "#fff", fontSize: 8, fontWeight: "700" },
 
   ddOverlay: { position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.01)" },
   ddCard: { position: "absolute", top: Platform.OS === "ios" ? 120 : 130, right: 16, backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", borderWidth: 1, width: 160, elevation: 3 },

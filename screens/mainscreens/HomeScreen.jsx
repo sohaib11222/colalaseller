@@ -69,6 +69,7 @@ export default function StoreHomeScreen() {
     email: "sashastores@gmail.com",
     phone: "070123456789",
     categories: ["Electronics", "Phones"],
+    categorytext: "Category",
     stats: { qty: 100, followers: 500, rating: 4.7 },
   };
 
@@ -78,7 +79,7 @@ export default function StoreHomeScreen() {
   }, [theme?.colors?.primary]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F6F6" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F6F6",  marginBottom:60 }}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
         {/* header bar */}
@@ -89,7 +90,7 @@ export default function StoreHomeScreen() {
               <ThemedText style={styles.headerName}>{store.name}</ThemedText>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                 <ThemedText style={styles.headerLocation}>{store.location}</ThemedText>
-                <Ionicons name="chevron-down" size={14} color="#FFEFEF" />
+                <Ionicons name="caret-down" size={14} color="#FFEFEF" />
               </View>
             </View>
           </View>
@@ -139,8 +140,10 @@ export default function StoreHomeScreen() {
           {/* name + verified */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <ThemedText style={styles.title}>{store.name}</ThemedText>
-            <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
-          </View>
+            <Image
+              source={require('../../assets/SealCheck.png')}
+              style={styles.iconImg}
+            />          </View>
 
           {/* contact rows */}
           <InfoRow icon="mail-outline" text={store.email} />
@@ -148,14 +151,15 @@ export default function StoreHomeScreen() {
           <InfoRow icon="location-outline" text={store.location} />
 
           {/* chips */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-            <View style={[styles.chip, { backgroundColor: theme.colors.primary100 }]}>
-              <ThemedText style={[styles.chipText, { color: theme.colors.primary }]}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: -3 }}>
+            <InfoRow icon="call-outline" text={store.categorytext} />
+            <View style={[styles.chip, { backgroundColor: "#0000FF33", borderWidth: 0.5, borderColor: "#0000FF" }]}>
+              <ThemedText style={[styles.chipText, { color: "#0000FF" }]}>
                 Electronics
               </ThemedText>
             </View>
-            <View style={[styles.chip, { backgroundColor: theme.colors.primary100 }]}>
-              <ThemedText style={[styles.chipText, { color: theme.colors.primary }]}>
+            <View style={[styles.chip, { backgroundColor: "#FF000033", borderWidth: 0.5, borderColor: "#FF0000" }]}>
+              <ThemedText style={[styles.chipText, { color: "#FF0000" }]}>
                 Phones
               </ThemedText>
             </View>
@@ -163,7 +167,7 @@ export default function StoreHomeScreen() {
 
           {/* stats row (icon + text inline) */}
           <View style={styles.statsCard}>
-            <Stat img={ASSETS.stats_qty} label="Qty Sold" value={store.stats.qty} divider />
+            <Stat img={ASSETS.stats_qty} value={store.stats.qty} label="Qty Sold" divider />
             <Stat img={ASSETS.stats_followers} label="Followers" value={store.stats.followers} divider />
             <Stat img={ASSETS.stats_rating} label="Ratings" value={store.stats.rating} />
           </View>
@@ -189,27 +193,27 @@ export default function StoreHomeScreen() {
         {/* 4 tiles */}
         <View style={styles.grid}>
           <MenuTile
-            icon="bag-handle-outline"
+            img={require("../../assets/Vector (26).png")}
             title="My Orders"
             subtitle={"Manage your orders effectively\nview and monitor every\naspect of your customer orders"}
             color={theme.colors.primary}
           />
           <MenuTile
-            icon="pricetag-outline"
+            img={require("../../assets/Vector (27).png")}
             title="My Products/Service"
-            subtitle={"This is home for all your Products\nmanage everything here"}
+            subtitle={"This is home for all your Products manage everything here"}
             color={theme.colors.primary}
           />
           <MenuTile
-            icon="stats-chart-outline"
+            img={require("../../assets/Vector (28).png")}
             title="Statistics"
-            subtitle={"View detailed statistics for all your\nproducts."}
+            subtitle={"View detailed statistics for all your products."}
             color={theme.colors.primary}
           />
           <MenuTile
-            icon="card-outline"
+            img={require("../../assets/Vector (29).png")}
             title="Subscription"
-            subtitle={"Manage your subscription package\nhere effectively"}
+            subtitle={"Manage your subscription package here effectively"}
             color={theme.colors.primary}
           />
         </View>
@@ -245,20 +249,19 @@ function Stat({ img, label, value, divider }) {
       <View style={styles.statCell}>
         <Image source={img} style={styles.statImg} />
         <View style={{ justifyContent: "center" }}>
-          <ThemedText style={styles.statValue}>{value}</ThemedText>
           <ThemedText style={styles.statLabel}>{label}</ThemedText>
+          <ThemedText style={styles.statValue}>{value}</ThemedText>
         </View>
       </View>
       {divider && <View style={styles.statDivider} />}
     </>
   );
 }
-function MenuTile({ icon, title, subtitle, color }) {
+function MenuTile({ img, title, subtitle, color }) {
   return (
     <View style={styles.tile}>
       <View style={[styles.tileIconCircle, { backgroundColor: "#FFF1F1" }]}>
-        <Ionicons name={icon} size={20} color={color} />
-      </View>
+        <Image source={img} style={styles.tileImg} />      </View>
       <ThemedText style={[styles.tileTitle, { color }]}>{title}</ThemedText>
       <ThemedText style={styles.tileSub}>{subtitle}</ThemedText>
     </View>
@@ -269,7 +272,7 @@ function OrderRow({ name, items, price, color }) {
     <View style={styles.orderRow}>
       <View style={styles.orderLeft}>
         <View style={styles.orderAvatar}>
-          <Ionicons name="cart-outline" size={18} color={color} />
+          <Ionicons name="cart-outline" size={27} color={color} />
         </View>
         <View>
           <ThemedText style={styles.orderName}>{name}</ThemedText>
@@ -295,9 +298,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerAvatar: { width: 45, height: 45, borderRadius: 30, backgroundColor: "#fff" },
-  headerName: { color: "#fff", fontWeight: "700" },
-  headerLocation: { color: "#FFEFEF", fontSize: 12 },
+  headerAvatar: { width: 60, height: 60, borderRadius: 35, backgroundColor: "#fff" },
+  headerName: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  headerLocation: { color: "#FFEFEF", fontSize: 10 },
   bellBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 
   card: { marginHorizontal: 16, marginTop: -12, borderRadius: CARD_RADIUS, paddingTop: 8 },
@@ -311,25 +314,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   coverImg: { width: "100%", height: "100%", borderTopRightRadius: CARD_RADIUS, borderTopLeftRadius: CARD_RADIUS },
-  ownerAvatar: { position: "absolute", left: 16, bottom: -26, width: 56, height: 56, borderRadius: 28, backgroundColor: "#fff", zIndex: 10 },
+  ownerAvatar: { position: "absolute", left: 16, bottom: -26, width: 65, height: 65, borderRadius: 40, backgroundColor: "#fff", zIndex: 10 },
 
   topActions: { flexDirection: "row", gap: 10, alignSelf: "flex-end" },
-  viewProfileBtn: { backgroundColor: "#000", paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10 },
-  viewProfileText: { color: "#fff", fontWeight: "700", fontSize: 12 },
-  storeBuilderBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10 },
-  storeBuilderText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  viewProfileBtn: { backgroundColor: "#000", paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10 },
+  viewProfileText: { color: "#fff", fontWeight: "700", fontSize: 10 },
+  storeBuilderBtn: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10 },
+  storeBuilderText: { color: "#fff", fontWeight: "700", fontSize: 10 },
 
-  title: { fontSize: 18, fontWeight: "800", color: "#1A1A1A" },
+  title: { fontSize: 16, fontWeight: "800", color: "#1A1A1A" },
 
   infoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
-  infoText: { color: "#5C5C5C", fontSize: 13 },
+  infoText: { color: "#5C5C5C", fontSize: 12 },
 
-  chip: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 14 },
-  chipText: { fontWeight: "700", fontSize: 12 },
+  chip: { paddingVertical: 2, paddingHorizontal: 5, borderRadius: 5, justifyContent: "center", alignItems: "center", marginTop: 10 },
+  chipText: { fontWeight: "700", fontSize: 10 },
 
   statsCard: {
     marginTop: 14,
-    borderRadius: 16,
+    borderRadius: 20,
+    elevation: 1.5,
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#EDEDED",
@@ -338,15 +342,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
   },
+  tileImg: {
+    width: 21.75,
+    height: 19.5,
+    resizeMode: "contain",
+  },
+
   statCell: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 4 },
   statImg: { width: 22, height: 22, resizeMode: "contain" },
   statDivider: { width: 1, backgroundColor: "#EFEFEF" },
-  statValue: { fontWeight: "800", fontSize: 16, color: "#1A1A1A", lineHeight: 20, textAlign: "left" },
-  statLabel: { color: "#777", fontSize: 12, marginTop: 2, textAlign: "left" },
+  statValue: { fontWeight: "800", fontSize: 14, color: "#1A1A1A", lineHeight: 20, textAlign: "left" },
+  statLabel: { color: "#777", fontSize: 7, marginTop: 2, textAlign: "left" },
 
   actionsRow: { flexDirection: "row", gap: 12, marginTop: 14 },
   actionBtn: { flex: 1, paddingVertical: 15, borderRadius: 15, alignItems: "center" },
-  actionBtnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+  actionBtnText: { color: "#fff", fontWeight: "600", fontSize: 12 },
 
   promoFull: { width: width - 32, height: 170, borderRadius: 20, overflow: "hidden", alignSelf: "center", marginTop: 16 },
 
@@ -354,27 +364,27 @@ const styles = StyleSheet.create({
   tile: {
     width: (width - 16 * 2 - 12) / 2,
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 14,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
+    // shadowOpacity: 0.05,
     height: 190,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    // shadowRadius: 5,
+    // shadowOffset: { width: 0, height: 2 },
+    // elevation: 1,
   },
   tileIconCircle: { width: 53, height: 53, borderRadius: 35, alignItems: "center", justifyContent: "center", marginBottom: 12 },
   tileTitle: { fontSize: 14, fontWeight: "800" },
-  tileSub: { fontSize: 12, color: "#7D7D7D", marginTop: 4 },
+  tileSub: { fontSize: 10, color: "#7D7D7D", marginTop: 4 },
 
   sectionHeader: { marginHorizontal: 16, marginTop: 16, fontWeight: "800", fontSize: 16, color: "#1A1A1A" },
-  orderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", marginHorizontal: 16, marginTop: 10, padding: 14, borderRadius: 14 },
+  orderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", marginHorizontal: 16, marginTop: 10, padding: 14, borderRadius: 15 },
   orderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  orderAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#FFF1F1", alignItems: "center", justifyContent: "center" },
-  orderName: { fontWeight: "700", color: "#1A1A1A" },
-  orderItems: { color: "#8B8B8B", fontSize: 12 },
-  orderPrice: { fontWeight: "800" },
-   iconRow: { flexDirection: "row" },
+  orderAvatar: { width: 51, height: 51, borderRadius: 30, backgroundColor: "#B9191933", alignItems: "center", justifyContent: "center" },
+  orderName: { fontWeight: "700", color: "#1A1A1A", fontSize:14 },
+  orderItems: { color: "#8B8B8B", fontSize: 10 },
+  orderPrice: { fontWeight: "800", fontSize: 14 },
+  iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
 

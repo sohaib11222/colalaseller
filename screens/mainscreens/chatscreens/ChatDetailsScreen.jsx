@@ -167,8 +167,10 @@ export default function ChatDetailsScreen() {
           </View>
 
           <TouchableOpacity style={styles.hIcon} onPress={() => { /* navigate to cart screen if available */ }}>
-            <Ionicons name="cart-outline" size={18} color={C.text} />
-          </TouchableOpacity>
+  <Image
+                source={require("../../../assets/cart-black.png")}
+                style={styles.iconImg}
+              />          </TouchableOpacity>
         </View>
 
         {/* Messages */}

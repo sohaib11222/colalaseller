@@ -63,8 +63,8 @@ const OrdersScreen = ({ navigation }) => {
         navigation?.navigate?.("ChatNavigator", { screen: "SingleOrderDetails", params: { orderId: item.id } })
       }
     >
-      <View style={[styles.leftIcon, { backgroundColor: "#FDECEC" }]}>
-        <Ionicons name="cart-outline" size={22} color={C.primary} />
+      <View style={[styles.leftIcon, { backgroundColor: "#B9191933" }]}>
+        <Ionicons name="cart-outline" size={25} color={C.primary} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
 
   searchBox: {
-    height: 50,
+    height: 60,
     borderRadius: 14,
     paddingHorizontal: 12,
     flexDirection: "row",
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabTxt: { fontWeight: "700", fontSize: 11 },
+  tabTxt: { fontWeight: "700", fontSize: 10 },
 
   row: {
     flexDirection: "row",
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   cust: { fontSize: 14, fontWeight: "700" },
-  items: { fontSize: 12, marginTop: 2 },
+  items: { fontSize: 10, marginTop: 2 },
    iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
