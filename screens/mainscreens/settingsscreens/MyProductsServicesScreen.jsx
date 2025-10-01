@@ -723,8 +723,21 @@ export default function MyProductsServicesScreen({ navigation }) {
           >
             My Products/Services
           </ThemedText>
-          <View style={styles.hIcon} />
-        </View>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Notification",
+              })
+            }
+            style={[styles.iconButton, styles.iconPill]}
+            accessibilityRole="button"
+            accessibilityLabel="Open notifications"
+          >
+            <Image
+              source={require("../../../assets/bell-icon.png")}
+              style={styles.iconImg}
+            />
+          </TouchableOpacity>      </View>
 
         <View style={styles.headerInputs}>
           <View style={[styles.searchBox, { backgroundColor: "#fff", minWidth: 150 }]}>
@@ -831,35 +844,46 @@ export default function MyProductsServicesScreen({ navigation }) {
       </ScrollView>
 
       {/* grid */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(it) => it.id}
-        renderItem={({ item }) => (
-          <ItemCard
-            item={item}
-            C={C}
-            onPress={() => {
-              if (item.type === "product") {
-                navigation.navigate("ChatNavigator", {
-                  screen: "ProductDetails",
-                  params: { item },
-                });
-              } else {
-                navigation.navigate("ChatNavigator", {
-                  screen: "ServiceDetails",
-                  params: { item },
-                });
-              }
-            }}
-          />
-        )}
+      <View style={{ flex: 1, backgroundColor: "#F6F6F6" }}>
+        {/* Tabs / Filters Row */}
+        <View style={{ paddingHorizontal: 16, marginTop: -270 }}>
+          {/* Your filter buttons here */}
+        </View>
 
-        numColumns={2}
-        columnWrapperStyle={{ paddingHorizontal: 14, gap: 12 }}
-        contentContainerStyle={{ paddingBottom: 28, paddingTop: 4, gap: 12 }}
-        showsVerticalScrollIndicator={false}
-        style={{ flex: 1, marginTop:200 }}
-      />
+        {/* Products / Services Grid */}
+        <FlatList
+          data={filtered}
+          keyExtractor={(it) => it.id}
+          renderItem={({ item }) => (
+            <ItemCard
+              item={item}
+              C={C}
+              onPress={() => {
+                if (item.type === "product") {
+                  navigation.navigate("ChatNavigator", {
+                    screen: "ProductDetails",
+                    params: { item },
+                  });
+                } else {
+                  navigation.navigate("ChatNavigator", {
+                    screen: "ServiceDetails",
+                    params: { item },
+                  });
+                }
+              }}
+            />
+          )}
+          numColumns={2}
+          columnWrapperStyle={{ paddingHorizontal: 14, gap: 12 }}
+          contentContainerStyle={{
+            paddingBottom: 28,
+            paddingTop: 8,   // 👈 only small spacing
+            gap: 12,
+          }}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+
 
       {/* Category sheet */}
       <CategorySheet
@@ -886,7 +910,7 @@ function ItemCard({ item, C, onPress }) {
   // SERVICE CARD (matches mock)
   if (isService) {
     return (
-      <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, flex:1 }]}>
+      <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, flex: 1 }]}>
         <View style={styles.cardImgWrap}>
           <Image source={toSrc(item.image)} style={styles.cardImg} />
         </View>
@@ -1136,7 +1160,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    // marginBottom: -20,
+    // marginBottom: -,
   },
 
   /* card */
@@ -1154,6 +1178,8 @@ const styles = StyleSheet.create({
   },
   cardImgWrap: { width: "100%", height: 140, backgroundColor: "#000" },
   cardImg: { width: "100%", height: 140 },
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
+
   sponsoredPill: {
     position: "absolute",
     top: 10,
@@ -1213,6 +1239,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
   searchBar: {
     height: 46,
     borderRadius: 12,
