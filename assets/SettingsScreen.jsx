@@ -134,7 +134,7 @@ const SettingsScreen = () => {
         <View style={styles.walletCard}>
           <View style={{ flex: 1 }}>
             <ThemedText style={styles.walletLabel}>Main Wallet</ThemedText>
-            <ThemedText style={styles.walletAmount}>₦50,000</ThemedText>
+            <ThemedText style={styles.walletAmount}>₦50,00sss0</ThemedText>
           </View>
           <TouchableOpacity style={styles.viewWalletBtn} onPress={() => navigation.navigate('SettingsNavigator', {
             screen: "ShoppingWallet",
