@@ -1,5 +1,902 @@
+// // screens/FeedScreen.js
+// import React, { useMemo, useRef, useState } from "react";
+// import {
+//   View,
+//   StyleSheet,
+//   Image,
+//   FlatList,
+//   TouchableOpacity,
+//   TextInput,
+//   KeyboardAvoidingView,
+//   Platform,
+//   ScrollView,
+//   Modal,
+//   StatusBar,
+// } from "react-native";
+// import { Ionicons } from "@expo/vector-icons";
+// import ThemedText from "../../components/ThemedText";
+// import { useTheme } from "../../components/ThemeProvider";
+
+// /* -------------------- MOCK DATA -------------------- */
+// const ALL_POSTS = [
+//   {
+//     id: "1",
+//     store: "Sasha Stores",
+//     avatar:
+//       "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+//     location: "Lagos, Nigeria",
+//     timeAgo: "20 min ago",
+//     images: [
+//       "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200&auto=format&fit=crop",
+//       "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop",
+//       "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1200&auto=format&fit=crop",
+//     ],
+//     caption: "Get this phone at a cheap price for a limited period",
+//     likes: 500,
+//     comments: 26,
+//     shares: 26,
+//   },
+//   {
+//     id: "2",
+//     store: "Vee Stores",
+//     avatar:
+//       "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
+//     location: "Lagos, Nigeria",
+//     timeAgo: "20 min ago",
+//     image:
+//       "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop",
+//     caption: "Weekend discount on accessories only!",
+//     likes: 128,
+//     comments: 12,
+//     shares: 8,
+//   },
+// ];
+
+// // pretend the first item is “mine”
+// const MY_POSTS = ALL_POSTS.slice(0, 1);
+
+// /* -------------------- CREATE POST (full screen) -------------------- */
+// function CreatePostModal({ visible, onClose, onPost }) {
+//   const { theme } = useTheme();
+//   const C = useMemo(
+//     () => ({
+//       primary: theme.colors.primary || "#EF534E",
+//       text: "#101318",
+//       sub: "#6C727A",
+//       line: "#E9EBEF",
+//       card: "#FFFFFF",
+//       pill: "#F1F2F5",
+//       bg: "#F7F8FA",
+//     }),
+//     [theme]
+//   );
+
+
+
+
+//   const [text, setText] = useState("");
+//   const [images, setImages] = useState([
+//     "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?q=80&w=600&auto=format&fit=crop",
+//     "https://images.unsplash.com/photo-1580910051074-3eb694886505?q=80&w=600&auto=format&fit=crop",
+//   ]);
+
+//   // fake gallery thumbs
+//   const GALLERY = [
+//     "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=600&auto=format&fit=crop",
+//     "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=600&auto=format&fit=crop",
+//     "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?q=80&w=600&auto=format&fit=crop",
+//     "https://images.unsplash.com/photo-1580910051074-3eb694886505?q=80&w=600&auto=format&fit=crop",
+//     "https://images.unsplash.com/photo-1526178612928-82a3f1153d44?q=80&w=600&auto=format&fit=crop",
+//   ];
+
+//   const addImage = (uri) => {
+//     setImages((prev) => (prev.includes(uri) ? prev : [...prev, uri]));
+//   };
+//   const removeImage = (uri) => {
+//     setImages((prev) => prev.filter((u) => u !== uri));
+//   };
+
+//     const handleHidePost = (postId) => {
+//     console.log('Hiding post with ID:', postId);
+//     setHiddenPosts(prev => {
+//       const newSet = new Set([...prev, postId]);
+//       console.log('Updated hidden posts:', Array.from(newSet));
+//       return newSet;
+//     });
+//     setOptionsVisible(false);
+//   };
+
+
+//   const submit = () => {
+//     onPost?.({
+//       id: String(Date.now()),
+//       store: "Sasha Stores",
+//       avatar:
+//         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+//       location: "Lagos, Nigeria",
+//       timeAgo: "now",
+//       images: images.length ? images : undefined,
+//       image: images.length ? undefined : null,
+//       caption: text || "Shared a new post",
+//       likes: 0,
+//       comments: 0,
+//       shares: 0,
+//     });
+//     onClose?.();
+//     setText("");
+//     setImages([]);
+//   };
+
+//   return (
+//     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+//       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: "#fff" }}>
+//         {/* Header */}
+//         <View style={[stylesCP.header, { borderBottomColor: C.line }]}>
+//           <TouchableOpacity onPress={onClose} style={stylesCP.iconBtn}>
+//             <Ionicons name="chevron-back" size={22} color={C.text} />
+//           </TouchableOpacity>
+//           <ThemedText style={[stylesCP.title, { color: C.text }]}>Create Post</ThemedText>
+//           <TouchableOpacity onPress={submit} style={[stylesCP.postBtn, { backgroundColor: C.primary }]}>
+//             <ThemedText style={stylesCP.postBtnTxt}>Post</ThemedText>
+//           </TouchableOpacity>
+//         </View>
+
+//         <ScrollView contentContainerStyle={{ padding: 16 }}>
+//           {/* Composer card */}
+//           <View style={[stylesCP.card, { borderColor: C.line }]}>
+//             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+//               <Image
+//                 source={{
+//                   uri: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+//                 }}
+//                 style={stylesCP.avatar}
+//               />
+//               <TextInput
+//                 placeholder="What is on your mind"
+//                 placeholderTextColor={C.sub}
+//                 value={text}
+//                 onChangeText={setText}
+//                 multiline
+//                 style={[stylesCP.input, { color: C.text }]}
+//               />
+//             </View>
+
+//             {/* Selected images grid */}
+//             {!!images.length && (
+//               <View style={stylesCP.grid}>
+//                 {images.map((uri) => (
+//                   <View key={uri} style={stylesCP.gridItem}>
+//                     <Image source={{ uri }} style={stylesCP.gridImg} />
+//                     <TouchableOpacity onPress={() => removeImage(uri)} style={[stylesCP.closeChip, { backgroundColor: "#00000088" }]}>
+//                       <Ionicons name="close" size={16} color="#fff" />
+//                     </TouchableOpacity>
+//                   </View>
+//                 ))}
+//               </View>
+//             )}
+//           </View>
+
+//           {/* Mini gallery row (tap to add) */}
+//           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+//             <View style={{ flexDirection: "row", gap: 10 }}>
+//               <TouchableOpacity style={[stylesCP.thumbAdd, { borderColor: C.line }]}>
+//                 <Ionicons name="image-outline" size={20} color={C.sub} />
+//               </TouchableOpacity>
+//               {GALLERY.map((uri) => (
+//                 <TouchableOpacity key={uri} onPress={() => addImage(uri)}>
+//                   <Image source={{ uri }} style={stylesCP.thumb} />
+//                 </TouchableOpacity>
+//               ))}
+//             </View>
+//           </ScrollView>
+//         </ScrollView>
+//       </KeyboardAvoidingView>
+//     </Modal>
+//   );
+// }
+
+// const stylesCP = StyleSheet.create({
+//   header: {
+//     height: 56,
+//     flexDirection: "row",
+//     alignItems: "center",
+//     paddingHorizontal: 12,
+//     borderBottomWidth: 1,
+//   },
+//   iconBtn: { padding: 6, borderRadius: 20 },
+//   title: { flex: 1, textAlign: "center", fontWeight: "700", fontSize: 16 },
+//   postBtn: { paddingHorizontal: 14, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+//   postBtnTxt: { color: "#fff", fontWeight: "700" },
+//   card: { borderWidth: 1, borderRadius: 14, padding: 12 },
+//   avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
+//   input: { flex: 1, minHeight: 38 },
+//   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+//   gridItem: { width: "48%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", position: "relative" },
+//   gridImg: { width: "100%", height: "100%" },
+//   closeChip: { position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+//   thumbAdd: { width: 56, height: 56, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
+//   thumb: { width: 56, height: 56, borderRadius: 12 },
+// });
+
+// /* -------------------- FEED HEADER -------------------- */
+// function FeedHeader({ C }) {
+//   return (
+//     <View style={[styles.header, { backgroundColor: C.primary }]}>
+//       <View style={styles.headerTopRow}>
+//         <ThemedText font="oleo" style={styles.headerTitle}>Social Feed</ThemedText>
+//         <View style={styles.headerIcons}>
+
+//           <View style={styles.iconRow}>
+
+//             <TouchableOpacity
+//               onPress={() =>
+//                 navigation.navigate("ChatNavigator", {
+//                   screen: "Notification",
+//                 })
+//               }
+//               style={[styles.iconButton, styles.iconPill]}
+//               accessibilityRole="button"
+//               accessibilityLabel="Open notifications"
+//             >
+//               <Image
+//                 source={require("../../assets/bell-icon.png")}
+//                 style={styles.iconImg}
+//               />
+//             </TouchableOpacity>
+//           </View>
+//         </View>
+//       </View>
+
+//       {/* Search */}
+//       <View style={styles.searchContainer}>
+//         <TextInput
+//           placeholder="Search any product, shop or category"
+//           placeholderTextColor="#888"
+//           style={styles.searchInput}
+//         />
+//         {/* <Ionicons name="camera-outline" size={22} color="#444" style={styles.cameraIcon} /> */}
+//       </View>
+//     </View>
+//   );
+// }
+
+// /* -------------------- POST CARD -------------------- */
+// function PostCard({ item, onOpenComments, onOpenOptions, C }) {
+//   const [liked, setLiked] = useState(false);
+//   const likeCount = liked ? (item.likes || 0) + 1 : item.likes || 0;
+
+//   const images = item.images?.length ? item.images : [item.image].filter(Boolean);
+//   const [activeIdx, setActiveIdx] = useState(0);
+//   const [carouselW, setCarouselW] = useState(0);
+
+//   const onCarouselScroll = (e) => {
+//     if (!carouselW) return;
+//     setActiveIdx(Math.round(e.nativeEvent.contentOffset.x / carouselW));
+//   };
+
+//   return (
+//     <View style={styles.postCard}>
+//       {/* Top */}
+//       <View style={styles.postTop}>
+//         <Image source={{ uri: item.avatar }} style={styles.avatar} />
+//         <View style={{ flex: 1 }}>
+//           <ThemedText style={styles.storeName}>{item.store}</ThemedText>
+//           <ThemedText style={styles.metaText}>
+//             {item.location} • {item.timeAgo}
+//           </ThemedText>
+//         </View>
+//         <TouchableOpacity onPress={() => onOpenOptions(item)}>
+//           <Ionicons name="ellipsis-vertical" size={18} color="#6C727A" />
+//         </TouchableOpacity>
+//       </View>
+
+//       {/* Media */}
+//       {!!images.length && (
+//         <View style={styles.carouselWrap} onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}>
+//           <ScrollView
+//             horizontal
+//             pagingEnabled
+//             showsHorizontalScrollIndicator={false}
+//             onScroll={onCarouselScroll}
+//             scrollEventThrottle={16}
+//           >
+//             {images.map((uri, idx) => (
+//               <Image key={`${item.id}-img-${idx}`} source={{ uri }} style={[styles.postImage, { width: carouselW || "100%" }]} />
+//             ))}
+//           </ScrollView>
+
+//           {images.length > 1 && (
+//             <View style={styles.dotsRow}>
+//               {images.map((_, i) => (
+//                 <View key={`dot-${i}`} style={[styles.dot, i === activeIdx && styles.dotActive]} />
+//               ))}
+//             </View>
+//           )}
+//         </View>
+//       )}
+
+//       {/* Caption */}
+//       {item.caption ? (
+//         <View style={styles.captionPill}>
+//           <ThemedText style={styles.captionText}>{item.caption}</ThemedText>
+//         </View>
+//       ) : null}
+
+//       {/* Actions */}
+//       <View style={styles.actionsRow}>
+//         <View style={styles.actionsLeft}>
+//           <TouchableOpacity style={styles.actionBtn} onPress={() => setLiked((p) => !p)}>
+//             <Ionicons name={liked ? "heart" : "heart-outline"} size={25} color={liked ? C.primary : "#101318"} />
+//             <ThemedText style={styles.actionCount}>{likeCount}</ThemedText>
+//           </TouchableOpacity>
+
+//           <TouchableOpacity style={styles.actionBtn} onPress={() => onOpenComments(item)}>
+//             <Ionicons name="chatbubble-outline" size={25} color="#101318" />
+//             <ThemedText style={styles.actionCount}>{item.comments || 0}</ThemedText>
+//           </TouchableOpacity>
+
+//           <TouchableOpacity style={styles.actionBtn}>
+//             <Ionicons name="arrow-redo-outline" size={25} color="#101318" />
+//             <ThemedText style={styles.actionCount}>{item.shares || 0}</ThemedText>
+//           </TouchableOpacity>
+//         </View>
+
+//         <View style={styles.actionsRight}>
+//           <TouchableOpacity style={[styles.visitBtn, { backgroundColor: C.primary }]}>
+//             <ThemedText style={styles.visitBtnText}>Visit Store</ThemedText>
+//           </TouchableOpacity>
+//           <TouchableOpacity style={{ marginLeft: 10 }}>
+//             <Image source={require("../../assets/DownloadSimple.png")} style={{ width: 30, height: 30 }} />
+//           </TouchableOpacity>
+//         </View>
+//       </View>
+//     </View>
+//   );
+// }
+
+// /* -------------------- COMMENTS SHEET (same as your earlier) -------------------- */
+// function CommentsSheet({ visible, onClose }) {
+//   const inputRef = useRef(null);
+//   const [text, setText] = useState("");
+//   const [replyTo, setReplyTo] = useState(null);
+//   const currentUser = {
+//     name: "Sasha Stores",
+//     avatar:
+//       "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+//   };
+//   const [comments, setComments] = useState([
+//     {
+//       id: "c1",
+//       user: "Adam Chris",
+//       time: "1 min",
+//       avatar:
+//         "https://images.unsplash.com/photo-1502767089025-6572583495b0?q=80&w=200&auto=format&fit=crop",
+//       body: "This product looks really nice, do you deliver nationwide ?",
+//       likes: 30,
+//       replies: [
+//         {
+//           id: "r1",
+//           user: currentUser.name,
+//           time: "1 min",
+//           avatar: currentUser.avatar,
+//           body: "We do deliver nationwide.",
+//           mentionOf: "Adam Chris",
+//         },
+//       ],
+//     },
+//   ]);
+
+//   const startReply = (c) => {
+//     setReplyTo({ commentId: c.id, username: c.user });
+//     setText(`@${c.user} `);
+//     setTimeout(() => inputRef.current?.focus(), 0);
+//   };
+//   const clearReply = () => {
+//     setReplyTo(null);
+//     setText("");
+//     inputRef.current?.focus();
+//   };
+//   const handleSend = () => {
+//     const trimmed = text.trim();
+//     if (!trimmed) return;
+
+//     if (replyTo) {
+//       const newReply = {
+//         id: `r-${Date.now()}`,
+//         user: currentUser.name,
+//         time: "1 min",
+//         avatar: currentUser.avatar,
+//         body: trimmed.replace(new RegExp(`^@${replyTo.username}\\s*`), ""),
+//         mentionOf: replyTo.username,
+//       };
+//       setComments((prev) =>
+//         prev.map((c) =>
+//           c.id === replyTo.commentId ? { ...c, replies: [...(c.replies || []), newReply] } : c
+//         )
+//       );
+//       setReplyTo(null);
+//       setText("");
+//     } else {
+//       const newComment = {
+//         id: `c-${Date.now()}`,
+//         user: currentUser.name,
+//         time: "1 min",
+//         avatar: currentUser.avatar,
+//         body: trimmed,
+//         likes: 0,
+//         replies: [],
+//       };
+//       setComments((prev) => [...prev, newComment]);
+//       setText("");
+//     }
+//   };
+
+//   const ReplyBlock = ({ reply }) => (
+//     <View style={styles.replyContainer}>
+//       <Image source={{ uri: reply.avatar }} style={styles.commentAvatar} />
+//       <View style={{ flex: 1 }}>
+//         <View style={{ flexDirection: "row", alignItems: "center" }}>
+//           <ThemedText style={styles.commentName}>{reply.user}</ThemedText>
+//           <ThemedText style={styles.commentTime}>  {reply.time}</ThemedText>
+//         </View>
+//         <ThemedText style={styles.commentBody}>
+//           {reply.mentionOf ? (
+//             <>
+//               <ThemedText style={styles.mentionText}>@{reply.mentionOf} </ThemedText>
+//               {reply.body}
+//             </>
+//           ) : (
+//             reply.body
+//           )}
+//         </ThemedText>
+//       </View>
+//     </View>
+//   );
+
+//   return (
+//     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+//       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
+//         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+//         <View style={styles.sheet}>
+//           <View style={styles.sheetHandle} />
+//           <View style={styles.sheetHeader}>
+//             <ThemedText style={styles.sheetTitle}>Comments</ThemedText>
+//             <TouchableOpacity
+//               style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2, alignItems: "center" }}
+//               onPress={onClose}
+//             >
+//               <Ionicons name="close" size={18} color="#101318" />
+//             </TouchableOpacity>
+//           </View>
+
+//           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+//             {comments.map((c) => (
+//               <View key={c.id} style={{ paddingBottom: 4 }}>
+//                 <View style={styles.commentRow}>
+//                   <Image source={{ uri: c.avatar }} style={styles.commentAvatar} />
+//                   <View style={{ flex: 1 }}>
+//                     <View style={{ flexDirection: "row", alignItems: "center" }}>
+//                       <ThemedText style={styles.commentName}>{c.user}</ThemedText>
+//                       <ThemedText style={styles.commentTime}>  {c.time}</ThemedText>
+//                     </View>
+//                     <ThemedText style={styles.commentBody}>{c.body}</ThemedText>
+
+//                     <View style={styles.commentMetaRow}>
+//                       <TouchableOpacity onPress={() => startReply(c)}>
+//                         <ThemedText style={styles.replyText}>Reply</ThemedText>
+//                       </TouchableOpacity>
+//                       <View style={{ flexDirection: "row", alignItems: "center" }}>
+//                         <Ionicons name="chatbubble-ellipses-outline" size={14} color="#101318" />
+//                         <ThemedText style={styles.commentLikeCount}>  {c.likes}</ThemedText>
+//                       </View>
+//                     </View>
+//                   </View>
+//                 </View>
+
+//                 {c.replies?.length ? (
+//                   <View style={styles.repliesWrap}>
+//                     {c.replies.map((r) => (
+//                       <ReplyBlock key={r.id} reply={r} />
+//                     ))}
+//                   </View>
+//                 ) : null}
+//               </View>
+//             ))}
+//           </ScrollView>
+
+//           {replyTo ? (
+//             <View style={styles.replyingChip}>
+//               <ThemedText style={styles.replyingText}>Replying to {replyTo.username}</ThemedText>
+//               <TouchableOpacity onPress={clearReply} style={{ padding: 6 }}>
+//                 <Ionicons name="close-circle" size={18} color="#6C727A" />
+//               </TouchableOpacity>
+//             </View>
+//           ) : null}
+
+//           <View style={styles.inputRow}>
+//             <TextInput
+//               ref={inputRef}
+//               value={text}
+//               onChangeText={setText}
+//               placeholder={replyTo ? `Reply to ${replyTo.username}` : "Type a message"}
+//               placeholderTextColor="#6C727A"
+//               style={styles.input}
+//             />
+//             <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+//               <Ionicons name="send" size={20} color="#101318" />
+//             </TouchableOpacity>
+//           </View>
+//         </View>
+//       </KeyboardAvoidingView>
+//     </Modal>
+//   );
+// }
+
+// function OptionsSheet({ visible, onClose }) {
+//   const { theme } = useTheme();
+//   const C = useMemo(
+//     () => ({
+//       primary: theme.colors.primary || "#EF534E",
+//       text: "#101318",
+//       sub: "#6C727A",
+//     }),
+//     [theme]
+//   );
+
+//   const Row = ({ icon, label, danger, onPress }) => (
+//     <TouchableOpacity
+//       style={[styles.optionRow, danger && styles.optionRowDanger]}
+//       onPress={onPress}
+//     >
+//       <View style={styles.optionLeft}>
+//         {icon}
+//         <ThemedText style={[styles.optionLabel, danger && { color: C.primary }]}>
+//           {label}
+//         </ThemedText>
+//       </View>
+//       <Ionicons
+//         name="chevron-forward"
+//         size={18}
+//         color={danger ? C.primary : C.sub}
+//       />
+//     </TouchableOpacity>
+//   );
+
+//   return (
+//     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+//       <View style={styles.modalOverlay}>
+//         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+//         <View style={[styles.sheet, { backgroundColor: "#F9F9F9" }]}>
+//           <View style={styles.sheetHandle} />
+//           <View style={styles.sheetHeader}>
+//             <ThemedText style={styles.sheetTitle}>Options</ThemedText>
+//             <TouchableOpacity
+//               style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2 }}
+//               onPress={onClose}
+//             >
+//               <Ionicons name="close" size={18} color={C.text} />
+//             </TouchableOpacity>
+//           </View>
+
+//           <Row
+//             icon={
+//               <Image
+//                 source={require("../../assets/Vector (16).png")}
+//                 style={styles.profileImage}
+//               />
+//             }
+//             label="Share this post"
+//             onPress={onClose}
+//           />
+//           <Row
+//             icon={
+//               <Image
+//                 source={require("../../assets/PencilSimpleLine.png")}
+//                 style={styles.profileImage}
+//               />
+//             }
+//             label="Edit Post"
+//             onPress={onClose}
+//           />
+//           <Row
+//             icon={
+//               <Image
+//                 source={require("../../assets/Vector (30).png")}
+//                 style={styles.profileImage}
+//               />
+//             }
+//             label="Delete Post"
+//             danger
+//             onPress={onClose}
+//           />
+//         </View>
+//       </View>
+//     </Modal>
+//   );
+// }
+
+
+// /* -------------------- MAIN SCREEN -------------------- */
+// export default function FeedScreen() {
+//   const { theme } = useTheme();
+//   const C = useMemo(
+//     () => ({
+//       primary: theme.colors.primary || "#EF534E",
+//       bg: "#F5F6F8",
+//       card: "#FFFFFF",
+//       text: "#101318",
+//       sub: "#6C727A",
+//       line: "#E9EBEF",
+//       pill: "#F1F2F5",
+//     }),
+//     [theme]
+//   );
+
+//   const [commentsVisible, setCommentsVisible] = useState(false);
+//   const [optionsVisible, setOptionsVisible] = useState(false);
+//   const [createVisible, setCreateVisible] = useState(false);
+//   const [activePost, setActivePost] = useState(null);
+//   const [tab, setTab] = useState("my"); // 'my' | 'all'
+//   const [posts, setPosts] = useState(ALL_POSTS);
+
+//   const openComments = (post) => {
+//     setActivePost(post);
+//     setCommentsVisible(true);
+//   };
+//   const openOptions = (post) => {
+//     setActivePost(post);
+//     setOptionsVisible(true);
+//   };
+
+//   const data = tab === "my" ? MY_POSTS : posts;
+
+//   return (
+//     <View style={[styles.screen, { backgroundColor: "#fff" }]}>
+//       <StatusBar barStyle="dark-content" />
+//       <FlatList
+//         data={data}
+//         keyExtractor={(it) => it.id}
+//         ListHeaderComponent={
+//           <>
+//             <FeedHeader C={C} />
+
+//             {/* Tabs under header */}
+//             <View style={styles.tabsWrap}>
+//               <TouchableOpacity
+//                 onPress={() => setTab("my")}
+//                 style={[styles.tabBtn, tab === "my" && { backgroundColor: C.primary }]}
+//               >
+//                 <ThemedText style={[styles.tabTxt, tab === "my" && { color: "#fff" }]}>My Posts</ThemedText>
+//               </TouchableOpacity>
+//               <TouchableOpacity
+//                 onPress={() => setTab("all")}
+//                 style={[
+//                   styles.tabBtn,
+//                   { backgroundColor: "#fff", borderWidth: 1, borderColor: "#EEE" },
+//                   tab === "all" && { borderColor: C.primary, backgroundColor: C.primary },
+//                 ]}
+//               >
+//                 <ThemedText style={[styles.tabTxt, { color: tab === "all" ? "#fff" : "#6C727A", }]}>
+//                   All Posts
+//                 </ThemedText>
+//               </TouchableOpacity>
+//             </View>
+//           </>
+//         }
+//         contentContainerStyle={{ paddingBottom: 100 }}
+//         renderItem={({ item }) => (
+//           <PostCard item={item} onOpenComments={openComments} onOpenOptions={openOptions} C={C} />
+//         )}
+//         showsVerticalScrollIndicator={false}
+//       />
+
+//       {/* FAB */}
+//       <TouchableOpacity style={[styles.fab, { backgroundColor: C.primary }]} onPress={() => setCreateVisible(true)}>
+//         <Ionicons name="add" size={26} color="#fff" />
+//       </TouchableOpacity>
+
+//       {/* Sheets / Modals */}
+//       <CommentsSheet visible={commentsVisible} onClose={() => setCommentsVisible(false)} />
+//       <OptionsSheet
+//         visible={optionsVisible}
+//         onClose={() => setOptionsVisible(false)}
+//         // onHidePost={() => handleHidePost(activePost?.id)}
+//       />      <CreatePostModal
+//         visible={createVisible}
+//         onClose={() => setCreateVisible(false)}
+//         onPost={(post) => setPosts((p) => [post, ...p])}
+//       />
+//     </View>
+//   );
+// }
+
+// /* -------------------- STYLES -------------------- */
+// const styles = StyleSheet.create({
+//   screen: { flex: 1 },
+
+//   /* Header */
+//   header: {
+//     paddingTop: 60,
+//     paddingBottom: 20,
+//     paddingHorizontal: 16,
+//     borderBottomLeftRadius: 24,
+//     borderBottomRightRadius: 24,
+//   },
+//   headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+//   headerTitle: { color: "#fff", fontSize: 20, fontWeight: "600" },
+//   headerIcons: { flexDirection: "row" },
+//   icon: { backgroundColor: "#fff", padding: 6, borderRadius: 30, marginLeft: 8 },
+
+//   searchContainer: {
+//     marginTop: 20,
+//     backgroundColor: "white",
+//     borderRadius: 12,
+//     paddingHorizontal: 14,
+//     flexDirection: "row",
+//     alignItems: "center",
+//     height: 60,
+//   },
+//   searchInput: { flex: 1, fontSize: 14, color: "#333" },
+//   cameraIcon: { marginLeft: 8 },
+
+//   /* Tabs under header */
+//   tabsWrap: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 12 },
+//   tabBtn: { flex: 1, height: 42, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+//   tabTxt: { fontWeight: "700", fontSize: 10 },
+
+//   /* Post card */
+//   postCard: {
+//     backgroundColor: "#fff",
+//     marginHorizontal: 14,
+//     marginTop: 14,
+//     borderRadius: 18,
+//     padding: 12,
+//     shadowColor: "#000",
+//     shadowOpacity: 0.05,
+//     shadowRadius: 8,
+//     shadowOffset: { width: 0, height: 2 },
+//   },
+//   postTop: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+//   avatar: { width: 55, height: 55, borderRadius: 40, marginRight: 10 },
+//   storeName: { fontSize: 14, fontWeight: "400", color: "#000" },
+//   metaText: { fontSize: 10, color: "#000000B2", marginTop: 2 },
+
+//   carouselWrap: { borderRadius: 14, overflow: "hidden" },
+//   postImage: {
+//     height: 390,
+//     borderRadius: 10,
+//     resizeMode: "cover",
+//     borderTopRightRadius: 30,
+//     borderTopLeftRadius: 30,
+//   },
+
+//   dotsRow: {
+//     marginTop: 8,
+//     alignSelf: "center",
+//     flexDirection: "row",
+//     gap: 6,
+//   },
+//   dot: {
+//     width: 6,
+//     height: 6,
+//     borderRadius: 3,
+//     backgroundColor: "#bbb",
+//     opacity: 0.6,
+//   },
+//   dotActive: { backgroundColor: "#EF534E", opacity: 1, width: 8, height: 8, borderRadius: 4, marginTop: -1 },
+
+//   captionPill: {
+//     marginTop: 10,
+//     backgroundColor: "#F1F2F5",
+//     borderRadius: 12,
+//     paddingHorizontal: 12,
+//     paddingVertical: 15,
+//   },
+//   captionText: { color: "#000", fontSize: 12 },
+
+//   actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+//   actionsLeft: { flexDirection: "row", alignItems: "center" },
+//   actionBtn: { flexDirection: "row", alignItems: "center", marginRight: 14 },
+//   actionCount: { marginLeft: 6, fontSize: 12, color: "#101318" },
+//   actionsRight: { flexDirection: "row", alignItems: "center" },
+//   visitBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+//   visitBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+
+//   /* Comments / options shared styles */
+//   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
+//   sheet: {
+//     backgroundColor: "#fff",
+//     paddingHorizontal: 16,
+//     paddingTop: 8,
+//     paddingBottom: 8,
+//     borderTopLeftRadius: 20,
+//     borderTopRightRadius: 20,
+//   },
+//   sheetHandle: {
+//     alignSelf: "center",
+//     width: 68,
+//     height: 6,
+//     borderRadius: 999,
+//     backgroundColor: "#D8DCE2",
+//     marginBottom: 6,
+//   },
+//   sheetHeader: {
+//     flexDirection: "row",
+//     alignItems: "center",
+//     justifyContent: "space-between",
+//     paddingVertical: 8,
+//     marginBottom: 10,
+//   },
+//   sheetTitle: {
+//     fontSize: 20,
+//     fontWeight: "700",
+//     color: "#000",
+//     textAlign: "center",
+//     marginLeft: 160,
+//   },
+//    optionRow: {
+//     height: 56,
+//     borderRadius: 12,
+//     paddingHorizontal: 12,
+//     marginBottom: 10,
+//     flexDirection: "row",
+//     alignItems: "center",
+//     backgroundColor: "#fff",
+//     justifyContent: "space-between",
+//     elevation: 1,
+//   },
+//   optionRowDanger: { borderColor: "#FDE2E0", backgroundColor: "#FFF8F8" },
+//   optionLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+//   optionLabel: { fontSize: 15, color: "#000" },
+
+//   commentRow: { flexDirection: "row", paddingVertical: 10 },
+//   commentAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
+//   commentName: { fontWeight: "700", color: "#101318" },
+//   commentTime: { color: "#6C727A", fontSize: 12 },
+//   commentBody: { color: "#101318", marginTop: 2 },
+//   commentMetaRow: { flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between", paddingRight: 14 },
+//   replyText: { color: "#6C727A" },
+//   commentLikeCount: { color: "#101318", fontSize: 12 },
+
+//   repliesWrap: { marginLeft: 44, marginTop: 6 },
+//   replyContainer: { flexDirection: "row", marginTop: 10 },
+//   mentionText: { color: "#EF534E", fontWeight: "600" },
+
+//   replyingChip: { alignSelf: "flex-start", marginTop: 8, backgroundColor: "#F3F4F6", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 6 },
+//   replyingText: { color: "#6C727A", fontSize: 12 },
+
+//   inputRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#F1F2F5", borderRadius: 16, paddingLeft: 14, marginTop: 12, marginBottom: 6 },
+//   input: { flex: 1, height: 46, fontSize: 14, color: "#101318" },
+//   sendBtn: { width: 44, height: 46, alignItems: "center", justifyContent: "center" },
+
+//   /* FAB */
+//   fab: {
+//     position: "absolute",
+//     right: 18,
+//     bottom: 85,
+//     width: 56,
+//     height: 56,
+//     borderRadius: 15,
+//     alignItems: "center",
+//     justifyContent: "center",
+//     elevation: 4,
+//     shadowColor: "#000",
+//     shadowOpacity: 0.15,
+//     shadowRadius: 8,
+//     shadowOffset: { width: 0, height: 3 },
+//   },
+//   iconRow: { flexDirection: "row" },
+//   iconButton: { marginLeft: 9 },
+//   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+//   // If your PNGs are already colored, remove tintColor.
+//   iconImg: { width: 22, height: 22, resizeMode: "contain" },
+// });
+
 // screens/FeedScreen.js
-import React, { useMemo, useRef, useState } from "react";
+// screens/FeedScreen.js
+// screens/FeedScreen.js
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -12,51 +909,74 @@ import {
   ScrollView,
   Modal,
   StatusBar,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 
-/* -------------------- MOCK DATA -------------------- */
-const ALL_POSTS = [
-  {
-    id: "1",
-    store: "Sasha Stores",
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-    location: "Lagos, Nigeria",
-    timeAgo: "20 min ago",
-    images: [
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1200&auto=format&fit=crop",
-    ],
-    caption: "Get this phone at a cheap price for a limited period",
-    likes: 500,
-    comments: 26,
-    shares: 26,
-  },
-  {
-    id: "2",
-    store: "Vee Stores",
-    avatar:
-      "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
-    location: "Lagos, Nigeria",
-    timeAgo: "20 min ago",
-    image:
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop",
-    caption: "Weekend discount on accessories only!",
-    likes: 128,
-    comments: 12,
-    shares: 8,
-  },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { API_DOMAIN } from "../../apiConfig";
+import { getToken } from "../../utils/tokenStorage";
 
-// pretend the first item is “mine”
-const MY_POSTS = ALL_POSTS.slice(0, 1);
+import * as PostQueries from "../../utils/queries/posts";     // getPosts, getPostComments
+import * as PostMutations from "../../utils/mutations/posts"; // createPost, updatePost, deletePost, likePost, addComment
 
-/* -------------------- CREATE POST (full screen) -------------------- */
-function CreatePostModal({ visible, onClose, onPost }) {
+/* -------------------- HELPERS -------------------- */
+const absUrl = (maybePath) =>
+  !maybePath
+    ? null
+    : maybePath.startsWith("http")
+      ? maybePath
+      : `${API_DOMAIN.replace(/\/api$/, "")}${maybePath.startsWith("/") ? "" : "/"}${maybePath}`;
+
+const timeAgo = (iso) => {
+  if (!iso) return "now";
+  const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+};
+
+const mapPost = (p) => {
+  const storeName = p?.user?.store?.store_name || p?.user?.full_name || "Store";
+  const avatar = absUrl(p?.user?.profile_picture) || "https://via.placeholder.com/80";
+  const images = (p?.media_urls || [])
+    .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
+    .map((m) => absUrl(m.url))
+    .filter(Boolean);
+
+  return {
+    id: String(p.id),
+    store: storeName,
+    avatar,
+    location: "Lagos, Nigeria", // not in API → hardcoded
+    timeAgo: timeAgo(p.created_at),
+    images: images.length ? images : undefined,
+    image: images.length ? undefined : null,
+    caption: p.body,
+    likes: p.likes_count ?? 0,
+    comments: p.comments_count ?? 0,
+    shares: p.shares_count ?? 0,
+    is_liked: !!p.is_liked,
+    _raw: p,
+  };
+};
+
+/* -------------------- CREATE/EDIT POST (shared) -------------------- */
+function CreatePostModal({
+  visible,
+  onClose,
+  onSubmit,
+  mode = "create", // "create" | "edit"
+  initialCaption = "",
+  initialImageUrls = [], // array of absolute URLs
+}) {
   const { theme } = useTheme();
   const C = useMemo(
     () => ({
@@ -64,67 +984,89 @@ function CreatePostModal({ visible, onClose, onPost }) {
       text: "#101318",
       sub: "#6C727A",
       line: "#E9EBEF",
-      card: "#FFFFFF",
-      pill: "#F1F2F5",
-      bg: "#F7F8FA",
     }),
     [theme]
   );
-  
 
+  // existing images from server (URLs)
+  const [existingUrls, setExistingUrls] = useState(initialImageUrls);
+  // newly picked files
+  const [newFiles, setNewFiles] = useState([]);
+  const [text, setText] = useState(initialCaption || "");
 
+  useEffect(() => {
+    if (!visible) return;
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please allow photo library access to attach images.");
+      }
+    })();
+  }, [visible]);
 
-  const [text, setText] = useState("");
-  const [images, setImages] = useState([
-    "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1580910051074-3eb694886505?q=80&w=600&auto=format&fit=crop",
-  ]);
+  // useEffect(() => {
+  //   // hydrate when opening edit
+  //   if (visible) {
+  //     setText(initialCaption || "");
+  //     setExistingUrls(initialImageUrls || []);
+  //     setNewFiles([]);
+  //   }
+  // }, [visible, initialCaption, initialImageUrls]);
+  useEffect(() => {
+    if (!visible) return;
+    // Only (re)hydrate when the modal is shown or mode flips create<->edit
+    setText(mode === "edit" ? (initialCaption || "") : "");
+    setExistingUrls(Array.isArray(initialImageUrls) ? initialImageUrls : []);
+    setNewFiles([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, mode]);
 
-  // fake gallery thumbs
-  const GALLERY = [
-    "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1580910051074-3eb694886505?q=80&w=600&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1526178612928-82a3f1153d44?q=80&w=600&auto=format&fit=crop",
+  const pickImages = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        allowsMultipleSelection: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+      });
+      if (res.canceled) return;
+      const assets = res.assets || [];
+      setNewFiles((prev) => [
+        ...prev,
+        ...assets
+          .filter((a) => a.uri)
+          .map((a, idx) => ({
+            uri: a.uri,
+            name: a.fileName || `photo_${Date.now()}_${idx}.jpg`,
+            type: a.mimeType || "image/jpeg",
+          })),
+      ]);
+    } catch (e) {
+      console.log("pick error", e);
+    }
+  };
+
+  const removeExistingUrl = (url) =>
+    setExistingUrls((prev) => prev.filter((u) => u !== url));
+
+  const removeNewFile = (uri) =>
+    setNewFiles((prev) => prev.filter((f) => f.uri !== uri));
+
+  const previews = [
+    ...existingUrls.map((u) => ({ kind: "url", key: u, uri: u })),
+    ...newFiles.map((f) => ({ kind: "file", key: f.uri, uri: f.uri })),
   ];
 
-  const addImage = (uri) => {
-    setImages((prev) => (prev.includes(uri) ? prev : [...prev, uri]));
-  };
-  const removeImage = (uri) => {
-    setImages((prev) => prev.filter((u) => u !== uri));
-  };
-
-    const handleHidePost = (postId) => {
-    console.log('Hiding post with ID:', postId);
-    setHiddenPosts(prev => {
-      const newSet = new Set([...prev, postId]);
-      console.log('Updated hidden posts:', Array.from(newSet));
-      return newSet;
-    });
-    setOptionsVisible(false);
-  };
-
-
   const submit = () => {
-    onPost?.({
-      id: String(Date.now()),
-      store: "Sasha Stores",
-      avatar:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      location: "Lagos, Nigeria",
-      timeAgo: "now",
-      images: images.length ? images : undefined,
-      image: images.length ? undefined : null,
-      caption: text || "Shared a new post",
-      likes: 0,
-      comments: 0,
-      shares: 0,
+    onSubmit?.({
+      body: text || "Shared a new post",
+      newFiles,           // files to upload
+      keptUrls: existingUrls, // URLs the user kept
+      // If your API supports removing media explicitly, we could also pass:
+      removedUrls: (initialImageUrls || []).filter((u) => !existingUrls.includes(u)),
     });
+    // reset local when closing
+    setNewFiles([]);
     onClose?.();
-    setText("");
-    setImages([]);
   };
 
   return (
@@ -135,20 +1077,17 @@ function CreatePostModal({ visible, onClose, onPost }) {
           <TouchableOpacity onPress={onClose} style={stylesCP.iconBtn}>
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </TouchableOpacity>
-          <ThemedText style={[stylesCP.title, { color: C.text }]}>Create Post</ThemedText>
+          <ThemedText style={[stylesCP.title, { color: C.text }]}>{mode === "edit" ? "Edit Post" : "Create Post"}</ThemedText>
           <TouchableOpacity onPress={submit} style={[stylesCP.postBtn, { backgroundColor: C.primary }]}>
-            <ThemedText style={stylesCP.postBtnTxt}>Post</ThemedText>
+            <ThemedText style={stylesCP.postBtnTxt}>{mode === "edit" ? "Save" : "Post"}</ThemedText>
           </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-          {/* Composer card */}
           <View style={[stylesCP.card, { borderColor: C.line }]}>
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
               <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-                }}
+                source={{ uri: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop" }}
                 style={stylesCP.avatar}
               />
               <TextInput
@@ -161,13 +1100,15 @@ function CreatePostModal({ visible, onClose, onPost }) {
               />
             </View>
 
-            {/* Selected images grid */}
-            {!!images.length && (
+            {!!previews.length && (
               <View style={stylesCP.grid}>
-                {images.map((uri) => (
-                  <View key={uri} style={stylesCP.gridItem}>
-                    <Image source={{ uri }} style={stylesCP.gridImg} />
-                    <TouchableOpacity onPress={() => removeImage(uri)} style={[stylesCP.closeChip, { backgroundColor: "#00000088" }]}>
+                {previews.map((p) => (
+                  <View key={p.key} style={stylesCP.gridItem}>
+                    <Image source={{ uri: p.uri }} style={stylesCP.gridImg} />
+                    <TouchableOpacity
+                      onPress={() => (p.kind === "url" ? removeExistingUrl(p.uri) : removeNewFile(p.uri))}
+                      style={[stylesCP.closeChip, { backgroundColor: "#00000088" }]}
+                    >
                       <Ionicons name="close" size={16} color="#fff" />
                     </TouchableOpacity>
                   </View>
@@ -176,17 +1117,11 @@ function CreatePostModal({ visible, onClose, onPost }) {
             )}
           </View>
 
-          {/* Mini gallery row (tap to add) */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity style={[stylesCP.thumbAdd, { borderColor: C.line }]}>
+              <TouchableOpacity style={[stylesCP.thumbAdd, { borderColor: C.line }]} onPress={pickImages}>
                 <Ionicons name="image-outline" size={20} color={C.sub} />
               </TouchableOpacity>
-              {GALLERY.map((uri) => (
-                <TouchableOpacity key={uri} onPress={() => addImage(uri)}>
-                  <Image source={{ uri }} style={stylesCP.thumb} />
-                </TouchableOpacity>
-              ))}
             </View>
           </ScrollView>
         </ScrollView>
@@ -195,29 +1130,6 @@ function CreatePostModal({ visible, onClose, onPost }) {
   );
 }
 
-const stylesCP = StyleSheet.create({
-  header: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-  },
-  iconBtn: { padding: 6, borderRadius: 20 },
-  title: { flex: 1, textAlign: "center", fontWeight: "700", fontSize: 16 },
-  postBtn: { paddingHorizontal: 14, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  postBtnTxt: { color: "#fff", fontWeight: "700" },
-  card: { borderWidth: 1, borderRadius: 14, padding: 12 },
-  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
-  input: { flex: 1, minHeight: 38 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  gridItem: { width: "48%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", position: "relative" },
-  gridImg: { width: "100%", height: "100%" },
-  closeChip: { position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  thumbAdd: { width: 56, height: 56, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
-  thumb: { width: 56, height: 56, borderRadius: 12 },
-});
-
 /* -------------------- FEED HEADER -------------------- */
 function FeedHeader({ C }) {
   return (
@@ -225,46 +1137,27 @@ function FeedHeader({ C }) {
       <View style={styles.headerTopRow}>
         <ThemedText font="oleo" style={styles.headerTitle}>Social Feed</ThemedText>
         <View style={styles.headerIcons}>
-
           <View style={styles.iconRow}>
-
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("ChatNavigator", {
-                  screen: "Notification",
-                })
-              }
-              style={[styles.iconButton, styles.iconPill]}
-              accessibilityRole="button"
-              accessibilityLabel="Open notifications"
-            >
-              <Image
-                source={require("../../assets/bell-icon.png")}
-                style={styles.iconImg}
-              />
+            <TouchableOpacity style={[styles.iconButton, styles.iconPill]}>
+              <Image source={require("../../assets/bell-icon.png")} style={styles.iconImg} />
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* Search */}
       <View style={styles.searchContainer}>
-        <TextInput
-          placeholder="Search any product, shop or category"
-          placeholderTextColor="#888"
-          style={styles.searchInput}
-        />
-        {/* <Ionicons name="camera-outline" size={22} color="#444" style={styles.cameraIcon} /> */}
+        <TextInput placeholder="Search any product, shop or category" placeholderTextColor="#888" style={styles.searchInput} />
       </View>
     </View>
   );
 }
 
 /* -------------------- POST CARD -------------------- */
-function PostCard({ item, onOpenComments, onOpenOptions, C }) {
-  const [liked, setLiked] = useState(false);
-  const likeCount = liked ? (item.likes || 0) + 1 : item.likes || 0;
+function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, C }) {
+  const [liked, setLiked] = useState(!!item.is_liked);
+  useEffect(() => setLiked(!!item.is_liked), [item.is_liked]);
 
+  const likeCount = liked ? (item.likes || 0) + (item.is_liked ? 0 : 1) : item.likes || 0;
   const images = item.images?.length ? item.images : [item.image].filter(Boolean);
   const [activeIdx, setActiveIdx] = useState(0);
   const [carouselW, setCarouselW] = useState(0);
@@ -276,7 +1169,6 @@ function PostCard({ item, onOpenComments, onOpenOptions, C }) {
 
   return (
     <View style={styles.postCard}>
-      {/* Top */}
       <View style={styles.postTop}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
         <View style={{ flex: 1 }}>
@@ -290,16 +1182,9 @@ function PostCard({ item, onOpenComments, onOpenOptions, C }) {
         </TouchableOpacity>
       </View>
 
-      {/* Media */}
       {!!images.length && (
         <View style={styles.carouselWrap} onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={onCarouselScroll}
-            scrollEventThrottle={16}
-          >
+          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onScroll={onCarouselScroll} scrollEventThrottle={16}>
             {images.map((uri, idx) => (
               <Image key={`${item.id}-img-${idx}`} source={{ uri }} style={[styles.postImage, { width: carouselW || "100%" }]} />
             ))}
@@ -315,17 +1200,21 @@ function PostCard({ item, onOpenComments, onOpenOptions, C }) {
         </View>
       )}
 
-      {/* Caption */}
       {item.caption ? (
         <View style={styles.captionPill}>
           <ThemedText style={styles.captionText}>{item.caption}</ThemedText>
         </View>
       ) : null}
 
-      {/* Actions */}
       <View style={styles.actionsRow}>
         <View style={styles.actionsLeft}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => setLiked((p) => !p)}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => {
+              setLiked((p) => !p);
+              onToggleLike?.(item.id);
+            }}
+          >
             <Ionicons name={liked ? "heart" : "heart-outline"} size={25} color={liked ? C.primary : "#101318"} />
             <ThemedText style={styles.actionCount}>{likeCount}</ThemedText>
           </TouchableOpacity>
@@ -354,40 +1243,46 @@ function PostCard({ item, onOpenComments, onOpenOptions, C }) {
   );
 }
 
-/* -------------------- COMMENTS SHEET (same as your earlier) -------------------- */
-function CommentsSheet({ visible, onClose }) {
+/* -------------------- COMMENTS (API-WIRED) -------------------- */
+function CommentsSheet({ visible, onClose, postId }) {
   const inputRef = useRef(null);
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState(null);
-  const currentUser = {
-    name: "Sasha Stores",
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-  };
-  const [comments, setComments] = useState([
-    {
-      id: "c1",
-      user: "Adam Chris",
-      time: "1 min",
-      avatar:
-        "https://images.unsplash.com/photo-1502767089025-6572583495b0?q=80&w=200&auto=format&fit=crop",
-      body: "This product looks really nice, do you deliver nationwide ?",
-      likes: 30,
-      replies: [
-        {
-          id: "r1",
-          user: currentUser.name,
-          time: "1 min",
-          avatar: currentUser.avatar,
-          body: "We do deliver nationwide.",
-          mentionOf: "Adam Chris",
-        },
-      ],
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["post", "comments", postId],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await PostQueries.getPostComments(postId, token);
+      return res?.data;
     },
-  ]);
+    enabled: !!postId && visible,
+  });
+
+  const qc = useQueryClient();
+  const add = useMutation({
+    mutationFn: async ({ body, parent_id }) => {
+      const token = await getToken();
+      return PostMutations.addComment(postId, { body, ...(parent_id ? { parent_id } : {}) }, token);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["post", "comments", postId] });
+      qc.invalidateQueries({ queryKey: ["posts", "lists"] });
+    },
+  });
+
+  const comments = (data?.data || []).map((c) => ({
+    id: c.id,
+    body: c.body,
+    time: timeAgo(c.created_at),
+    user: c.user?.full_name || "User",
+    avatar: absUrl(c.user?.profile_picture) || "https://via.placeholder.com/56",
+    replies: c.replies || [],
+    _raw: c,
+  }));
 
   const startReply = (c) => {
-    setReplyTo({ commentId: c.id, username: c.user });
+    setReplyTo({ id: c.id, username: c.user });
     setText(`@${c.user} `);
     setTimeout(() => inputRef.current?.focus(), 0);
   };
@@ -396,59 +1291,25 @@ function CommentsSheet({ visible, onClose }) {
     setText("");
     inputRef.current?.focus();
   };
+
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
-
-    if (replyTo) {
-      const newReply = {
-        id: `r-${Date.now()}`,
-        user: currentUser.name,
-        time: "1 min",
-        avatar: currentUser.avatar,
-        body: trimmed.replace(new RegExp(`^@${replyTo.username}\\s*`), ""),
-        mentionOf: replyTo.username,
-      };
-      setComments((prev) =>
-        prev.map((c) =>
-          c.id === replyTo.commentId ? { ...c, replies: [...(c.replies || []), newReply] } : c
-        )
-      );
-      setReplyTo(null);
-      setText("");
-    } else {
-      const newComment = {
-        id: `c-${Date.now()}`,
-        user: currentUser.name,
-        time: "1 min",
-        avatar: currentUser.avatar,
-        body: trimmed,
-        likes: 0,
-        replies: [],
-      };
-      setComments((prev) => [...prev, newComment]);
-      setText("");
-    }
+    const body = replyTo ? trimmed.replace(new RegExp(`^@${replyTo.username}\\s*`), "") : trimmed;
+    add.mutate({ body, parent_id: replyTo?.id });
+    setReplyTo(null);
+    setText("");
   };
 
   const ReplyBlock = ({ reply }) => (
     <View style={styles.replyContainer}>
-      <Image source={{ uri: reply.avatar }} style={styles.commentAvatar} />
+      <Image source={{ uri: absUrl(reply.user?.profile_picture) || "https://via.placeholder.com/56" }} style={styles.commentAvatar} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <ThemedText style={styles.commentName}>{reply.user}</ThemedText>
-          <ThemedText style={styles.commentTime}>  {reply.time}</ThemedText>
+          <ThemedText style={styles.commentName}>{reply.user?.full_name || "User"}</ThemedText>
+          <ThemedText style={styles.commentTime}>  {timeAgo(reply.created_at)}</ThemedText>
         </View>
-        <ThemedText style={styles.commentBody}>
-          {reply.mentionOf ? (
-            <>
-              <ThemedText style={styles.mentionText}>@{reply.mentionOf} </ThemedText>
-              {reply.body}
-            </>
-          ) : (
-            reply.body
-          )}
-        </ThemedText>
+        <ThemedText style={styles.commentBody}>{reply.body}</ThemedText>
       </View>
     </View>
   );
@@ -461,47 +1322,44 @@ function CommentsSheet({ visible, onClose }) {
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
             <ThemedText style={styles.sheetTitle}>Comments</ThemedText>
-            <TouchableOpacity
-              style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2, alignItems: "center" }}
-              onPress={onClose}
-            >
+            <TouchableOpacity style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2, alignItems: "center" }} onPress={onClose}>
               <Ionicons name="close" size={18} color="#101318" />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-            {comments.map((c) => (
-              <View key={c.id} style={{ paddingBottom: 4 }}>
-                <View style={styles.commentRow}>
-                  <Image source={{ uri: c.avatar }} style={styles.commentAvatar} />
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <ThemedText style={styles.commentName}>{c.user}</ThemedText>
-                      <ThemedText style={styles.commentTime}>  {c.time}</ThemedText>
-                    </View>
-                    <ThemedText style={styles.commentBody}>{c.body}</ThemedText>
-
-                    <View style={styles.commentMetaRow}>
-                      <TouchableOpacity onPress={() => startReply(c)}>
-                        <ThemedText style={styles.replyText}>Reply</ThemedText>
-                      </TouchableOpacity>
+            {isLoading ? (
+              <ThemedText>Loading…</ThemedText>
+            ) : (
+              comments.map((c) => (
+                <View key={c.id} style={{ paddingBottom: 4 }}>
+                  <View style={styles.commentRow}>
+                    <Image source={{ uri: c.avatar }} style={styles.commentAvatar} />
+                    <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#101318" />
-                        <ThemedText style={styles.commentLikeCount}>  {c.likes}</ThemedText>
+                        <ThemedText style={styles.commentName}>{c.user}</ThemedText>
+                        <ThemedText style={styles.commentTime}>  {c.time}</ThemedText>
+                      </View>
+                      <ThemedText style={styles.commentBody}>{c.body}</ThemedText>
+
+                      <View style={styles.commentMetaRow}>
+                        <TouchableOpacity onPress={() => startReply(c)}>
+                          <ThemedText style={styles.replyText}>Reply</ThemedText>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   </View>
-                </View>
 
-                {c.replies?.length ? (
-                  <View style={styles.repliesWrap}>
-                    {c.replies.map((r) => (
-                      <ReplyBlock key={r.id} reply={r} />
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            ))}
+                  {!!c.replies?.length && (
+                    <View style={styles.repliesWrap}>
+                      {c.replies.map((r) => (
+                        <ReplyBlock key={r.id} reply={r} />
+                      ))}
+                    </View>
+                  )}
+                </View>
+              ))
+            )}
           </ScrollView>
 
           {replyTo ? (
@@ -532,36 +1390,8 @@ function CommentsSheet({ visible, onClose }) {
   );
 }
 
-function OptionsSheet({ visible, onClose }) {
-  const { theme } = useTheme();
-  const C = useMemo(
-    () => ({
-      primary: theme.colors.primary || "#EF534E",
-      text: "#101318",
-      sub: "#6C727A",
-    }),
-    [theme]
-  );
-
-  const Row = ({ icon, label, danger, onPress }) => (
-    <TouchableOpacity
-      style={[styles.optionRow, danger && styles.optionRowDanger]}
-      onPress={onPress}
-    >
-      <View style={styles.optionLeft}>
-        {icon}
-        <ThemedText style={[styles.optionLabel, danger && { color: C.primary }]}>
-          {label}
-        </ThemedText>
-      </View>
-      <Ionicons
-        name="chevron-forward"
-        size={18}
-        color={danger ? C.primary : C.sub}
-      />
-    </TouchableOpacity>
-  );
-
+/* -------------------- OPTIONS SHEETS -------------------- */
+function OptionsSheetAll({ visible, onClose }) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -569,62 +1399,174 @@ function OptionsSheet({ visible, onClose }) {
         <View style={[styles.sheet, { backgroundColor: "#F9F9F9" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText style={styles.sheetTitle}>Options</ThemedText>
-            <TouchableOpacity
-              style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2 }}
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={18} color={C.text} />
+            <ThemedText font="oleo" style={styles.sheetTitle}>Options</ThemedText>
+            <TouchableOpacity style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2 }} onPress={onClose}>
+              <Ionicons name="close" size={18} color="#101318" />
             </TouchableOpacity>
           </View>
 
-          <Row
-            icon={
-              <Image
-                source={require("../../assets/Vector (16).png")}
-                style={styles.profileImage}
-              />
-            }
-            label="Share this post"
-            onPress={onClose}
-          />
-          <Row
-            icon={
-              <Image
-                source={require("../../assets/Vector (17).png")}
-                style={styles.profileImage}
-              />
-            }
-            label="Follow User"
-            onPress={onClose}
-          />
-          <Row
-            icon={
-              <Image
-                source={require("../../assets/Vector (18).png")}
-                style={styles.profileImage}
-              />
-            }
-            label="Hide Post"
-            // onPress={onHidePost}
-          />
-          <Row
-            icon={
-              <Image
-                source={require("../../assets/Vector (19).png")}
-                style={styles.profileImage}
-              />
-            }
-            label="Report Post"
-            danger
-            onPress={onClose}
-          />
+          <TouchableOpacity style={styles.optionRow}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="share-outline" size={20} color="#101318" />
+              <ThemedText style={styles.optionLabel}>Share this post</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6C727A" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionRow}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="person-add-outline" size={20} color="#101318" />
+              <ThemedText style={styles.optionLabel}>Follow User</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6C727A" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionRow}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="grid-outline" size={20} color="#101318" />
+              <ThemedText style={styles.optionLabel}>Hide Post</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6C727A" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.optionRow, styles.optionRowDanger]}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="warning-outline" size={20} color="#EF534E" />
+              <ThemedText style={[styles.optionLabel, { color: "#EF534E" }]}>Report Post</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#EF534E" />
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 }
 
+function OptionsSheetMine({ visible, onClose, onEditPost, onDeletePost }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: "#F9F9F9" }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <ThemedText font="oleo" style={styles.sheetTitle}>Options</ThemedText>
+            <TouchableOpacity style={{ borderColor: "#000", borderWidth: 1.4, borderRadius: 20, padding: 2 }} onPress={onClose}>
+              <Ionicons name="close" size={18} color="#101318" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.optionRow} onPress={onClose}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="share-outline" size={20} color="#101318" />
+              <ThemedText style={styles.optionLabel}>Share this post</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6C727A" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.optionRow} onPress={onEditPost}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="pencil-outline" size={20} color="#101318" />
+              <ThemedText style={styles.optionLabel}>Edit Post</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6C727A" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.optionRow, styles.optionRowDanger]} onPress={onDeletePost}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="trash-outline" size={20} color="#EF534E" />
+              <ThemedText style={[styles.optionLabel, { color: "#EF534E" }]}>Delete Post</ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#EF534E" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* -------------------- DATA HOOKS (in this file) -------------------- */
+function useAllAndMyPosts() {
+  return useQuery({
+    queryKey: ["posts", "lists"],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await PostQueries.getPosts(token);
+      const posts = (res?.data?.posts?.data || []).map(mapPost);
+      const myPosts = (res?.data?.myPosts?.data || []).map(mapPost);
+      return { posts, myPosts };
+    },
+    staleTime: 30_000,
+  });
+}
+
+function useCreatePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ body, files = [], visibility = "public" }) => {
+      const token = await getToken();
+      const fd = new FormData();
+      fd.append("body", body);
+      fd.append("visibility", visibility);
+      files.forEach((f) => fd.append("media[]", f));
+      return PostMutations.createPost(fd, token);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts", "lists"] }),
+  });
+}
+
+function useUpdatePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, body, files = [], visibility = "public" }) => {
+      const token = await getToken();
+      const fd = new FormData();
+      if (body != null) fd.append("body", String(body));
+      fd.append("visibility", String(visibility));
+      // Only uploading new images; if backend needs explicit replace/remove flags, tell me.
+      files.forEach((f) => fd.append("media[]", f));
+      return PostMutations.updatePost(id, fd, token);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts", "lists"] }),
+  });
+}
+
+function useDeletePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => {
+      const token = await getToken();
+      return PostMutations.deletePost(id, token);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts", "lists"] }),
+  });
+}
+
+function useToggleLikeMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ postId }) => {
+      const token = await getToken();
+      return PostMutations.likePost(postId, token);
+    },
+    onMutate: async ({ postId }) => {
+      await qc.cancelQueries({ queryKey: ["posts", "lists"] });
+      const prev = qc.getQueryData(["posts", "lists"]);
+      if (prev) {
+        const bump = (arr = []) =>
+          arr.map((p) =>
+            p.id === String(postId)
+              ? { ...p, is_liked: !p.is_liked, likes: (p.likes || 0) + (p.is_liked ? -1 : 1) }
+              : p
+          );
+        qc.setQueryData(["posts", "lists"], { posts: bump(prev.posts), myPosts: bump(prev.myPosts) });
+      }
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(["posts", "lists"], ctx.prev),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["posts", "lists"] }),
+  });
+}
 
 /* -------------------- MAIN SCREEN -------------------- */
 export default function FeedScreen() {
@@ -645,9 +1587,19 @@ export default function FeedScreen() {
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [createVisible, setCreateVisible] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
   const [activePost, setActivePost] = useState(null);
   const [tab, setTab] = useState("my"); // 'my' | 'all'
-  const [posts, setPosts] = useState(ALL_POSTS);
+
+  const { data, isLoading, error } = useAllAndMyPosts();
+  const create = useCreatePost();
+  const update = useUpdatePost();
+  const remove = useDeletePost();
+  const likeMut = useToggleLikeMutation();
+
+  const posts = data?.posts || [];
+  theMyPosts = data?.myPosts || [];
+  const listData = tab === "my" ? theMyPosts : posts;
 
   const openComments = (post) => {
     setActivePost(post);
@@ -658,24 +1610,43 @@ export default function FeedScreen() {
     setOptionsVisible(true);
   };
 
-  const data = tab === "my" ? MY_POSTS : posts;
+  const handleToggleLike = (postId) => likeMut.mutate({ postId });
+
+  const handleDeletePost = async () => {
+    setOptionsVisible(false);
+    if (!activePost) return;
+    await remove.mutateAsync(activePost.id);
+  };
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ThemedText>Loading…</ThemedText>
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ThemedText>Error: {error.message}</ThemedText>
+      </View>
+    );
+  }
+
+  // helper to extract current server images from a post for edit modal
+  const getPostImageUrls = (p) => (p?.images?.length ? p.images : p?.image ? [p.image] : []);
 
   return (
     <View style={[styles.screen, { backgroundColor: "#fff" }]}>
       <StatusBar barStyle="dark-content" />
       <FlatList
-        data={data}
+        data={listData}
         keyExtractor={(it) => it.id}
         ListHeaderComponent={
           <>
             <FeedHeader C={C} />
-
-            {/* Tabs under header */}
             <View style={styles.tabsWrap}>
-              <TouchableOpacity
-                onPress={() => setTab("my")}
-                style={[styles.tabBtn, tab === "my" && { backgroundColor: C.primary }]}
-              >
+              <TouchableOpacity onPress={() => setTab("my")} style={[styles.tabBtn, tab === "my" && { backgroundColor: C.primary }]}>
                 <ThemedText style={[styles.tabTxt, tab === "my" && { color: "#fff" }]}>My Posts</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
@@ -686,16 +1657,14 @@ export default function FeedScreen() {
                   tab === "all" && { borderColor: C.primary, backgroundColor: C.primary },
                 ]}
               >
-                <ThemedText style={[styles.tabTxt, { color: tab === "all" ? "#fff" : "#6C727A", }]}>
-                  All Posts
-                </ThemedText>
+                <ThemedText style={[styles.tabTxt, { color: tab === "all" ? "#fff" : "#6C727A" }]}>All Posts</ThemedText>
               </TouchableOpacity>
             </View>
           </>
         }
         contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
-          <PostCard item={item} onOpenComments={openComments} onOpenOptions={openOptions} C={C} />
+          <PostCard item={item} onOpenComments={openComments} onOpenOptions={openOptions} onToggleLike={handleToggleLike} C={C} />
         )}
         showsVerticalScrollIndicator={false}
       />
@@ -705,16 +1674,48 @@ export default function FeedScreen() {
         <Ionicons name="add" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {/* Sheets / Modals */}
-      <CommentsSheet visible={commentsVisible} onClose={() => setCommentsVisible(false)} />
-      <OptionsSheet
-        visible={optionsVisible}
-        onClose={() => setOptionsVisible(false)}
-        // onHidePost={() => handleHidePost(activePost?.id)}
-      />      <CreatePostModal
+      {/* Comments */}
+      <CommentsSheet visible={commentsVisible} onClose={() => setCommentsVisible(false)} postId={activePost?.id} />
+
+      {/* Options: All vs My */}
+      {tab === "all" ? (
+        <OptionsSheetAll visible={optionsVisible} onClose={() => setOptionsVisible(false)} />
+      ) : (
+        <OptionsSheetMine
+          visible={optionsVisible}
+          onClose={() => setOptionsVisible(false)}
+          onEditPost={() => {
+            setOptionsVisible(false);
+            setEditVisible(true);
+          }}
+          onDeletePost={handleDeletePost}
+        />
+      )}
+
+      {/* Create (new) */}
+      <CreatePostModal
         visible={createVisible}
         onClose={() => setCreateVisible(false)}
-        onPost={(post) => setPosts((p) => [post, ...p])}
+        mode="create"
+        onSubmit={async ({ body, newFiles }) => {
+          await create.mutateAsync({ body, files: newFiles });
+          setCreateVisible(false);
+        }}
+      />
+
+      {/* Edit (same modal UI) */}
+      <CreatePostModal
+        visible={editVisible}
+        onClose={() => setEditVisible(false)}
+        mode="edit"
+        initialCaption={activePost?.caption}
+        initialImageUrls={getPostImageUrls(activePost)}
+        onSubmit={async ({ body, newFiles /* keptUrls, removedUrls */ }) => {
+          // NOTE: backend delete/replace behavior is unknown.
+          // We upload new files with caption update. Tell me if it needs "replace_media" or "remove_media_ids[]".
+          await update.mutateAsync({ id: activePost.id, body, files: newFiles });
+          setEditVisible(false);
+        }}
       />
     </View>
   );
@@ -724,7 +1725,6 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
 
-  /* Header */
   header: {
     paddingTop: 60,
     paddingBottom: 20,
@@ -747,14 +1747,11 @@ const styles = StyleSheet.create({
     height: 60,
   },
   searchInput: { flex: 1, fontSize: 14, color: "#333" },
-  cameraIcon: { marginLeft: 8 },
 
-  /* Tabs under header */
   tabsWrap: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 12 },
   tabBtn: { flex: 1, height: 42, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   tabTxt: { fontWeight: "700", fontSize: 10 },
 
-  /* Post card */
   postCard: {
     backgroundColor: "#fff",
     marginHorizontal: 14,
@@ -780,28 +1777,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
   },
 
-  dotsRow: {
-    marginTop: 8,
-    alignSelf: "center",
-    flexDirection: "row",
-    gap: 6,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#bbb",
-    opacity: 0.6,
-  },
+  dotsRow: { marginTop: 8, alignSelf: "center", flexDirection: "row", gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#bbb", opacity: 0.6 },
   dotActive: { backgroundColor: "#EF534E", opacity: 1, width: 8, height: 8, borderRadius: 4, marginTop: -1 },
 
-  captionPill: {
-    marginTop: 10,
-    backgroundColor: "#F1F2F5",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 15,
-  },
+  captionPill: { marginTop: 10, backgroundColor: "#F1F2F5", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 15 },
   captionText: { color: "#000", fontSize: 12 },
 
   actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -812,39 +1792,13 @@ const styles = StyleSheet.create({
   visitBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   visitBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" },
 
-  /* Comments / options shared styles */
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
-  sheet: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 68,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: "#D8DCE2",
-    marginBottom: 6,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    marginBottom: 10,
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#000",
-    textAlign: "center",
-    marginLeft: 160,
-  },
-   optionRow: {
+  sheet: { backgroundColor: "#fff", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheetHandle: { alignSelf: "center", width: 68, height: 6, borderRadius: 999, backgroundColor: "#D8DCE2", marginBottom: 6 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, marginBottom: 10 },
+  sheetTitle: { fontSize: 20, fontWeight: "700", color: "#000", textAlign: "center", marginLeft: 160 },
+
+  optionRow: {
     height: 56,
     borderRadius: 12,
     paddingHorizontal: 12,
@@ -855,7 +1809,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     elevation: 1,
   },
-  optionRowDanger: { borderColor: "#FDE2E0", backgroundColor: "#FFF8F8" },
+  optionRowDanger: { backgroundColor: "#FFF8F8" },
   optionLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   optionLabel: { fontSize: 15, color: "#000" },
 
@@ -865,12 +1819,9 @@ const styles = StyleSheet.create({
   commentTime: { color: "#6C727A", fontSize: 12 },
   commentBody: { color: "#101318", marginTop: 2 },
   commentMetaRow: { flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between", paddingRight: 14 },
-  replyText: { color: "#6C727A" },
-  commentLikeCount: { color: "#101318", fontSize: 12 },
 
   repliesWrap: { marginLeft: 44, marginTop: 6 },
   replyContainer: { flexDirection: "row", marginTop: 10 },
-  mentionText: { color: "#EF534E", fontWeight: "600" },
 
   replyingChip: { alignSelf: "flex-start", marginTop: 8, backgroundColor: "#F3F4F6", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 6 },
   replyingText: { color: "#6C727A", fontSize: 12 },
@@ -879,7 +1830,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, height: 46, fontSize: 14, color: "#101318" },
   sendBtn: { width: 44, height: 46, alignItems: "center", justifyContent: "center" },
 
-  /* FAB */
   fab: {
     position: "absolute",
     right: 18,
@@ -898,7 +1848,21 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
-
-  // If your PNGs are already colored, remove tintColor.
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
+});
+
+const stylesCP = StyleSheet.create({
+  header: { height: 56, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, borderBottomWidth: 1 },
+  iconBtn: { padding: 6, borderRadius: 20 },
+  title: { flex: 1, textAlign: "center", fontWeight: "700", fontSize: 16 },
+  postBtn: { paddingHorizontal: 14, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  postBtnTxt: { color: "#fff", fontWeight: "700" },
+  card: { borderWidth: 1, borderRadius: 14, padding: 12 },
+  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
+  input: { flex: 1, minHeight: 38 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  gridItem: { width: "48%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", position: "relative" },
+  gridImg: { width: "100%", height: "100%" },
+  closeChip: { position: "absolute", top: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  thumbAdd: { width: 56, height: 56, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
 });
