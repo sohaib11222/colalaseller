@@ -1,5 +1,5 @@
 // screens/my/ShoppingWalletScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -11,6 +11,8 @@ import {
   TextInput,
   SafeAreaView,
   Image,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -18,6 +20,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
+
+//Code Related to the integration
+import { getTransactionHistory } from "../../../utils/queries/settings";
+import { useQuery } from "@tanstack/react-query";
+import { getOnboardingToken } from "../../../utils/tokenStorage";
+import { useAuth } from "../../../contexts/AuthContext";
 
 /* ---------- Local icons (swap paths if different) ---------- */
 const ICONS = {
@@ -29,19 +37,79 @@ const ICONS = {
 const whenText = "07/10/25 - 06:22 AM";
 
 const WITHDRAWALS = [
-  { id: "w1", title: "Funds Deposit", amount: 20000, status: "successful", when: whenText },
-  { id: "w2", title: "Funds Deposit", amount: 20000, status: "pending", when: whenText },
-  { id: "w3", title: "Funds Deposit", amount: 20000, status: "failed", when: whenText },
-  { id: "w4", title: "Funds Deposit", amount: 20000, status: "successful", when: whenText },
-  { id: "w5", title: "Funds Deposit", amount: 20000, status: "successful", when: whenText },
+  {
+    id: "w1",
+    title: "Funds Deposit",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
+  {
+    id: "w2",
+    title: "Funds Deposit",
+    amount: 20000,
+    status: "pending",
+    when: whenText,
+  },
+  {
+    id: "w3",
+    title: "Funds Deposit",
+    amount: 20000,
+    status: "failed",
+    when: whenText,
+  },
+  {
+    id: "w4",
+    title: "Funds Deposit",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
+  {
+    id: "w5",
+    title: "Funds Deposit",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
 ];
 
 const PAYMENTS = [
-  { id: "p1", title: "Order Payment - Wallet", amount: 20000, status: "successful", when: whenText },
-  { id: "p2", title: "Order Payment - Flutterwave", amount: 20000, status: "successful", when: whenText },
-  { id: "p3", title: "Order Payment", amount: 20000, status: "successful", when: whenText },
-  { id: "p4", title: "Order Payment", amount: 20000, status: "successful", when: whenText },
-  { id: "p5", title: "Order Payment", amount: 20000, status: "successful", when: whenText },
+  {
+    id: "p1",
+    title: "Order Payment - Wallet",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
+  {
+    id: "p2",
+    title: "Order Payment - Flutterwave",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
+  {
+    id: "p3",
+    title: "Order Payment",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
+  {
+    id: "p4",
+    title: "Order Payment",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
+  {
+    id: "p5",
+    title: "Order Payment",
+    amount: 20000,
+    status: "successful",
+    when: whenText,
+  },
 ];
 
 /* ---------- Small helpers ---------- */
@@ -52,11 +120,15 @@ const StatusLabel = ({ status, C }) => {
     failed: { text: "Failed", color: "#E11D48" },
   };
   const it = map[status] || map.successful;
-  return <ThemedText style={{ color: it.color, marginTop: 6 }}>{it.text}</ThemedText>;
+  return (
+    <ThemedText style={{ color: it.color, marginTop: 6 }}>{it.text}</ThemedText>
+  );
 };
 
 const Amount = ({ value, color }) => (
-  <ThemedText style={{ color, fontWeight: "800" }}>{`₦${value.toLocaleString()}`}</ThemedText>
+  <ThemedText
+    style={{ color, fontWeight: "800" }}
+  >{`₦${value.toLocaleString()}`}</ThemedText>
 );
 
 const TxIcon = ({ type }) => (
@@ -67,20 +139,30 @@ const TxIcon = ({ type }) => (
 
 const RowCard = ({ item, tab, C }) => {
   const amountColor =
-    item.status === "failed" ? "#E11D48" : item.status === "pending" ? "#E6A700" : "#18A957";
+    item.status === "failed"
+      ? "#E11D48"
+      : item.status === "pending"
+      ? "#E6A700"
+      : "#18A957";
 
   return (
-    <View style={[styles.rowCard, { borderColor: C.line, backgroundColor: C.card }]}>
+    <View
+      style={[styles.rowCard, { borderColor: C.line, backgroundColor: C.card }]}
+    >
       <TxIcon type={tab} />
 
       <View style={{ flex: 1 }}>
-        <ThemedText style={{ color: C.text, fontWeight: "700" }}>{item.title}</ThemedText>
+        <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+          {item.title}
+        </ThemedText>
         <StatusLabel status={item.status} C={C} />
       </View>
 
       <View style={{ alignItems: "flex-end" }}>
         <Amount value={item.amount} color={amountColor} />
-        <ThemedText style={[styles.when, { color: C.sub }]}>{item.when}</ThemedText>
+        <ThemedText style={[styles.when, { color: C.sub }]}>
+          {item.when}
+        </ThemedText>
       </View>
     </View>
   );
@@ -90,6 +172,8 @@ const RowCard = ({ item, tab, C }) => {
 export default function ShoppingWalletScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const [onboardingToken, setOnboardingToken] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
     () => ({
@@ -115,27 +199,139 @@ export default function ShoppingWalletScreen() {
   const [wAccName, setWAccName] = useState("");
   const [saveDetails, setSaveDetails] = useState(false);
 
+  // Get onboarding token
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        console.log("🔍 Fetching onboarding token for transaction history...");
+        const token = await getOnboardingToken();
+        console.log("🔑 Transaction token retrieved:", token ? "Token present" : "No token");
+        console.log("🔑 Transaction token value:", token);
+        setOnboardingToken(token);
+      } catch (error) {
+        console.error("❌ Error getting onboarding token for transactions:", error);
+        setOnboardingToken(null);
+      }
+    };
+    getToken();
+  }, []);
+
+  // Fetch transaction history data
+  const {
+    data: transactionData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["transactionHistory", onboardingToken],
+    queryFn: () => {
+      console.log("🚀 Executing getTransactionHistory API call with token:", onboardingToken);
+      return getTransactionHistory(onboardingToken);
+    },
+    enabled: !!onboardingToken,
+    onSuccess: (data) => {
+      console.log("✅ Transaction history API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Transaction history API call failed:", error);
+    },
+  });
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    console.log("🔄 Starting transaction history pull-to-refresh...");
+    setRefreshing(true);
+    try {
+      console.log("🔄 Refreshing transaction history data...");
+      await refetch();
+      console.log("✅ Transaction history data refreshed successfully");
+    } catch (error) {
+      console.error("❌ Error refreshing transaction history data:", error);
+    } finally {
+      setRefreshing(false);
+      console.log("🔄 Transaction history pull-to-refresh completed");
+    }
+  };
+
+  // Extract data from API response
+  const balance = transactionData?.data?.balance || 0;
+  const withdrawals = transactionData?.data?.withdrawals || [];
+  const deposits = transactionData?.data?.deposits || [];
+  const orderPayments = transactionData?.data?.orderPayments || [];
+
+  // Debug logging for transaction data
+  console.log("📊 Transaction data:", transactionData);
+  console.log("💰 Balance:", balance);
+  console.log("📤 Withdrawals count:", withdrawals.length);
+  console.log("📥 Deposits count:", deposits.length);
+  console.log("💳 Order payments count:", orderPayments.length);
+  console.log("⏳ Is loading:", isLoading);
+  console.log("❌ Has error:", error);
+  console.log("🔄 Is refreshing:", refreshing);
+
+  // Map API data to component format
+  const mapTransactionData = (transactions, type) => {
+    return transactions.map((tx) => ({
+      id: tx.id.toString(),
+      title: tx.title || "Fund Transfer",
+      amount: tx.amount,
+      status: tx.status === "completed" ? "successful" : tx.status,
+      when: tx.created_at ? new Date(tx.created_at).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) : "N/A",
+      tx_id: tx.tx_id,
+      type: tx.type,
+      order_id: tx.order_id,
+    }));
+  };
+
   const data = useMemo(() => {
-    const base = tab === "withdrawals" ? WITHDRAWALS : PAYMENTS;
-    if (filter === "all") return base;
-    return base.filter((r) => r.status === filter);
-  }, [tab, filter]);
+    if (isLoading || error) return [];
+    
+    let baseData = [];
+    if (tab === "withdrawals") {
+      // Combine withdrawals and deposits for withdrawals tab
+      baseData = [...mapTransactionData(withdrawals, "withdrawal"), ...mapTransactionData(deposits, "deposit")];
+    } else {
+      // Use order payments for payments tab
+      baseData = mapTransactionData(orderPayments, "order_payment");
+    }
+    
+    if (filter === "all") return baseData;
+    return baseData.filter((r) => r.status === filter);
+  }, [tab, filter, withdrawals, deposits, orderPayments, isLoading, error]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <StatusBar style="dark" />
+      <StatusBar style="dark" />
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.line, backgroundColor: C.card }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: C.line, backgroundColor: C.card },
+        ]}
+      >
         <View style={styles.headerRow}>
           <TouchableOpacity
-            onPress={() => (navigation.canGoBack() ? navigation.goBack() : null)}
-            style={[styles.iconBtn, { borderColor: C.line, backgroundColor: C.card }]}
+            onPress={() =>
+              navigation.canGoBack() ? navigation.goBack() : null
+            }
+            style={[
+              styles.iconBtn,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </TouchableOpacity>
 
-          <ThemedText style={[styles.headerTitle, { color: C.text }]}>Shopping Wallet</ThemedText>
+          <ThemedText style={[styles.headerTitle, { color: C.text }]}>
+            Shopping Wallet
+          </ThemedText>
           <View style={{ width: 40, height: 40 }} />
         </View>
       </View>
@@ -145,6 +341,17 @@ export default function ShoppingWalletScreen() {
         keyExtractor={(i) => i.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
         ListHeaderComponentStyle={{ zIndex: 20, elevation: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[C.primary]}
+            tintColor={C.primary}
+            title="Pull to refresh transactions"
+            titleColor={C.primary}
+            progressBackgroundColor={C.card}
+          />
+        }
         ListHeaderComponent={
           <View style={{ zIndex: 20, elevation: 20 }}>
             {/* Balance Card (gradient) */}
@@ -154,30 +361,67 @@ export default function ShoppingWalletScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.gradientCard}
             >
-              <ThemedText style={styles.balanceLabel}>Shopping Wallet</ThemedText>
-              <ThemedText style={styles.balanceValue}>N35,000</ThemedText>
+              <ThemedText style={styles.balanceLabel}>
+                Shopping Wallet
+              </ThemedText>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <ThemedText style={[styles.balanceValue, { marginLeft: 8 }]}>
+                    Loading...
+                  </ThemedText>
+                </View>
+              ) : error ? (
+                <ThemedText style={[styles.balanceValue, { color: "#ff6b6b" }]}>
+                  Error loading
+                </ThemedText>
+              ) : (
+                <ThemedText style={styles.balanceValue}>
+                  ₦{parseFloat(balance).toLocaleString()}
+                  {parseFloat(balance) === 0 && (
+                    <ThemedText style={{ fontSize: 14, opacity: 0.8 }}>
+                      {" "}(No funds)
+                    </ThemedText>
+                  )}
+                </ThemedText>
+              )}
 
               {/* Only Withdraw button, styled like a pill */}
-              <TouchableOpacity style={styles.withdrawPill} onPress={() => setWithdrawVisible(true)}>
-                <ThemedText style={{ color: C.text, fontWeight: "600" }}>Withdraw</ThemedText>
+              <TouchableOpacity
+                style={styles.withdrawPill}
+                onPress={() => setWithdrawVisible(true)}
+              >
+                <ThemedText style={{ color: C.text, fontWeight: "600" }}>
+                  Withdraw
+                </ThemedText>
               </TouchableOpacity>
             </LinearGradient>
 
             {/* Transaction header + filter */}
             <View style={styles.txHeaderRow}>
-              <ThemedText style={[styles.txHeader, { color: C.text }]}>Transaction History</ThemedText>
+              <ThemedText style={[styles.txHeader, { color: C.text }]}>
+                Transaction History
+              </ThemedText>
 
               <View style={styles.filterWrap}>
                 <TouchableOpacity
                   onPress={() => setFilterOpen((p) => !p)}
-                  style={[styles.filterBtn, { borderColor: C.line, backgroundColor: C.card }]}
+                  style={[
+                    styles.filterBtn,
+                    { borderColor: C.line, backgroundColor: C.card },
+                  ]}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="filter-outline" size={18} color={C.text} />
                 </TouchableOpacity>
 
                 {filterOpen && (
-                  <View style={[styles.popover, { borderColor: C.line, backgroundColor: C.card }]}>
+                  <View
+                    style={[
+                      styles.popover,
+                      { borderColor: C.line, backgroundColor: C.card },
+                    ]}
+                  >
                     {[
                       { key: "all", label: "All" },
                       { key: "successful", label: "Successful" },
@@ -186,13 +430,19 @@ export default function ShoppingWalletScreen() {
                     ].map((opt, idx) => (
                       <TouchableOpacity
                         key={opt.key}
-                        style={[styles.popItem, { borderBottomColor: C.line }, idx === 3 && { borderBottomWidth: 0 }]}
+                        style={[
+                          styles.popItem,
+                          { borderBottomColor: C.line },
+                          idx === 3 && { borderBottomWidth: 0 },
+                        ]}
                         onPress={() => {
                           setFilter(opt.key);
                           setFilterOpen(false);
                         }}
                       >
-                        <ThemedText style={{ color: C.text }}>{opt.label}</ThemedText>
+                        <ThemedText style={{ color: C.text }}>
+                          {opt.label}
+                        </ThemedText>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -202,55 +452,172 @@ export default function ShoppingWalletScreen() {
 
             {/* Tabs */}
             <View style={styles.tabsWrap}>
-              <TabBtn label="Withdrawals" active={tab === "withdrawals"} onPress={() => setTab("withdrawals")} C={C} />
-              <TabBtn label="Payments" active={tab === "payments"} onPress={() => setTab("payments")} C={C} />
+              <TabBtn
+                label="Withdrawals"
+                active={tab === "withdrawals"}
+                onPress={() => setTab("withdrawals")}
+                C={C}
+              />
+              <TabBtn
+                label="Payments"
+                active={tab === "payments"}
+                onPress={() => setTab("payments")}
+                C={C}
+              />
             </View>
           </View>
         }
         renderItem={({ item }) => <RowCard item={item} tab={tab} C={C} />}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          !isLoading && !error ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="wallet-outline" size={48} color={C.sub} />
+              <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+                No transactions yet
+              </ThemedText>
+              <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+                {tab === "withdrawals" 
+                  ? "Your withdrawal and deposit transactions will appear here"
+                  : "Your payment transactions will appear here"
+                }
+              </ThemedText>
+            </View>
+          ) : null
+        }
       />
 
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <ThemedText style={[styles.loadingText, { color: C.text }]}>
+            Loading transaction history...
+          </ThemedText>
+          <ThemedText style={[styles.loadingSubtext, { color: C.sub }]}>
+            Fetching balance and transaction details
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <View style={styles.errorOverlay}>
+          <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
+          <ThemedText style={[styles.errorTitle, { color: C.text }]}>
+            Failed to load transactions
+          </ThemedText>
+          <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
+            {error.message || "Unable to fetch transaction history. Please check your connection and try again."}
+          </ThemedText>
+          <TouchableOpacity
+            onPress={() => {
+              console.log("🔄 Retrying transaction history fetch...");
+              refetch();
+            }}
+            style={[styles.retryButton, { backgroundColor: C.primary }]}
+          >
+            <ThemedText style={[styles.retryButtonText, { color: C.card }]}>
+              Try Again
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ===== Withdraw Full-Screen Modal ===== */}
-      <Modal visible={withdrawVisible} animationType="slide" onRequestClose={() => setWithdrawVisible(false)}>
+      <Modal
+        visible={withdrawVisible}
+        animationType="slide"
+        onRequestClose={() => setWithdrawVisible(false)}
+      >
         <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
           {/* top bar */}
-          <View style={[styles.withdrawHeader, { borderBottomColor: C.line, backgroundColor: C.card }]}>
+          <View
+            style={[
+              styles.withdrawHeader,
+              { borderBottomColor: C.line, backgroundColor: C.card },
+            ]}
+          >
             <TouchableOpacity
               onPress={() => setWithdrawVisible(false)}
-              style={[styles.iconBtn, { borderColor: C.line, backgroundColor: C.card }]}
+              style={[
+                styles.iconBtn,
+                { borderColor: C.line, backgroundColor: C.card },
+              ]}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons name="chevron-back" size={22} color={C.text} />
             </TouchableOpacity>
-            <ThemedText style={[styles.withdrawTitle, { color: C.text }]}>Withdraw</ThemedText>
+            <ThemedText style={[styles.withdrawTitle, { color: C.text }]}>
+              Withdraw
+            </ThemedText>
             <View style={{ width: 40, height: 40 }} />
           </View>
 
           {/* form */}
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}
+          >
             <View style={{ padding: 16, backgroundColor: C.bg, flex: 1 }}>
-              <Input C={C} placeholder="Amount to withdraw" keyboardType="numeric" value={wAmount} onChangeText={setWAmount} />
-              <Input C={C} placeholder="Account Number" keyboardType="number-pad" value={wAccNumber} onChangeText={setWAccNumber} />
-              <Input C={C} placeholder="Bank Name" value={wBankName} onChangeText={setWBankName} />
-              <Input C={C} placeholder="Account Name" value={wAccName} onChangeText={setWAccName} />
+              <Input
+                C={C}
+                placeholder="Amount to withdraw"
+                keyboardType="numeric"
+                value={wAmount}
+                onChangeText={setWAmount}
+              />
+              <Input
+                C={C}
+                placeholder="Account Number"
+                keyboardType="number-pad"
+                value={wAccNumber}
+                onChangeText={setWAccNumber}
+              />
+              <Input
+                C={C}
+                placeholder="Bank Name"
+                value={wBankName}
+                onChangeText={setWBankName}
+              />
+              <Input
+                C={C}
+                placeholder="Account Name"
+                value={wAccName}
+                onChangeText={setWAccName}
+              />
 
-              <TouchableOpacity style={styles.saveRow} onPress={() => setSaveDetails((p) => !p)}>
+              <TouchableOpacity
+                style={styles.saveRow}
+                onPress={() => setSaveDetails((p) => !p)}
+              >
                 <View
                   style={[
                     styles.checkbox,
-                    { borderColor: C.primary, backgroundColor: saveDetails ? C.primary : "#fff" },
+                    {
+                      borderColor: C.primary,
+                      backgroundColor: saveDetails ? C.primary : "#fff",
+                    },
                   ]}
                 >
-                  {saveDetails ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+                  {saveDetails ? (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  ) : null}
                 </View>
-                <ThemedText style={{ color: C.text }}>Save account details</ThemedText>
+                <ThemedText style={{ color: C.text }}>
+                  Save account details
+                </ThemedText>
               </TouchableOpacity>
 
               <View style={{ flex: 1 }} />
-              <TouchableOpacity style={[styles.withdrawBtn, { backgroundColor: C.primary }]} onPress={() => setWithdrawVisible(false)}>
-                <ThemedText style={styles.withdrawBtnTxt}>Process Withdrawal</ThemedText>
+              <TouchableOpacity
+                style={[styles.withdrawBtn, { backgroundColor: C.primary }]}
+                onPress={() => setWithdrawVisible(false)}
+              >
+                <ThemedText style={styles.withdrawBtnTxt}>
+                  Process Withdrawal
+                </ThemedText>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -266,10 +633,14 @@ const TabBtn = ({ label, active, onPress, C }) => (
     onPress={onPress}
     style={[
       styles.tabBtn,
-      active ? { backgroundColor: C.primary } : { backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+      active
+        ? { backgroundColor: C.primary }
+        : { backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
     ]}
   >
-    <ThemedText style={[styles.tabTxt, { color: active ? "#fff" : C.text }]}>{label}</ThemedText>
+    <ThemedText style={[styles.tabTxt, { color: active ? "#fff" : C.text }]}>
+      {label}
+    </ThemedText>
   </TouchableOpacity>
 );
 
@@ -277,7 +648,10 @@ const Input = ({ C, ...props }) => (
   <TextInput
     {...props}
     placeholderTextColor={C.sub}
-    style={[styles.input, { borderColor: C.line, backgroundColor: C.card, color: C.text }]}
+    style={[
+      styles.input,
+      { borderColor: C.line, backgroundColor: C.card, color: C.text },
+    ]}
   />
 );
 
@@ -334,7 +708,12 @@ const styles = StyleSheet.create({
     ...shadow(6),
   },
   balanceLabel: { color: "#fff", opacity: 0.9, fontSize: 12, marginBottom: 18 },
-  balanceValue: { color: "#fff", fontSize: 38, fontWeight: "700", marginBottom: 16 },
+  balanceValue: {
+    color: "#fff",
+    fontSize: 38,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
 
   withdrawPill: {
     height: 44,
@@ -342,6 +721,90 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  // Loading overlay styles
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Error overlay styles
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    zIndex: 1000,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Empty state styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 
   /* Transaction header */
@@ -443,7 +906,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 12,
   },
-  saveRow: { flexDirection: "row", alignItems: "center", marginTop: 4, marginBottom: 24, gap: 10 },
+  saveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 24,
+    gap: 10,
+  },
   checkbox: {
     width: 18,
     height: 18,

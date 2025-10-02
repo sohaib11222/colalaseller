@@ -142,11 +142,13 @@ export default function EscrowWalletScreen() {
   useEffect(() => {
     const getToken = async () => {
       try {
+        console.log("🔍 Fetching onboarding token for escrow wallet...");
         const token = await getOnboardingToken();
+        console.log("🔑 Escrow token retrieved:", token ? "Token present" : "No token");
+        console.log("🔑 Escrow token value:", token);
         setOnboardingToken(token);
-        console.log("Retrieved onboarding token for escrow wallet:", token ? "Token present" : "No token");
       } catch (error) {
-        console.error("Error getting onboarding token:", error);
+        console.error("❌ Error getting onboarding token for escrow:", error);
         setOnboardingToken(null);
       }
     };
@@ -161,8 +163,17 @@ export default function EscrowWalletScreen() {
     refetch: refetchWallet 
   } = useQuery({
     queryKey: ['escrowWallet', onboardingToken],
-    queryFn: () => getEscrowWallet(onboardingToken),
+    queryFn: () => {
+      console.log("🚀 Executing getEscrowWallet API call with token:", onboardingToken);
+      return getEscrowWallet(onboardingToken);
+    },
     enabled: !!onboardingToken,
+    onSuccess: (data) => {
+      console.log("✅ Escrow wallet API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Escrow wallet API call failed:", error);
+    },
   });
 
   // Fetch escrow history data
@@ -173,20 +184,32 @@ export default function EscrowWalletScreen() {
     refetch: refetchHistory 
   } = useQuery({
     queryKey: ['escrowHistory', onboardingToken],
-    queryFn: () => getEscrowHistory(onboardingToken),
+    queryFn: () => {
+      console.log("🚀 Executing getEscrowHistory API call with token:", onboardingToken);
+      return getEscrowHistory(onboardingToken);
+    },
     enabled: !!onboardingToken,
+    onSuccess: (data) => {
+      console.log("✅ Escrow history API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Escrow history API call failed:", error);
+    },
   });
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
+    console.log("🔄 Starting escrow pull-to-refresh...");
     setRefreshing(true);
     try {
+      console.log("🔄 Refreshing escrow wallet and history data...");
       await Promise.all([refetchWallet(), refetchHistory()]);
-      console.log("Escrow data refreshed successfully");
+      console.log("✅ Escrow data refreshed successfully");
     } catch (error) {
-      console.error("Error refreshing escrow data:", error);
+      console.error("❌ Error refreshing escrow data:", error);
     } finally {
       setRefreshing(false);
+      console.log("🔄 Escrow pull-to-refresh completed");
     }
   };
 
@@ -195,6 +218,15 @@ export default function EscrowWalletScreen() {
   const historyList = historyData?.data?.data || [];
   const isLoading = walletLoading || historyLoading;
   const hasError = walletError || historyError;
+
+  // Debug logging for data extraction
+  console.log("📊 Escrow wallet data:", walletData);
+  console.log("📊 Escrow history data:", historyData);
+  console.log("💰 Locked balance:", lockedBalance);
+  console.log("📋 History list length:", historyList.length);
+  console.log("⏳ Is loading:", isLoading);
+  console.log("❌ Has error:", hasError);
+  console.log("🔄 Is refreshing:", refreshing);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -236,6 +268,9 @@ export default function EscrowWalletScreen() {
             onRefresh={onRefresh}
             colors={[C.primary]}
             tintColor={C.primary}
+            title="Pull to refresh escrow data"
+            titleColor={C.primary}
+            progressBackgroundColor={C.card}
           />
         }
         ListHeaderComponent={
@@ -289,8 +324,11 @@ export default function EscrowWalletScreen() {
       {isLoading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={C.primary} />
-          <ThemedText style={[styles.loadingText, { color: C.sub }]}>
-            Loading escrow data...
+          <ThemedText style={[styles.loadingText, { color: C.text }]}>
+            Loading escrow wallet data...
+          </ThemedText>
+          <ThemedText style={[styles.loadingSubtext, { color: C.sub }]}>
+            Fetching balance and transaction history
           </ThemedText>
         </View>
       )}
@@ -298,15 +336,16 @@ export default function EscrowWalletScreen() {
       {/* Error State */}
       {hasError && !isLoading && (
         <View style={styles.errorOverlay}>
-          <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
+          <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
           <ThemedText style={[styles.errorTitle, { color: C.text }]}>
-            Failed to load data
+            Failed to load escrow data
           </ThemedText>
           <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
-            {walletError?.message || historyError?.message || "Something went wrong"}
+            {walletError?.message || historyError?.message || "Unable to fetch escrow wallet data. Please check your connection and try again."}
           </ThemedText>
           <TouchableOpacity
             onPress={() => {
+              console.log("🔄 Retrying escrow data fetch...");
               refetchWallet();
               refetchHistory();
             }}
@@ -417,6 +456,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    fontWeight: "500",
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: "center",
   },
 
   // Error overlay styles

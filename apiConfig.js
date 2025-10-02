@@ -84,6 +84,7 @@ const API_ENDPOINTS = {
     FAQs: `${API_DOMAIN}/faqs/category/name/general`, // GET
     Escrow_Wallet: `${API_DOMAIN}/faqs/escrow`, // GET
     Escrow_History: `${API_DOMAIN}/faqs/escrow/history`, // GET
+    Transaction_History: `${API_DOMAIN}/user/transactions`, // GET
   },
 };
 

@@ -1,5 +1,5 @@
 // screens/settings/SettingsScreen.jsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,15 +8,25 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import ThemedText from '../../../components/ThemedText';
 import { useTheme } from '../../../components/ThemeProvider';
 
+//Code Related to the integration
+import { getBalance } from '../../../utils/queries/settings';
+import { useQuery } from '@tanstack/react-query';
+import { getOnboardingToken } from '../../../utils/tokenStorage';
+import { useAuth } from '../../../contexts/AuthContext';
+
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const [onboardingToken, setOnboardingToken] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
     () => ({
@@ -35,6 +45,76 @@ const SettingsScreen = () => {
 
   const cartCount = 2;
   const notifCount = 3;
+
+  // Get onboarding token
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        console.log("🔍 Fetching onboarding token for balance...");
+        const token = await getOnboardingToken();
+        console.log("🔑 Balance token retrieved:", token ? "Token present" : "No token");
+        console.log("🔑 Balance token value:", token);
+        setOnboardingToken(token);
+      } catch (error) {
+        console.error("❌ Error getting onboarding token for balance:", error);
+        setOnboardingToken(null);
+      }
+    };
+    getToken();
+  }, []);
+
+  // Fetch balance data using React Query
+  const {
+    data: balanceData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["balance", onboardingToken],
+    queryFn: () => {
+      console.log("🚀 Executing getBalance API call with token:", onboardingToken);
+      return getBalance(onboardingToken);
+    },
+    enabled: !!onboardingToken,
+    onSuccess: (data) => {
+      console.log("✅ Balance API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Balance API call failed:", error);
+    },
+  });
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    console.log("🔄 Starting balance pull-to-refresh...");
+    setRefreshing(true);
+    try {
+      console.log("🔄 Refreshing balance data...");
+      await refetch();
+      console.log("✅ Balance data refreshed successfully");
+    } catch (error) {
+      console.error("❌ Error refreshing balance data:", error);
+    } finally {
+      setRefreshing(false);
+      console.log("🔄 Balance pull-to-refresh completed");
+    }
+  };
+
+  // Extract balance data from API response
+  const shoppingBalance = balanceData?.data?.shopping_balance || 0;
+  const escrowBalance = balanceData?.data?.escrow_balance || 0;
+  const rewardBalance = balanceData?.data?.reward_balance || 0;
+  const loyaltyPoints = balanceData?.data?.loyality_points || 0;
+
+  // Debug logging for balance data
+  console.log("📊 Balance data:", balanceData);
+  console.log("💰 Shopping balance:", shoppingBalance);
+  console.log("🔒 Escrow balance:", escrowBalance);
+  console.log("🎁 Reward balance:", rewardBalance);
+  console.log("⭐ Loyalty points:", loyaltyPoints);
+  console.log("⏳ Is loading:", isLoading);
+  console.log("❌ Has error:", error);
+  console.log("🔄 Is refreshing:", refreshing);
 
   const IMG_SUB_ACTIVE = require('../../../assets/Group 115.png');
 
@@ -145,7 +225,25 @@ const SettingsScreen = () => {
         <View style={[styles.walletCard, { backgroundColor: C.white }]}>
           <View style={{ flex: 1 }}>
             <ThemedText style={[styles.walletLabel, { color: C.sub }]}>Main Wallet</ThemedText>
-            <ThemedText style={[styles.walletAmount, { color: C.text }]}>₦50,000</ThemedText>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={C.primary} />
+                <ThemedText style={[styles.walletAmount, { marginLeft: 8, color: C.text }]}>
+                  Loading...
+                </ThemedText>
+              </View>
+            ) : error ? (
+              <ThemedText style={[styles.walletAmount, { color: C.danger }]}>Error loading</ThemedText>
+            ) : (
+              <ThemedText style={[styles.walletAmount, { color: C.text }]}>
+                ₦{parseFloat(shoppingBalance).toLocaleString()}
+                {parseFloat(shoppingBalance) === 0 && (
+                  <ThemedText style={{ fontSize: 14, opacity: 0.8 }}>
+                    {" "}(No funds)
+                  </ThemedText>
+                )}
+              </ThemedText>
+            )}
           </View>
           <TouchableOpacity style={[styles.viewWalletBtn, { backgroundColor: C.primary }]} onPress={() => onPressRow('wallet')}>
             <ThemedText style={styles.viewWalletText}>View Wallet</ThemedText>
@@ -153,12 +251,44 @@ const SettingsScreen = () => {
         </View>
         <TouchableOpacity style={[styles.holdingBar, { backgroundColor: '#FF6B6B' }]} onPress={() => onPressRow('holdingWallet')}>
           <ThemedText style={styles.holdingText}>
-            ₦50,000 locked in holding wallet <ThemedText style={{ color: '#640505', fontSize: 13 }}>· Click to view</ThemedText>
+            {isLoading ? (
+              "Loading escrow balance..."
+            ) : error ? (
+              "Error loading escrow balance"
+            ) : parseFloat(escrowBalance) === 0 ? (
+              <>
+                No funds locked in holding wallet{" "}
+                <ThemedText style={{ color: '#640505', fontSize: 13 }}>
+                  · Click to view
+                </ThemedText>
+              </>
+            ) : (
+              <>
+                ₦{parseFloat(escrowBalance).toLocaleString()} locked in holding wallet{" "}
+                <ThemedText style={{ color: '#640505', fontSize: 13 }}>
+                  · Click to view
+                </ThemedText>
+              </>
+            )}
           </ThemedText>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
+      <ScrollView 
+        contentContainerStyle={{ paddingBottom: 28 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[C.primary]}
+            tintColor={C.primary}
+            title="Pull to refresh balance"
+            titleColor={C.primary}
+            progressBackgroundColor={C.white}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         {/* Shop Upgrade */}
         <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: C.primary }]} onPress={() => onPressRow('shopUpgrade')}>
           <ThemedText style={styles.primaryBtnText}>Shop Upgrade</ThemedText>
@@ -211,6 +341,43 @@ const SettingsScreen = () => {
           <ThemedText style={styles.disabledText}>Delete Account</ThemedText>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <ThemedText style={[styles.loadingText, { color: C.text }]}>
+            Loading wallet data...
+          </ThemedText>
+          <ThemedText style={[styles.loadingSubtext, { color: C.sub }]}>
+            Fetching balance and transaction details
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <View style={styles.errorOverlay}>
+          <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
+          <ThemedText style={[styles.errorTitle, { color: C.text }]}>
+            Failed to load wallet data
+          </ThemedText>
+          <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
+            {error.message || "Unable to fetch wallet balance. Please check your connection and try again."}
+          </ThemedText>
+          <TouchableOpacity
+            onPress={() => {
+              console.log("🔄 Retrying balance data fetch...");
+              refetch();
+            }}
+            style={[styles.retryButton, { backgroundColor: C.primary }]}
+          >
+            <ThemedText style={[styles.retryButtonText, { color: C.white }]}>
+              Try Again
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -327,6 +494,70 @@ const styles = StyleSheet.create({
   walletAmount: { fontSize: 26, fontWeight: '900', letterSpacing: 0.2, paddingBottom: 25 },
   viewWalletBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginTop: 45 },
   viewWalletText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 25,
+  },
+
+  // Loading overlay styles
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  loadingSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+
+  // Error overlay styles
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    zIndex: 1000,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
   holdingBar: {
     opacity: 0.95,
     borderBottomRightRadius: 20,

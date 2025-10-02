@@ -14,3 +14,6 @@ export const getEscrowHistory = async (token) =>
 
 export const getBalance = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Balance, "GET", undefined, token);
+
+export const getTransactionHistory = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Transaction_History, "GET", undefined, token);
