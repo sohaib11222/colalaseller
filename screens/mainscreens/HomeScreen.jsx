@@ -79,7 +79,7 @@ export default function StoreHomeScreen() {
   }, [theme?.colors?.primary]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F6F6",  marginBottom:60 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F6F6", marginBottom: 60 }}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
         {/* header bar */}
@@ -192,29 +192,43 @@ export default function StoreHomeScreen() {
 
         {/* 4 tiles */}
         <View style={styles.grid}>
+
           <MenuTile
             img={require("../../assets/Vector (26).png")}
             title="My Orders"
             subtitle={"Manage your orders effectively\nview and monitor every\naspect of your customer orders"}
             color={theme.colors.primary}
+            onPress={() => navigation.navigate('ChatNavigator', {
+              screen: "SingleOrderDetails",
+            })}
           />
+
           <MenuTile
             img={require("../../assets/Vector (27).png")}
             title="My Products/Service"
             subtitle={"This is home for all your Products manage everything here"}
             color={theme.colors.primary}
+            onPress={() => navigation.navigate('SettingsNavigator', {
+              screen: "myproducts",
+            })}
           />
           <MenuTile
             img={require("../../assets/Vector (28).png")}
             title="Statistics"
             subtitle={"View detailed statistics for all your products."}
             color={theme.colors.primary}
+            onPress={() => navigation.navigate('ChatNavigator', {
+              screen: "Analytics",
+            })}
           />
           <MenuTile
             img={require("../../assets/Vector (29).png")}
             title="Subscription"
             subtitle={"Manage your subscription package here effectively"}
             color={theme.colors.primary}
+            onPress={() => navigation.navigate('ChatNavigator', {
+              screen: "Subscription",
+            })}
           />
         </View>
 
@@ -257,14 +271,16 @@ function Stat({ img, label, value, divider }) {
     </>
   );
 }
-function MenuTile({ img, title, subtitle, color }) {
+function MenuTile({ img, title, subtitle, color, onPress }) {
   return (
-    <View style={styles.tile}>
+    <TouchableOpacity style={styles.tile} onPress={onPress}>
       <View style={[styles.tileIconCircle, { backgroundColor: "#FFF1F1" }]}>
-        <Image source={img} style={styles.tileImg} />      </View>
+        <Image source={img} style={styles.tileImg} />
+      </View>
+
       <ThemedText style={[styles.tileTitle, { color }]}>{title}</ThemedText>
       <ThemedText style={styles.tileSub}>{subtitle}</ThemedText>
-    </View>
+    </TouchableOpacity>
   );
 }
 function OrderRow({ name, items, price, color }) {
@@ -381,7 +397,7 @@ const styles = StyleSheet.create({
   orderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", marginHorizontal: 16, marginTop: 10, padding: 14, borderRadius: 15 },
   orderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   orderAvatar: { width: 51, height: 51, borderRadius: 30, backgroundColor: "#B9191933", alignItems: "center", justifyContent: "center" },
-  orderName: { fontWeight: "700", color: "#1A1A1A", fontSize:14 },
+  orderName: { fontWeight: "700", color: "#1A1A1A", fontSize: 14 },
   orderItems: { color: "#8B8B8B", fontSize: 10 },
   orderPrice: { fontWeight: "800", fontSize: 14 },
   iconRow: { flexDirection: "row" },

@@ -20,7 +20,7 @@ import { useTheme } from "../components/ThemeProvider";
 
 const { width } = Dimensions.get("window");
 const COVER_H = 210;
-const AVATAR = 56;
+const AVATAR = 65;
 
 /* ---- helpers ---- */
 const src = (v) => (typeof v === "number" ? v : v ? { uri: String(v) } : undefined);
@@ -279,9 +279,46 @@ export default function StoreProfileModal({
       shares: 8,
     },
   ];
+
+  const addresses = storeProp.addresses ?? [
+    {
+      label: "Address 1",
+      isMain: true,
+      state: "Lagos",
+      lga: "Ikeja",
+      fullAddress: "No 2, abcdefght street, opposite abc building, acd bus stop, ikeja",
+      hours: [
+        { day: "Monday", time: "08:00 AM - 07:00PM" },
+        { day: "Tuesday", time: "08:00 AM - 07:00PM" },
+        { day: "Wednesday", time: "08:00 AM - 07:00PM" },
+        { day: "Thursday", time: "08:00 AM - 07:00PM" },
+        { day: "Friday", time: "08:00 AM - 07:00PM" },
+        { day: "Saturday", time: "08:00 AM - 07:00PM" },
+      ],
+      onViewMap: (a) => {
+        // integrate your maps deeplink here
+        // Example: Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(a.fullAddress)}`)
+      },
+    },
+    {
+      label: "Address 2",
+      state: "Lagos",
+      lga: "Ikeja",
+      fullAddress: "No 2, abcdefght street , opposite abc building, acd bus stop, ikeja",
+      hours: [
+        { day: "Monday", time: "08:00 AM - 07:00PM" },
+        { day: "Tuesday", time: "08:00 AM - 07:00PM" },
+        { day: "Wednesday", time: "08:00 AM - 07:00PM" },
+        { day: "Thursday", time: "08:00 AM - 07:00PM" },
+        { day: "Friday", time: "08:00 AM - 07:00PM" },
+        { day: "Saturday", time: "08:00 AM - 07:00PM" },
+      ],
+    },
+  ];
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [activePost, setActivePost] = useState(null);
+  const [addrVisible, setAddrVisible] = useState(false);
 
   const openComments = (post) => {
     setActivePost(post);
@@ -474,6 +511,9 @@ export default function StoreProfileModal({
       }
     };
 
+   
+
+
     const ReplyBlock = ({ reply }) => (
       <View style={styles.replyContainer}>
         <Image source={src(reply.avatar)} style={styles.commentAvatar} />
@@ -577,6 +617,178 @@ export default function StoreProfileModal({
       </Modal>
     );
   };
+
+   const AddressesModal = ({ visible, onClose, addresses = [], theme }) => {
+      const C = {
+        danger: theme?.colors?.primary || "#E53E3E",
+        text: "#101318",
+        sub: "#6C727A",
+        card: "#FFFFFF",
+        line: "#EFEFEF",
+        chip: "#FFEAEA",
+      };
+
+      const Row = ({ label, value }) => (
+        <View style={{ marginBottom: 8 }}>
+          <ThemedText style={{ fontSize: 11, color: C.sub }}>{label}</ThemedText>
+          <ThemedText style={{ fontSize: 14, color: C.text }}>{value}</ThemedText>
+        </View>
+      );
+
+      const Hours = ({ hours }) => (
+        <View style={addrStyles.hoursBox}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name="time-outline" size={16} color={C.text} />
+            <ThemedText style={{ marginLeft: 6, fontWeight: "700", color: C.text }}>
+              Opening Hours
+            </ThemedText>
+          </View>
+
+          <View style={{ marginTop: 8 }}>
+            {hours?.map((h) => (
+              <View key={h.day} style={addrStyles.hoursRow}>
+                <ThemedText style={addrStyles.hoursDay}>{h.day}</ThemedText>
+                <ThemedText style={addrStyles.hoursTime}>{h.time}</ThemedText>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+
+      return (
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+          <View style={addrStyles.overlay}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+            <View style={addrStyles.sheet}>
+              {/* Header */}
+              <View style={addrStyles.sheetHandle} />
+              <View style={addrStyles.headerRow}>
+                <ThemedText font="oleo" style={addrStyles.title}>Store Addresses</ThemedText>
+                <TouchableOpacity onPress={onClose} style={addrStyles.xBtn}>
+                  <Ionicons name="close" size={18} color={C.text} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {addresses.map((a, i) => (
+                  <View key={`${a.label}-${i}`} style={addrStyles.card}>
+                    {/* Card header */}
+                    <View style={addrStyles.cardHeader}>
+                      <ThemedText style={addrStyles.cardHeaderText}>{a.label}</ThemedText>
+
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        {a.isMain && (
+                          <View style={addrStyles.badge}>
+                            <ThemedText style={addrStyles.badgeTxt}>Main Office</ThemedText>
+                          </View>
+                        )}
+                        <TouchableOpacity onPress={() => a.onViewMap?.(a)} style={addrStyles.mapBtn}>
+                          <ThemedText style={addrStyles.mapBtnTxt}>View on Map</ThemedText>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Body */}
+                    <View style={addrStyles.cardBody}>
+                      <Row label="State" value={a.state} />
+                      <Row label="Local Government" value={a.lga} />
+                      <Row label="Full Address" value={a.fullAddress} />
+                      <Hours hours={a.hours} />
+                    </View>
+                  </View>
+                ))}
+
+                <View style={{ height: 12 }} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      );
+    };
+    const addrStyles = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "88%",
+    paddingBottom: 16,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 62,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#D8DCE2",
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  headerRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  title: { fontSize: 18, fontWeight: "700", color: "#101318" },
+  xBtn: { borderWidth: 1.2, borderColor: "#000", borderRadius: 18, padding: 4 },
+
+  card: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#EDEDED",
+  },
+  cardHeader: {
+    backgroundColor: "#EF534E",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cardHeaderText: { color: "#fff", fontWeight: "700" },
+
+  mapBtn: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  mapBtnTxt: { color: "#101318", fontSize: 12, fontWeight: "700" },
+
+  badge: {
+    backgroundColor: "#FFEAEA",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FFD5D5",
+  },
+  badgeTxt: { color: "#E53E3E", fontSize: 10, fontWeight: "700" },
+
+  cardBody: { padding: 12 },
+
+  hoursBox: {
+    marginTop: 6,
+    backgroundColor: "#FFF4F4",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#FFE1E1",
+  },
+  hoursRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  hoursDay: { color: "#6C727A", fontSize: 12 },
+  hoursTime: { color: "#101318", fontSize: 12 },
+});
 
   const OptionsSheet = ({ visible, onClose }) => {
     const Row = ({ icon, label, danger, onPress }) => (
@@ -801,7 +1013,7 @@ export default function StoreProfileModal({
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
-              <ThemedText style={styles.sheetTitle}>Leave a review</ThemedText>
+              <ThemedText font="oleo" style={styles.sheetTitle}>Leave a review</ThemedText>
               <TouchableOpacity
                 style={{ borderColor: "#000", borderWidth: 1.2, borderRadius: 20, padding: 2 }}
                 onPress={onClose}
@@ -835,7 +1047,7 @@ export default function StoreProfileModal({
               ))}
             </View>
 
-            <TouchableOpacity style={styles.sendReviewBtn} onPress={() => onSubmit?.({ rating, text })}>
+            <TouchableOpacity style={[styles.sendReviewBtn, { backgroundColor: theme?.colors?.primary }]} onPress={() => onSubmit?.({ rating, text })}>
               <ThemedText style={styles.sendReviewTxt}>Send Review</ThemedText>
             </TouchableOpacity>
           </View>
@@ -870,8 +1082,8 @@ export default function StoreProfileModal({
 
           {/* Open / Follow row */}
           <View style={{ marginTop: 12, marginBottom: 8, marginLeft: 60 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="ellipse" size={8} color={C.success} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+              <Ionicons name="ellipse" size={8} color={C.success} style={{ marginLeft: 10 }} />
               <ThemedText style={{ color: C.success, fontSize: 12, fontWeight: "700" }}>
                 Open Now · 07:00AM - 08:00PM
               </ThemedText>
@@ -899,9 +1111,17 @@ export default function StoreProfileModal({
             <View style={styles.metaRow}>
               <Ionicons name="location-outline" size={16} color={C.sub} />
               <ThemedText style={styles.metaTxt}>{store.location}</ThemedText>
-              <ThemedText style={{ color: C.primary, textDecorationLine: "underline" }}>  View Store Addresses</ThemedText>
+
+              {/* NEW: open addresses modal */}
+              <TouchableOpacity onPress={() => setAddrVisible(true)}>
+                <ThemedText style={{ color: C.primary, textDecorationLine: "underline" }}>
+                  {"  "}View Store Addresses
+                </ThemedText>
+              </TouchableOpacity>
             </View>
+
           </View>
+
 
           {/* Stats card */}
           <View style={[styles.statsCard, shadow(10)]}>
@@ -928,7 +1148,7 @@ export default function StoreProfileModal({
 
             <View style={[styles.statsBottom, { backgroundColor: C.primary }]}>
               <Ionicons name="megaphone-outline" size={16} color="#fff" />
-              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              <ThemedText style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>
                 New arrivals coming tomorrow
               </ThemedText>
             </View>
@@ -958,15 +1178,15 @@ export default function StoreProfileModal({
           {/* Action buttons */}
           <View style={{ marginHorizontal: 16, marginTop: 12 }}>
             <TouchableOpacity style={[styles.bigBtn, { backgroundColor: C.primary }]}>
-              <Ionicons name="call-outline" size={18} color="#fff" style={styles.bigBtnIcon} />
+              {/* <Ionicons name="call-outline" size={18} color="#fff" style={styles.bigBtnIcon} /> */}
               <ThemedText style={styles.bigBtnTxt}>Call</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.bigBtn, { backgroundColor: "#000" }]}>
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" style={styles.bigBtnIcon} />
+              {/* <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" style={styles.bigBtnIcon} /> */}
               <ThemedText style={styles.bigBtnTxt}>Chat</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.bigBtn, { backgroundColor: "#2ECC71" }]} onPress={() => setLeaveReviewVisible(true)}>
-              <Ionicons name="star-outline" size={18} color="#fff" style={styles.bigBtnIcon} />
+            <TouchableOpacity style={[styles.bigBtn, { backgroundColor: "#008000" }]} onPress={() => setLeaveReviewVisible(true)}>
+              {/* <Ionicons name="star-outline" size={18} color="#fff" style={styles.bigBtnIcon} /> */}
               <ThemedText style={styles.bigBtnTxt}>Leave a store review</ThemedText>
             </TouchableOpacity>
           </View>
@@ -981,7 +1201,7 @@ export default function StoreProfileModal({
                   onPress={() => setTab(t)}
                   style={[styles.tabItem, active && { backgroundColor: C.primary }]}
                 >
-                  <ThemedText style={[styles.tabTxt, active && { color: "#fff" }]}>{t}</ThemedText>
+                  <ThemedText style={[styles.tabTxt, active && { color: "#fff", fontSize: 10 }]}>{t}</ThemedText>
                 </TouchableOpacity>
               );
             })}
@@ -1070,6 +1290,12 @@ export default function StoreProfileModal({
       <CommentsSheet visible={commentsVisible} onClose={() => setCommentsVisible(false)} />
       <OptionsSheet visible={optionsVisible} onClose={() => setOptionsVisible(false)} />
       <ReviewSheet visible={leaveReviewVisible} onClose={() => setLeaveReviewVisible(false)} onSubmit={handleSubmitReview} />
+      <AddressesModal
+        visible={addrVisible}
+        onClose={() => setAddrVisible(false)}
+        addresses={addresses}
+        theme={theme}
+      />
 
       {/* Simple picker for the 3 filters */}
       <Modal visible={picker.open} animationType="fade" transparent onRequestClose={closePicker}>
@@ -1089,6 +1315,8 @@ export default function StoreProfileModal({
         </View>
       </Modal>
     </Modal>
+
+
   );
 }
 
@@ -1141,7 +1369,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#fff",
   },
   statIconImg: { width: 20, height: 20, resizeMode: "contain" },
-  statLabel: { color: "#6C727A", fontSize: 11 },
+  statLabel: { color: "#6C727A", fontSize: 7, marginBottom: 5 },
   statValue: { color: "#101318", fontSize: 16, fontWeight: "800" },
   statsBottom: {
     height: 44,
@@ -1158,17 +1386,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     backgroundColor: "#fff",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#EEE",
+    borderWidth: 0.5,
+    borderColor: "#CDCDCD",
     padding: 10,
     flexDirection: "row",
     gap: 12,
   },
   socialBtn: {
-    width: 48, height: 48, borderRadius: 12, backgroundColor: "#fff",
+    width: 43, height: 43, borderRadius: 7, backgroundColor: "#fff", elevation: 2,
     borderWidth: 1, borderColor: "#EEE", alignItems: "center", justifyContent: "center",
   },
-  socialImg: { width: 26, height: 26, resizeMode: "contain" },
+  socialImg: { width: 30, height: 30, resizeMode: "contain" },
 
   /* action buttons */
   followBtn: {
@@ -1177,29 +1405,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 50,
+    marginLeft: 30,
   },
-  followTxt: { color: "#fff", fontWeight: "400", fontSize: 12 },
+  followTxt: { color: "#fff", fontWeight: "400", fontSize: 10 },
 
   bigBtn: {
-    height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center",
+    height: 50, borderRadius: 15, alignItems: "center", justifyContent: "center",
     flexDirection: "row", marginBottom: 10,
   },
   bigBtnIcon: { marginRight: 10 },
-  bigBtnTxt: { color: "#fff", fontWeight: "700" },
+  bigBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 12 },
 
   /* tabs */
-  tabs: { marginTop: 14, marginHorizontal: 16, borderRadius: 12, flexDirection: "row", padding: 6 },
-  tabItem: { flex: 1, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  tabTxt: { color: "#101318", fontWeight: "700" },
+  tabs: { marginTop: 14, marginHorizontal: 16, borderRadius: 12, flexDirection: "row", padding: 6, gap: 7 },
+  tabItem: { flex: 1, height: 40, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
+  tabTxt: { color: "#101318", fontWeight: "700", fontSize: 10 },
 
   /* filters */
-  filtersRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  filtersRow: { flexDirection: "row", gap: 7, alignItems: "center" },
   select: {
     flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    height: 42,
+    backgroundColor: "#EDEDED",
+    borderRadius: 7,
+    height: 40,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: "#ECEDEF",
@@ -1207,7 +1435,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  selectLabel: { color: "#101318" },
+  selectLabel: { color: "#101318", fontSize: 10, },
 
   /* product card */
   card: {
@@ -1227,22 +1455,66 @@ const styles = StyleSheet.create({
   grayStrip: { backgroundColor: "#F2F2F2", width: "100%", paddingHorizontal: 8, paddingVertical: 5, flexDirection: "row", justifyContent: "space-between" },
   storeRow: { flexDirection: "row", alignItems: "center" },
   storeAvatar: { width: 20, height: 20, borderRadius: 12, marginRight: 6 },
-  storeName: { fontSize: 12, fontWeight: "600" },
+  storeName: { fontSize: 9, fontWeight: "600" },
   ratingRow: { flexDirection: "row", alignItems: "center" },
   ratingTxt: { marginLeft: 2, fontSize: 11, color: "#000" },
 
   infoContainer: { padding: 10 },
-  productTitle: { fontSize: 13, fontWeight: "500", marginVertical: 4 },
+  productTitle: { fontSize: 11, fontWeight: "500", marginVertical: 4 },
   priceRow: { flexDirection: "row", alignItems: "center" },
-  price: { fontWeight: "700", fontSize: 14, marginRight: 6 },
-  originalPrice: { color: "#999", fontSize: 10, textDecorationLine: "line-through" },
+  price: { fontWeight: "700", fontSize: 14, marginRight: 6, fontSize: 13 },
+  originalPrice: { color: "#999", fontSize: 8, textDecorationLine: "line-through" },
 
   tagsRow: { flexDirection: "row", marginTop: 3, gap: 3 },
-  tagIcon: { width: 70, height: 20, borderRadius: 50 },
+  tagIcon: { width: 59, height: 11, borderRadius: 2 },
 
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  location: { fontSize: 9, color: "#444", fontWeight: "500" },
+  location: { fontSize: 7, color: "#444", fontWeight: "500" },
+  textArea: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ECEDEF",
+    minHeight: 110,
+    padding: 12,
+    textAlignVertical: "top",
+    color: "#000",
+  },
+  photosRow: { flexDirection: "row", gap: 8, marginTop: 10, marginBottom: 12 },
+  addPhoto: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ECEDEF",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoThumb: { width: 48, height: 48, borderRadius: 10 },
+  sendReviewBtn: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  sendReviewTxt: { color: "#fff", fontWeight: "700" },
+  revBox: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#ECEDEF",
+    paddingVertical: 18,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  ratingRowLg: { flexDirection: "row" },
+
+  revLabel: { color: "#6C727A", marginBottom: 8 },
 
   /* ===== Social Feed styles ===== */
   postCard: {
@@ -1258,7 +1530,7 @@ const styles = StyleSheet.create({
   },
   postTop: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   feedAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
-  feedStoreName: { fontSize: 14, fontWeight: "700", color: "#101318" },
+  feedStoreName: { fontSize: 16, fontWeight: "700", color: "#101318" },
   metaText: { fontSize: 12, color: "#6C727A", marginTop: 2 },
 
   carouselWrap: { borderRadius: 14, overflow: "hidden", backgroundColor: "#ECEDEF" },
@@ -1290,6 +1562,45 @@ const styles = StyleSheet.create({
   sheetHandle: { alignSelf: "center", width: 68, height: 6, borderRadius: 999, backgroundColor: "#D8DCE2", marginBottom: 6 },
   sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
   sheetTitle: { fontSize: 18, fontWeight: "700", color: "#101318" },
+  revTabsCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#000",
+    paddingBottom: 8,
+    ...shadow(4),
+  },
+  revTabsRow: {
+    flexDirection: "row",
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    gap: 20,
+  },
+  revTabBtn: { paddingBottom: 10 },
+  revTabTxt: { color: "#000", fontWeight: "700" },
+  revTabTxtActive: { color: "#000" },
+  revTabUnderline: {
+    height: 3,
+    backgroundColor: "#000",
+    borderRadius: 999,
+    marginTop: 6,
+  },
+
+  ratingBlock: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderColor: "#000",
+  },
+  ratingMetaRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  ratingLeft: { color: "#000", fontWeight: "700" },
+  ratingRight: { color: "#000", fontWeight: "700" },
+
 
   commentRow: { flexDirection: "row", paddingVertical: 10 },
   commentAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
