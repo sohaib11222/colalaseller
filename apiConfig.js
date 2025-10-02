@@ -35,6 +35,7 @@ const API_ENDPOINTS = {
     SocialLinks: `${API_DOMAIN}/seller/onboarding/store/social-links`, // GET
     StoreCategories: `${API_DOMAIN}/seller/onboarding/store/categories`, // GET
     CatalogCategories: `${API_DOMAIN}/seller/onboarding/catalog/categories`, // GET
+    Delete_Address: (id) => `${API_DOMAIN}/seller/onboarding/level3/address/${id}`, // DELETE
   },
 
   PRODUCTS: {

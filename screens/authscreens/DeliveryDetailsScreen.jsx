@@ -1,5 +1,5 @@
 // screens/store/DeliveryDetailsScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -9,12 +9,24 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+
+//Code Related to the integration
+import { getDeliveries } from "../../utils/queries/services";
+import { useQuery } from "@tanstack/react-query";
+import { getOnboardingToken } from "../../utils/tokenStorage";
+import { deleteDelivery } from "../../utils/mutations/seller";
+import { useMutation } from "@tanstack/react-query";
+import { setDeliveryPricing } from "../../utils/mutations/seller";
+import { useAuth } from "../../contexts/AuthContext";
 
 /* Demo data — swap with API if you have one */
 const STATES = [
@@ -37,8 +49,7 @@ const VARIANTS = [
   {
     key: "Light",
     title: "Light Goods",
-    desc:
-      "Covers goods that can be transported by hand, bicycle or motorcycle",
+    desc: "Covers goods that can be transported by hand, bicycle or motorcycle",
   },
   {
     key: "Medium",
@@ -66,7 +77,11 @@ function InlineHeader({ title, onBack }) {
 }
 function FilterChip({ label, onPress }) {
   return (
-    <TouchableOpacity style={styles.filterChip} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={styles.filterChip}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
       <ThemedText style={styles.filterChipText}>{label}</ThemedText>
       <Ionicons name="chevron-down" size={14} color="#8D95A3" />
     </TouchableOpacity>
@@ -93,7 +108,11 @@ function SheetContainer({ visible, title, onClose, children }) {
 }
 function SheetItem({ title, subtitle, onPress }) {
   return (
-    <TouchableOpacity style={styles.variantItem} onPress={onPress} activeOpacity={0.9}>
+    <TouchableOpacity
+      style={styles.variantItem}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
       <ThemedText style={{ fontWeight: "700", marginBottom: subtitle ? 4 : 0 }}>
         {title}
       </ThemedText>
@@ -113,9 +132,11 @@ function PriceCard({ item, onEdit, onDelete }) {
 
   return (
     <View style={styles.card}>
-      {item.free && (
+      {(item.free || item.is_free === 1 || item.is_free === true) && (
         <View style={styles.freePill}>
-          <ThemedText style={styles.freePillText}>Free Delivery Active</ThemedText>
+          <ThemedText style={styles.freePillText}>
+            Free Delivery Active
+          </ThemedText>
         </View>
       )}
 
@@ -123,11 +144,19 @@ function PriceCard({ item, onEdit, onDelete }) {
       <ThemedText style={styles.muted}>State</ThemedText>
       <ThemedText style={styles.value}>{item.state}</ThemedText>
 
-      <ThemedText style={[styles.muted, { marginTop: 6 }]}>Local Government</ThemedText>
+      <ThemedText style={[styles.muted, { marginTop: 6 }]}>
+        Local Government
+      </ThemedText>
       <ThemedText style={styles.value}>{item.lga}</ThemedText>
 
       {/* Price & Variant in two columns */}
-      <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          marginTop: 10,
+        }}
+      >
         <View style={{ flex: 1, paddingRight: 10 }}>
           <ThemedText style={styles.muted}>Price</ThemedText>
           <ThemedText style={styles.value}>{money(item.price)}</ThemedText>
@@ -135,11 +164,17 @@ function PriceCard({ item, onEdit, onDelete }) {
 
         <View style={{ flex: 1, paddingLeft: 10 }}>
           <ThemedText style={styles.muted}>Variant</ThemedText>
-          <ThemedText style={styles.value}>{item.variant}</ThemedText>
+          <ThemedText style={styles.value}>
+            {item.variant ? item.variant.charAt(0).toUpperCase() + item.variant.slice(1) : item.variant}
+          </ThemedText>
 
           {/* Edit + Delete aligned to the right (like your mock) */}
           <View style={styles.rightActions}>
-            <TouchableOpacity style={styles.editBtn} onPress={onEdit} activeOpacity={0.9}>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={onEdit}
+              activeOpacity={0.9}
+            >
               <ThemedText style={styles.editBtnText}>Edit</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity onPress={onDelete} hitSlop={8}>
@@ -153,13 +188,15 @@ function PriceCard({ item, onEdit, onDelete }) {
 }
 
 /* ------------- Full-screen New Price Modal ------------- */
-function NewPriceModal({ visible, onClose, onSave, initial }) {
+function NewPriceModal({ visible, onClose, onSave, initial, isLoading = false }) {
   const { theme } = useTheme();
 
   const [stateName, setStateName] = useState(initial?.state || "");
   const [lga, setLga] = useState(initial?.lga || "");
   const [variant, setVariant] = useState(initial?.variant || "");
-  const [price, setPrice] = useState(initial?.price != null ? String(initial.price) : "");
+  const [price, setPrice] = useState(
+    initial?.price != null ? String(initial.price) : ""
+  );
   const [free, setFree] = useState(!!initial?.free);
 
   const [stateSheet, setStateSheet] = useState(false);
@@ -170,23 +207,46 @@ function NewPriceModal({ visible, onClose, onSave, initial }) {
   const [lgaSearch, setLgaSearch] = useState("");
 
   const filteredStates = useMemo(
-    () => STATES.filter((s) => s.toLowerCase().includes(stateSearch.toLowerCase())),
+    () =>
+      STATES.filter((s) => s.toLowerCase().includes(stateSearch.toLowerCase())),
     [stateSearch]
   );
   const filteredLGAs = useMemo(() => {
     const list = LGAS[stateName] || [];
-    return list.filter((x) => x.toLowerCase().includes(lgaSearch.toLowerCase()));
+    return list.filter((x) =>
+      x.toLowerCase().includes(lgaSearch.toLowerCase())
+    );
   }, [stateName, lgaSearch]);
 
   const save = () => {
-    if (!stateName || !lga || (!free && !price) || !variant) return;
-    onSave({
+    // Enhanced validation
+    if (!stateName || !lga || !variant) {
+      console.error("Missing required fields:", { stateName, lga, variant });
+      return;
+    }
+    
+    if (!free && (!price || price <= 0)) {
+      console.error("Price is required when not free:", { free, price });
+      return;
+    }
+    
+    const payload = {
       state: stateName,
-      lga,
-      variant,
+      local_government: lga, // API expects local_government, not lga
+      variant: variant.toLowerCase(), // Convert to lowercase as expected by API
       price: free ? 0 : Number(price),
-      free,
+      is_free: free, // API expects is_free, not free
+    };
+    
+    console.log("Delivery pricing payload:", payload);
+    console.log("Validation check:", {
+      hasState: !!stateName,
+      hasLGA: !!lga,
+      hasVariant: !!variant,
+      hasPrice: free || (price && price > 0)
     });
+    
+    onSave(payload);
     onClose();
   };
 
@@ -196,13 +256,21 @@ function NewPriceModal({ visible, onClose, onSave, initial }) {
         { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
         active
           ? { backgroundColor: "#E83B3B" }
-          : { borderWidth: 1, borderColor: "#E83B3B", backgroundColor: "transparent" },
+          : {
+              borderWidth: 1,
+              borderColor: "#E83B3B",
+              backgroundColor: "transparent",
+            },
       ]}
     />
   );
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+    >
       <SafeAreaView style={styles.wrap}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerBtn}>
@@ -220,7 +288,9 @@ function NewPriceModal({ visible, onClose, onSave, initial }) {
               setStateSheet(true);
             }}
           >
-            <ThemedText style={[styles.rowText, stateName && { color: "#101318" }]}>
+            <ThemedText
+              style={[styles.rowText, stateName && { color: "#101318" }]}
+            >
               {stateName || "State"}
             </ThemedText>
             <Ionicons name="chevron-forward" size={18} color="#9AA0A6" />
@@ -240,8 +310,13 @@ function NewPriceModal({ visible, onClose, onSave, initial }) {
             <Ionicons name="chevron-forward" size={18} color="#9AA0A6" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.row} onPress={() => setVariantSheet(true)}>
-            <ThemedText style={[styles.rowText, variant && { color: "#101318" }]}>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => setVariantSheet(true)}
+          >
+            <ThemedText
+              style={[styles.rowText, variant && { color: "#101318" }]}
+            >
               {variant || "Select Fee Variant"}
             </ThemedText>
             <Ionicons name="chevron-forward" size={18} color="#9AA0A6" />
@@ -272,12 +347,23 @@ function NewPriceModal({ visible, onClose, onSave, initial }) {
           style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
           onPress={save}
           activeOpacity={0.9}
+          disabled={isLoading}
         >
-          <ThemedText style={{ color: "#fff", fontWeight: "700" }}>Save</ThemedText>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              Save
+            </ThemedText>
+          )}
         </TouchableOpacity>
 
         {/* Sheets */}
-        <SheetContainer visible={stateSheet} title="Location" onClose={() => setStateSheet(false)}>
+        <SheetContainer
+          visible={stateSheet}
+          title="Location"
+          onClose={() => setStateSheet(false)}
+        >
           <TextInput
             value={stateSearch}
             onChangeText={setStateSearch}
@@ -285,17 +371,19 @@ function NewPriceModal({ visible, onClose, onSave, initial }) {
             style={styles.search}
           />
           <ThemedText style={styles.sectionLabel}>Popular</ThemedText>
-          {["Lagos State", "Oyo State", "FCT , Abuja", "Rivers State"].map((p) => (
-            <SheetItem
-              key={p}
-              title={p}
-              onPress={() => {
-                setStateName(p);
-                setLga("");
-                setStateSheet(false);
-              }}
-            />
-          ))}
+          {["Lagos State", "Oyo State", "FCT , Abuja", "Rivers State"].map(
+            (p) => (
+              <SheetItem
+                key={p}
+                title={p}
+                onPress={() => {
+                  setStateName(p);
+                  setLga("");
+                  setStateSheet(false);
+                }}
+              />
+            )
+          )}
           <ThemedText style={styles.sectionLabel}>All States</ThemedText>
           <ScrollView showsVerticalScrollIndicator={false}>
             {filteredStates.map((s) => (
@@ -373,47 +461,257 @@ export default function DeliveryDetailsScreen() {
   const [filterState, setFilterState] = useState("");
   const [filterVariant, setFilterVariant] = useState("");
 
-  const [prices, setPrices] = useState([]);
+  // Get onboarding token
+  const [onboardingToken, setOnboardingToken] = useState(null);
+  
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        const token = await getOnboardingToken();
+        setOnboardingToken(token);
+        console.log("Retrieved onboarding token for deliveries:", token ? "Token present" : "No token");
+      } catch (error) {
+        console.error("Error getting onboarding token:", error);
+        setOnboardingToken(null);
+      }
+    };
+    getToken();
+  }, []);
 
-  const filtered = prices.filter((p) => {
-    if (filterState && p.state !== filterState) return false;
-    if (filterVariant && p.variant !== filterVariant) return false;
-    return true;
+  // Fetch deliveries using React Query
+  const { 
+    data: deliveriesData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
+    queryKey: ['deliveries', onboardingToken],
+    queryFn: () => getDeliveries(onboardingToken),
+    enabled: !!onboardingToken, // Only run query when token is available
   });
+
+  const deliveries = deliveriesData?.items || [];
+  
+  console.log("Raw deliveries data:", deliveries);
+  console.log("Number of deliveries:", deliveries.length);
+
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Delete delivery mutation
+  const deleteDeliveryMutation = useMutation({
+    mutationFn: (deliveryId) => deleteDelivery(deliveryId, onboardingToken),
+    onSuccess: (data) => {
+      console.log("Delivery deleted successfully:", data);
+      // Refetch deliveries after successful deletion
+      refetch();
+    },
+    onError: (error) => {
+      console.error("Delete delivery error:", error);
+      Alert.alert("Error", "Failed to delete delivery. Please try again.");
+    },
+  });
+
+  // Set delivery pricing mutation
+  const setDeliveryPricingMutation = useMutation({
+    mutationFn: (payload) => {
+      console.log("Sending delivery pricing payload:", payload);
+      console.log("Onboarding token present:", !!onboardingToken);
+      return setDeliveryPricing(payload, onboardingToken);
+    },
+    onSuccess: (data) => {
+      console.log("Delivery pricing set successfully:", data);
+      // Refetch deliveries after successful save
+      refetch();
+      setShowForm(false);
+    },
+    onError: (error) => {
+      console.error("Set delivery pricing error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        statusCode: error.statusCode,
+        data: error.data
+      });
+      Alert.alert("Error", "Failed to save delivery pricing. Please try again.");
+    },
+  });
+
+  const filtered = deliveries.filter((p) => {
+    const stateMatches = !filterState || (p.state || "").toLowerCase() === filterState.toLowerCase();
+    const variantMatches = !filterVariant || (p.variant || "").toLowerCase() === filterVariant.toLowerCase();
+    return stateMatches && variantMatches;
+  });
+  
+  console.log("Filtered deliveries:", filtered);
+  console.log("Filter state:", filterState);
+  console.log("Filter variant:", filterVariant);
+
+  // Pull-to-refresh handler
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+      console.log("Deliveries refreshed successfully");
+    } catch (error) {
+      console.error("Error refreshing deliveries:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const [stateFilterSheet, setStateFilterSheet] = useState(false);
   const [variantFilterSheet, setVariantFilterSheet] = useState(false);
 
   return (
     <SafeAreaView style={styles.wrap}>
-        <StatusBar style="dark" />
+      <StatusBar style="dark" />
       <InlineHeader title="Delivery Details" onBack={() => nav.goBack()} />
 
       {/* Filter chips row */}
-      <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingBottom: 10 }}>
-        <FilterChip label={filterState || "State"} onPress={() => setStateFilterSheet(true)} />
-        <FilterChip label={filterVariant || "Variant"} onPress={() => setVariantFilterSheet(true)} />
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 10,
+          paddingHorizontal: 16,
+          paddingBottom: 10,
+          alignItems: "center",
+        }}
+      >
+        <FilterChip
+          label={filterState || "State"}
+          onPress={() => setStateFilterSheet(true)}
+        />
+        <FilterChip
+          label={filterVariant || "Variant"}
+          onPress={() => setVariantFilterSheet(true)}
+        />
+        {(filterState || filterVariant) && (
+          <TouchableOpacity
+            onPress={() => {
+              setFilterState("");
+              setFilterVariant("");
+            }}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 12,
+              backgroundColor: "#EFF1F5",
+            }}
+          >
+            <ThemedText style={{ color: "#6F7683", fontWeight: "600" }}>
+              Clear
+            </ThemedText>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {filtered.length === 0 ? (
-        <View style={{ flex: 1 }} />
-      ) : (
+      {(() => {
+        console.log("Render logic check:", {
+          isLoading,
+          error: !!error,
+          deliveriesLength: deliveries.length,
+          filteredLength: filtered.length,
+          hasData: !!deliveriesData
+        });
+        
+        if (isLoading) {
+          return (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <ThemedText style={styles.loadingText}>Loading deliveries...</ThemedText>
+            </View>
+          );
+        }
+        
+        if (error) {
+          return (
+            <View style={styles.errorContainer}>
+              <ThemedText style={styles.errorText}>
+                Error loading deliveries. Please try again.
+              </ThemedText>
+              <TouchableOpacity 
+                style={[styles.retryBtn, { backgroundColor: theme.colors.primary }]}
+                onPress={() => refetch()}
+              >
+                <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+        
+        if (filtered.length === 0) {
+          return (
+            <ScrollView
+              contentContainerStyle={styles.empty}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={[theme.colors.primary]} // Android
+                  tintColor={theme.colors.primary} // iOS
+                  title="Pull to refresh" // iOS
+                  titleColor="#6F7683" // iOS
+                />
+              }
+            >
+              <ThemedText style={{ color: "#B3BAC6", fontSize: 13 }}>
+                No delivery pricing found
+              </ThemedText>
+            </ScrollView>
+          );
+        }
+        
+        return (
         <FlatList
           data={filtered}
-          keyExtractor={(_, i) => String(i)}
-          renderItem={({ item, index }) => (
-            <PriceCard
-              item={item}
-              onEdit={() => {
-                setEditingIndex(index);
-                setShowForm(true);
-              }}
-              onDelete={() => setPrices((prev) => prev.filter((_, i) => i !== index))}
-            />
-          )}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item, index }) => {
+            // Map API data to component format
+            const mappedItem = {
+              ...item,
+              lga: item.local_government, // Map local_government to lga for component
+              free: Boolean(item.is_free), // Convert number to boolean for component
+              price: parseFloat(item.price), // Convert string price to number
+            };
+            
+            console.log("Mapped delivery item:", mappedItem);
+            console.log("Item details:", {
+              id: item.id,
+              state: item.state,
+              local_government: item.local_government,
+              is_free: item.is_free,
+              price: item.price,
+              variant: item.variant
+            });
+            
+            return (
+              <PriceCard
+                item={mappedItem}
+                onEdit={() => {
+                  setEditingIndex(index);
+                  setShowForm(true);
+                }}
+                onDelete={() => {
+                  console.log("Delete delivery:", item.id);
+                  deleteDeliveryMutation.mutate(item.id);
+                }}
+              />
+            );
+          }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]} // Android
+              tintColor={theme.colors.primary} // iOS
+              title="Pull to refresh" // iOS
+              titleColor="#6F7683" // iOS
+            />
+          }
         />
-      )}
+        );
+      })()}
 
       <TouchableOpacity
         style={[styles.cta, { backgroundColor: theme.colors.primary }]}
@@ -430,14 +728,17 @@ export default function DeliveryDetailsScreen() {
       <NewPriceModal
         visible={showForm}
         onClose={() => setShowForm(false)}
-        initial={editingIndex != null ? prices[editingIndex] : null}
+        initial={editingIndex != null ? {
+          ...deliveries[editingIndex],
+          lga: deliveries[editingIndex]?.local_government,
+          free: Boolean(deliveries[editingIndex]?.is_free),
+          price: parseFloat(deliveries[editingIndex]?.price || 0),
+        } : null}
         onSave={(payload) => {
-          if (editingIndex != null) {
-            setPrices((prev) => prev.map((x, i) => (i === editingIndex ? payload : x)));
-          } else {
-            setPrices((prev) => [...prev, payload]);
-          }
+          console.log("Saving delivery pricing:", payload);
+          setDeliveryPricingMutation.mutate(payload);
         }}
+        isLoading={setDeliveryPricingMutation.isPending}
       />
 
       {/* Filter sheets */}
@@ -511,9 +812,14 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     justifyContent: "space-between",
     paddingHorizontal: 6,
-    marginBottom:20,
+    marginBottom: 20,
   },
-  headerBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  headerBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: { fontSize: 16, fontWeight: "600" },
 
   /* chips */
@@ -698,5 +1004,46 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 6,
     fontWeight: "700",
+  },
+
+  /* Loading and Error States */
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#6F7683",
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 60,
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#E53E3E",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  retryBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 60,
   },
 });

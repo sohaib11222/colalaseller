@@ -1,5 +1,5 @@
 // screens/store/AddAddressScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   Modal,
   Dimensions,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../components/ThemedText";
@@ -17,6 +18,12 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 
 const { height } = Dimensions.get("window");
+
+//Code Related to the integration
+import { setAddress } from "../../utils/mutations/seller";
+import { useMutation } from "@tanstack/react-query";
+import { useAuth } from "../../contexts/AuthContext";
+import { getOnboardingToken } from "../../utils/tokenStorage";
 
 // Demo lists — replace with API data
 const STATES = [
@@ -39,6 +46,28 @@ const LGAS = {
   "FCT , Abuja": ["Gwagwalada", "Kuje", "Abaji", "Bwari"],
   "Rivers State": ["Port Harcourt", "Obio/Akpor", "Okrika"],
 };
+
+const TIME_OPTIONS = [
+  "Closed",
+  "06:00 AM",
+  "07:00 AM",
+  "08:00 AM",
+  "09:00 AM",
+  "10:00 AM",
+  "11:00 AM",
+  "12:00 PM",
+  "01:00 PM",
+  "02:00 PM",
+  "03:00 PM",
+  "04:00 PM",
+  "05:00 PM",
+  "06:00 PM",
+  "07:00 PM",
+  "08:00 PM",
+  "09:00 PM",
+  "10:00 PM",
+  "11:00 PM",
+];
 
 function InlineHeader({ title, onBack }) {
   return (
@@ -74,7 +103,10 @@ function TimeRow({ day, from, to, onChange }) {
         <ThemedText style={styles.timeText}>{from || "From"}</ThemedText>
         <Ionicons name="chevron-down" size={16} color="#9AA0A6" />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.timePicker} onPress={() => onChange("to")}>
+      <TouchableOpacity
+        style={styles.timePicker}
+        onPress={() => onChange("to")}
+      >
         <ThemedText style={styles.timeText}>{to || "To"}</ThemedText>
         <Ionicons name="chevron-down" size={16} color="#9AA0A6" />
       </TouchableOpacity>
@@ -87,26 +119,104 @@ export default function AddAddressScreen() {
   const nav = useNavigation();
   const route = useRoute();
   const onSaved = route.params?.onSaved;
+  const editData = route.params?.editData;
+  const { token } = useAuth();
+  
+  // Check if we're in edit mode
+  const isEditMode = !!editData;
+  
+  // Get onboarding token from storage
+  const [onboardingToken, setOnboardingToken] = useState(null);
+  
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        const token = await getOnboardingToken();
+        setOnboardingToken(token);
+        console.log("Retrieved onboarding token:", token ? "Token present" : "No token");
+      } catch (error) {
+        console.error("Error getting onboarding token:", error);
+        setOnboardingToken(null);
+      }
+    };
+    getToken();
+  }, []);
 
-  const [stateName, setStateName] = useState("");
-  const [lga, setLga] = useState("");
-  const [fullAddress, setFullAddress] = useState("");
+  const [stateName, setStateName] = useState(editData?.state || "");
+  const [lga, setLga] = useState(editData?.local_government || "");
+  const [fullAddress, setFullAddress] = useState(editData?.full_address || "");
 
-  const [hours, setHours] = useState({
-    Monday: { from: "", to: "" },
-    Tuesday: { from: "", to: "" },
-    Wednesday: { from: "", to: "" },
-    Thursday: { from: "", to: "" },
-    Friday: { from: "", to: "" },
-    Saturday: { from: "", to: "" },
-    Sunday: { from: "", to: "" },
-  });
-  const [main, setMain] = useState(false);
+  // Function to parse opening hours from API format
+  const parseOpeningHours = (apiHours) => {
+    if (!apiHours || typeof apiHours !== 'object') {
+      return {
+        Monday: { from: "", to: "" },
+        Tuesday: { from: "", to: "" },
+        Wednesday: { from: "", to: "" },
+        Thursday: { from: "", to: "" },
+        Friday: { from: "", to: "" },
+        Saturday: { from: "", to: "" },
+        Sunday: { from: "", to: "" },
+      };
+    }
+
+    const dayMapping = {
+      monday: "Monday",
+      tuesday: "Tuesday", 
+      wednesday: "Wednesday",
+      thursday: "Thursday",
+      friday: "Friday",
+      saturday: "Saturday",
+      sunday: "Sunday"
+    };
+
+    const parsedHours = {
+      Monday: { from: "", to: "" },
+      Tuesday: { from: "", to: "" },
+      Wednesday: { from: "", to: "" },
+      Thursday: { from: "", to: "" },
+      Friday: { from: "", to: "" },
+      Saturday: { from: "", to: "" },
+      Sunday: { from: "", to: "" },
+    };
+
+    Object.keys(apiHours).forEach(day => {
+      const dayHours = apiHours[day];
+      const dayName = dayMapping[day.toLowerCase()];
+      
+      if (dayName && dayHours) {
+        if (typeof dayHours === 'string') {
+          // Format: "06:00 AM-06:00 AM" or "9:00-18:00"
+          const [from, to] = dayHours.split('-');
+          parsedHours[dayName] = {
+            from: from?.trim() || "",
+            to: to?.trim() || ""
+          };
+        } else if (dayHours.from && dayHours.to) {
+          // Format: {from: "9:00", to: "18:00"}
+          parsedHours[dayName] = {
+            from: dayHours.from,
+            to: dayHours.to
+          };
+        }
+      }
+    });
+
+    return parsedHours;
+  };
+
+  const [hours, setHours] = useState(parseOpeningHours(editData?.opening_hours));
+  const [main, setMain] = useState(editData?.is_main || false);
 
   const [stateSheet, setStateSheet] = useState(false);
   const [lgaSheet, setLgaSheet] = useState(false);
+  const [timeSheet, setTimeSheet] = useState(false);
   const [search, setSearch] = useState("");
   const [lgaSearch, setLgaSearch] = useState("");
+  const [currentTimeEdit, setCurrentTimeEdit] = useState({
+    day: "",
+    which: "",
+  });
 
   const filteredStates = useMemo(
     () => STATES.filter((s) => s.toLowerCase().includes(search.toLowerCase())),
@@ -114,35 +224,102 @@ export default function AddAddressScreen() {
   );
   const filteredLGAs = useMemo(() => {
     const list = LGAS[stateName] || [];
-    return list.filter((x) => x.toLowerCase().includes(lgaSearch.toLowerCase()));
+    return list.filter((x) =>
+      x.toLowerCase().includes(lgaSearch.toLowerCase())
+    );
   }, [stateName, lgaSearch]);
 
+  // Set Address Mutation
+  const setAddressMutation = useMutation({
+    mutationFn: (payload) => {
+      console.log("Sending address with token:", onboardingToken ? "Token present" : "No token");
+      console.log("Payload:", payload);
+      return setAddress(payload, onboardingToken);
+    },
+    onSuccess: (data) => {
+      console.log("Address saved successfully:", data);
+      if (data.status === true) {
+        // Call the onSaved callback if provided
+        onSaved?.(data);
+        // Navigate back to the previous screen
+        nav.goBack();
+      }
+    },
+    onError: (error) => {
+      console.error("Set address error:", error);
+      console.error("Token status:", onboardingToken ? "Token present" : "No token");
+      // You can add error handling here (Alert, toast, etc.)
+    },
+  });
+
+  // Check if form is complete
+  const isFormComplete = stateName && lga && fullAddress.trim();
+  
+  // Debug form completion
+  console.log("Form validation:", {
+    stateName: !!stateName,
+    lga: !!lga,
+    fullAddress: !!fullAddress.trim(),
+    isFormComplete,
+    onboardingToken: !!onboardingToken
+  });
+
+  // Format hours for API
+  const formatHoursForAPI = (hours) => {
+    const formattedHours = {};
+    Object.keys(hours).forEach((day) => {
+      const dayHours = hours[day];
+      if (dayHours.from && dayHours.to && dayHours.from !== "Closed" && dayHours.to !== "Closed") {
+        // Convert to lowercase for API
+        const dayKey = day.toLowerCase();
+        formattedHours[dayKey] = `${dayHours.from}-${dayHours.to}`;
+      }
+    });
+    return formattedHours;
+  };
+
   const save = () => {
-    if (!stateName || !lga || !fullAddress.trim()) return;
+    if (!isFormComplete) return;
+    
+    // Check if token is available
+    if (!onboardingToken) {
+      console.error("No onboarding token available");
+      return;
+    }
+    
     const payload = {
       state: stateName,
-      lga,
-      address: fullAddress.trim(),
-      hours,
-      main,
+      local_government: lga,
+      full_address: fullAddress.trim(),
+      is_main: main,
+      opening_hours: formatHoursForAPI(hours),
     };
-    onSaved?.(payload);
-    // ensure we return to the list so it refreshes immediately
-    nav.goBack();
+
+    // Add ID for edit mode (for future backend implementation)
+    if (isEditMode && editData?.id) {
+      payload.id = editData.id;
+      console.log("Edit mode - Address ID:", editData.id);
+    }
+
+    console.log("Save payload:", payload);
+    setAddressMutation.mutate(payload);
   };
 
   const setTime = (day, which) => {
-    const presets = ["08:00 AM", "09:00 AM", "10:00 AM", "12:00 PM", "05:00 PM", "07:00 PM", ""];
-    const current = hours[day][which];
-    const next =
-      presets[(presets.indexOf(current) + 1 + presets.length) % presets.length];
-    setHours((h) => ({ ...h, [day]: { ...h[day], [which]: next } }));
+    setCurrentTimeEdit({ day, which });
+    setTimeSheet(true);
+  };
+
+  const selectTime = (time) => {
+    const { day, which } = currentTimeEdit;
+    setHours((h) => ({ ...h, [day]: { ...h[day], [which]: time } }));
+    setTimeSheet(false);
   };
 
   return (
     <SafeAreaView style={styles.page}>
-        <StatusBar style="dark" />
-      <InlineHeader title="Add New Address" onBack={() => nav.goBack()} />
+      <StatusBar style="dark" />
+      <InlineHeader title={isEditMode ? "Edit Address" : "Add New Address"} onBack={() => nav.goBack()} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
         <RowSelector
@@ -188,7 +365,11 @@ export default function AddAddressScreen() {
         ))}
 
         {/* Mark as Main Store — tap row to toggle, red dot like screenshot */}
-        <TouchableOpacity style={styles.mainRow} onPress={() => setMain((m) => !m)} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.mainRow}
+          onPress={() => setMain((m) => !m)}
+          activeOpacity={0.8}
+        >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View
               style={[
@@ -207,13 +388,30 @@ export default function AddAddressScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
+        style={[
+          styles.saveBtn, 
+          { 
+            backgroundColor: isFormComplete && !setAddressMutation.isPending 
+              ? theme.colors.primary 
+              : "#CCCCCC" 
+          }
+        ]}
         onPress={save}
         activeOpacity={0.9}
+        disabled={!isFormComplete || setAddressMutation.isPending}
       >
-        <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-          Save
-        </ThemedText>
+        {setAddressMutation.isPending ? (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+            <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              Saving...
+            </ThemedText>
+          </View>
+        ) : (
+          <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+            {isEditMode ? "Update" : "Save"} {!isFormComplete ? "(Incomplete)" : ""}
+          </ThemedText>
+        )}
       </TouchableOpacity>
 
       {/* STATE SHEET */}
@@ -282,7 +480,9 @@ export default function AddAddressScreen() {
           <View style={styles.sheet}>
             <View style={styles.dragHandle} />
             <View style={styles.sheetHeader}>
-              <ThemedText style={styles.sheetTitle}>Local Government</ThemedText>
+              <ThemedText style={styles.sheetTitle}>
+                Local Government
+              </ThemedText>
               <TouchableOpacity
                 onPress={() => setLgaSheet(false)}
                 style={styles.closeBtn}
@@ -316,6 +516,70 @@ export default function AddAddressScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* TIME PICKER SHEET */}
+      <Modal visible={timeSheet} transparent animationType="slide">
+        <View style={styles.sheetWrap}>
+          <TouchableOpacity
+            style={styles.sheetBackdrop}
+            onPress={() => setTimeSheet(false)}
+          />
+          <View style={styles.sheet}>
+            <View style={styles.dragHandle} />
+            <View style={styles.sheetHeader}>
+              <ThemedText style={styles.sheetTitle}>
+                Select{" "}
+                {currentTimeEdit.which === "from" ? "Opening" : "Closing"} Time
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setTimeSheet(false)}
+                style={styles.closeBtn}
+              >
+                <Ionicons name="close" size={16} color="#000" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.sheetList}>
+              {TIME_OPTIONS.map((time) => (
+                <TouchableOpacity
+                  key={time}
+                  style={[
+                    styles.option,
+                    hours[currentTimeEdit.day]?.[currentTimeEdit.which] ===
+                      time && {
+                      backgroundColor: theme.colors.primary + "20",
+                      borderWidth: 1,
+                      borderColor: theme.colors.primary,
+                    },
+                  ]}
+                  onPress={() => selectTime(time)}
+                >
+                  <ThemedText
+                    style={[
+                      styles.sheetItemText,
+                      hours[currentTimeEdit.day]?.[currentTimeEdit.which] ===
+                        time && {
+                        color: theme.colors.primary,
+                        fontWeight: "600",
+                      },
+                    ]}
+                  >
+                    {time}
+                  </ThemedText>
+                  {hours[currentTimeEdit.day]?.[currentTimeEdit.which] ===
+                    time && (
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color={theme.colors.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 16 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -333,7 +597,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 6,
   },
-  headerBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  headerBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: { fontSize: 16, fontWeight: "600" },
 
   row: {
@@ -398,7 +667,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   redDotFilled: { backgroundColor: "#E83B3B" },
-  redDotHollow: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#E83B3B" },
+  redDotHollow: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#E83B3B",
+  },
 
   saveBtn: {
     position: "absolute",
@@ -473,5 +746,15 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 6,
     fontWeight: "700",
+  },
+
+  /* time picker styles */
+  sheetList: {
+    maxHeight: 400,
+  },
+  sheetItemText: {
+    fontSize: 16,
+    color: "#101318",
+    fontWeight: "500",
   },
 });

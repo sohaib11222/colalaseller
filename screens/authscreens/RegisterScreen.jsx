@@ -1106,7 +1106,7 @@ export default function RegisterStoreScreen() {
                   <PickerRow
                     label={addressValue ? "Address added" : "Add Store Address"}
                     onPress={() =>
-                      navigation.navigate("StoreAddress", {
+                      navigation.navigate("StoreAdress", {
                         onPickAddress: (addr) => setAddressValue(`${addr.address}`),
                       })
                     }

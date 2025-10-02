@@ -50,6 +50,12 @@ export const uploadUtilityBill = async (payload, token) =>
 export const setAddress = async (payload, token) =>
   await apiCall(API_ENDPOINTS.SELLER.Address, "POST", payload, token);
 
+// Level 3 - Delete Address
+// payload = { id: 1 }
+export const deleteAddress = async (id, token) =>
+  await apiCall(API_ENDPOINTS.SELLER.Delete_Address(id), "DELETE", undefined, token);
+
+
 // Level 3 - Delivery Pricing
 // payload = { state: "Lagos", local_government: "Ikeja", variant: "light", price: 1000, is_free: false }
 export const setDeliveryPricing = async (payload, token) =>
