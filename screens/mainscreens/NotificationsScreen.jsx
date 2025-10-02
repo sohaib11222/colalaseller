@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
+    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", zIndex:5
   },
   headerTitle: {
     position: "absolute", left: 0, right: 0, top: 50, textAlign: "center", fontSize: 18, fontWeight: "600",

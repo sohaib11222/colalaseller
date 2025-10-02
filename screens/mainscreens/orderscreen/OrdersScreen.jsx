@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -62,8 +63,8 @@ const OrdersScreen = ({ navigation }) => {
         navigation?.navigate?.("ChatNavigator", { screen: "SingleOrderDetails", params: { orderId: item.id } })
       }
     >
-      <View style={[styles.leftIcon, { backgroundColor: "#FDECEC" }]}>
-        <Ionicons name="cart-outline" size={22} color={C.primary} /> 
+      <View style={[styles.leftIcon, { backgroundColor: "#B9191933" }]}>
+        <Ionicons name="cart-outline" size={25} color={C.primary} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -86,9 +87,24 @@ const OrdersScreen = ({ navigation }) => {
           <ThemedText font="oleo" style={styles.headerTitle}>
             Orders
           </ThemedText>
-          <TouchableOpacity style={styles.bellBtn}>
-            <Ionicons name="notifications-outline" size={18} color={C.primary} />
-          </TouchableOpacity>
+          <View style={styles.iconRow}>
+
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("ChatNavigator", {
+                  screen: "Notification",
+                })
+              }
+              style={[styles.iconButton, styles.iconPill]}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+            >
+              <Image
+                source={require("../../../assets/bell-icon.png")}
+                style={styles.iconImg}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={[styles.searchBox, { backgroundColor: C.card }]}>
@@ -172,7 +188,7 @@ const styles = StyleSheet.create({
   },
 
   searchBox: {
-    height: 50,
+    height: 60,
     borderRadius: 14,
     paddingHorizontal: 12,
     flexDirection: "row",
@@ -194,7 +210,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabTxt: { fontWeight: "700", fontSize:11 },
+  tabTxt: { fontWeight: "700", fontSize: 10 },
 
   row: {
     flexDirection: "row",
@@ -213,6 +229,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   cust: { fontSize: 14, fontWeight: "700" },
-  items: { fontSize: 12, marginTop: 2 },
+  items: { fontSize: 10, marginTop: 2 },
+   iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
   amount: { fontSize: 13, fontWeight: "900", marginLeft: 10 },
 });

@@ -61,8 +61,8 @@ const PRODUCTS = Array.from({ length: 8 }).map((_, i) => ({
 
 /* ---------- small bits ---------- */
 const SearchBox = ({ value, onChange, C }) => (
-  <View style={[styles.input, { borderColor: C.line, backgroundColor: C.card, flex: 1 }]}>
-    <Ionicons name="search" size={16} color={C.sub} />
+  <View style={[styles.input, { borderColor: "#CDCDCD", backgroundColor: C.card, flex: 1, borderWidth:0.5 }]}>
+    {/* <Ionicons name="search" size={16} color={C.sub} /> */}
     <TextInput
       value={value}
       onChangeText={onChange}
@@ -86,8 +86,8 @@ const PickerLike = ({ label, onPress, C }) => (
 
 const Metric = ({ label, value, C }) => (
   <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-    <ThemedText style={{ color: C.sub, fontSize: 11 }}>{label}</ThemedText>
-    <ThemedText style={{ color: C.text, fontSize: 11 }}>{value}</ThemedText>
+    <ThemedText style={{ color: C.sub, fontSize: 8 }}>{label}</ThemedText>
+    <ThemedText style={{ color: C.text, fontSize: 8 }}>{value}</ThemedText>
   </View>
 );
 
@@ -107,13 +107,13 @@ const ProductCard = ({ item, C, onPress }) => (
 
     {/* Body */}
     <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
-      <ThemedText numberOfLines={1} style={{ color: C.text, fontWeight: "700" }}>
+      <ThemedText numberOfLines={1} style={{ color: C.text, fontWeight: "700", fontSize: 10 }}>
         {item.title}
       </ThemedText>
 
       {/* price row */}
       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
-        <ThemedText style={{ color: "#E53E3E", fontWeight: "800" }}>
+        <ThemedText style={{ color: "#E53E3E", fontWeight: "800", fontSize: 12 }}>
           ₦{item.price.toLocaleString()}
         </ThemedText>
         <ThemedText
@@ -121,7 +121,7 @@ const ProductCard = ({ item, C, onPress }) => (
             color: C.sub,
             marginLeft: 6,
             textDecorationLine: "line-through",
-            fontSize: 12,
+            fontSize: 8,
           }}
         >
           ₦{item.oldPrice.toLocaleString()}
@@ -147,7 +147,7 @@ const ProductCard = ({ item, C, onPress }) => (
         style={[styles.cta, { backgroundColor: C.primary }]}
         onPress={onPress}
       >
-        <ThemedText style={{ color: "#fff", fontWeight: "600", fontSize: 11 }}>
+        <ThemedText style={{ color: "#fff", fontWeight: "600", fontSize: 10 }}>
           View Details
         </ThemedText>
       </TouchableOpacity>
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    height: 48,
+    height: 60,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
@@ -499,6 +499,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     marginTop: 12,
+  
   },
   imgWrap: { width: "100%", height: 140, backgroundColor: "#EEE" },
   img: { width: "100%", height: "100%" },
@@ -526,7 +527,7 @@ const styles = StyleSheet.create({
   },
 
   cta: {
-    height: 40,
+    height: 34,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",

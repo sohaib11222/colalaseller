@@ -236,7 +236,7 @@ export default function SubscriptionScreen() {
         <View style={[styles.header, { borderBottomColor: theme.colors.line }]}>
           <TouchableOpacity
             onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Home"))}
-            style={[styles.backBtn, { borderColor: theme.colors.line }]}
+            style={[styles.backBtn, { borderColor: "#ccc" }]}
           >
             <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
           </TouchableOpacity>

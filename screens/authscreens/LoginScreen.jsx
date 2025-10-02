@@ -99,11 +99,9 @@ const LoginScreen = () => {
 
           {/* Email Field */}
           <View style={styles.inputWrapper}>
-            <MaterialIcons
-              name="email"
-              size={20}
-              color="#999"
-              style={styles.icon}
+            <Image
+              source={require('../../assets/sms.png')}
+              style={styles.iconImg}
             />
             <TextInput
               placeholder="Enter email address"
@@ -119,11 +117,9 @@ const LoginScreen = () => {
 
           {/* Password Field */}
           <View style={styles.inputWrapper}>
-            <MaterialIcons
-              name="lock"
-              size={20}
-              color="#999"
-              style={styles.icon}
+            <Image
+              source={require('../../assets/lock.png')}
+              style={styles.iconImg}
             />
             <TextInput
               placeholder="Enter password"
@@ -138,11 +134,9 @@ const LoginScreen = () => {
             <TouchableOpacity
               onPress={() => setPasswordVisible(!passwordVisible)}
             >
-              <Ionicons
-                name={passwordVisible ? "eye-off" : "eye"}
-                size={20}
-                color="#999"
-                style={styles.icon}
+              <Image
+                source={require('../../assets/eye.png')}
+                style={styles.iconImg}
               />
             </TouchableOpacity>
           </View>
@@ -279,6 +273,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "400",
   },
+
+  iconImg: { width: 20, height: 20, marginRight: 8, resizeMode: 'contain' },
+
   createAccountButton: {
     backgroundColor: "#EBEBEB",
     paddingVertical: 16,

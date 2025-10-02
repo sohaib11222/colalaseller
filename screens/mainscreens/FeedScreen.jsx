@@ -70,6 +70,9 @@ function CreatePostModal({ visible, onClose, onPost }) {
     }),
     [theme]
   );
+  
+
+
 
   const [text, setText] = useState("");
   const [images, setImages] = useState([
@@ -93,7 +96,16 @@ function CreatePostModal({ visible, onClose, onPost }) {
     setImages((prev) => prev.filter((u) => u !== uri));
   };
 
-  
+    const handleHidePost = (postId) => {
+    console.log('Hiding post with ID:', postId);
+    setHiddenPosts(prev => {
+      const newSet = new Set([...prev, postId]);
+      console.log('Updated hidden posts:', Array.from(newSet));
+      return newSet;
+    });
+    setOptionsVisible(false);
+  };
+
 
   const submit = () => {
     onPost?.({
@@ -213,12 +225,25 @@ function FeedHeader({ C }) {
       <View style={styles.headerTopRow}>
         <ThemedText font="oleo" style={styles.headerTitle}>Social Feed</ThemedText>
         <View style={styles.headerIcons}>
-          <TouchableOpacity>
-            <Ionicons name="cart-outline" size={22} color={C.primary} style={styles.icon} />
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Ionicons name="notifications-outline" size={22} color={C.primary} style={styles.icon} />
-          </TouchableOpacity>
+
+          <View style={styles.iconRow}>
+
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("ChatNavigator", {
+                  screen: "Notification",
+                })
+              }
+              style={[styles.iconButton, styles.iconPill]}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+            >
+              <Image
+                source={require("../../assets/bell-icon.png")}
+                style={styles.iconImg}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -229,7 +254,7 @@ function FeedHeader({ C }) {
           placeholderTextColor="#888"
           style={styles.searchInput}
         />
-        <Ionicons name="camera-outline" size={22} color="#444" style={styles.cameraIcon} />
+        {/* <Ionicons name="camera-outline" size={22} color="#444" style={styles.cameraIcon} /> */}
       </View>
     </View>
   );
@@ -257,7 +282,7 @@ function PostCard({ item, onOpenComments, onOpenOptions, C }) {
         <View style={{ flex: 1 }}>
           <ThemedText style={styles.storeName}>{item.store}</ThemedText>
           <ThemedText style={styles.metaText}>
-            {item.location} · {item.timeAgo}
+            {item.location} • {item.timeAgo}
           </ThemedText>
         </View>
         <TouchableOpacity onPress={() => onOpenOptions(item)}>
@@ -554,22 +579,42 @@ function OptionsSheet({ visible, onClose }) {
           </View>
 
           <Row
-            icon={<Ionicons name="share-outline" size={20} color={C.text} />}
+            icon={
+              <Image
+                source={require("../../assets/Vector (16).png")}
+                style={styles.profileImage}
+              />
+            }
             label="Share this post"
             onPress={onClose}
           />
           <Row
-            icon={<Ionicons name="person-add-outline" size={20} color={C.text} />}
+            icon={
+              <Image
+                source={require("../../assets/Vector (17).png")}
+                style={styles.profileImage}
+              />
+            }
             label="Follow User"
             onPress={onClose}
           />
           <Row
-            icon={<Ionicons name="eye-off-outline" size={20} color={C.text} />}
+            icon={
+              <Image
+                source={require("../../assets/Vector (18).png")}
+                style={styles.profileImage}
+              />
+            }
             label="Hide Post"
-            onPress={onClose}
+            // onPress={onHidePost}
           />
           <Row
-            icon={<Ionicons name="warning-outline" size={20} color={C.primary} />}
+            icon={
+              <Image
+                source={require("../../assets/Vector (19).png")}
+                style={styles.profileImage}
+              />
+            }
             label="Report Post"
             danger
             onPress={onClose}
@@ -638,10 +683,10 @@ export default function FeedScreen() {
                 style={[
                   styles.tabBtn,
                   { backgroundColor: "#fff", borderWidth: 1, borderColor: "#EEE" },
-                  tab === "all" && { borderColor: C.primary, backgroundColor: C.primary   },
+                  tab === "all" && { borderColor: C.primary, backgroundColor: C.primary },
                 ]}
               >
-                <ThemedText style={[styles.tabTxt, { color: tab === "all" ?  "#fff"  : "#6C727A",   }]}>
+                <ThemedText style={[styles.tabTxt, { color: tab === "all" ? "#fff" : "#6C727A", }]}>
                   All Posts
                 </ThemedText>
               </TouchableOpacity>
@@ -662,8 +707,11 @@ export default function FeedScreen() {
 
       {/* Sheets / Modals */}
       <CommentsSheet visible={commentsVisible} onClose={() => setCommentsVisible(false)} />
-      <OptionsSheet visible={optionsVisible} onClose={() => setOptionsVisible(false)} />
-      <CreatePostModal
+      <OptionsSheet
+        visible={optionsVisible}
+        onClose={() => setOptionsVisible(false)}
+        // onHidePost={() => handleHidePost(activePost?.id)}
+      />      <CreatePostModal
         visible={createVisible}
         onClose={() => setCreateVisible(false)}
         onPost={(post) => setPosts((p) => [post, ...p])}
@@ -685,7 +733,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
   headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle: { color: "#fff", fontSize: 24, fontWeight: "600" },
+  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "600" },
   headerIcons: { flexDirection: "row" },
   icon: { backgroundColor: "#fff", padding: 6, borderRadius: 30, marginLeft: 8 },
 
@@ -696,15 +744,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    height: 50,
+    height: 60,
   },
   searchInput: { flex: 1, fontSize: 14, color: "#333" },
   cameraIcon: { marginLeft: 8 },
 
   /* Tabs under header */
   tabsWrap: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 12 },
-  tabBtn: { flex: 1, height: 42, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  tabTxt: { fontWeight: "700" },
+  tabBtn: { flex: 1, height: 42, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  tabTxt: { fontWeight: "700", fontSize: 10 },
 
   /* Post card */
   postCard: {
@@ -719,19 +767,42 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   postTop: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
-  storeName: { fontSize: 14, fontWeight: "700", color: "#101318" },
-  metaText: { fontSize: 12, color: "#6C727A", marginTop: 2 },
+  avatar: { width: 55, height: 55, borderRadius: 40, marginRight: 10 },
+  storeName: { fontSize: 14, fontWeight: "400", color: "#000" },
+  metaText: { fontSize: 10, color: "#000000B2", marginTop: 2 },
 
-  carouselWrap: { borderRadius: 14, overflow: "hidden", backgroundColor: "#E9EBEF" },
-  postImage: { height: 300, resizeMode: "cover", borderTopRightRadius: 30, borderTopLeftRadius: 30 },
+  carouselWrap: { borderRadius: 14, overflow: "hidden" },
+  postImage: {
+    height: 390,
+    borderRadius: 10,
+    resizeMode: "cover",
+    borderTopRightRadius: 30,
+    borderTopLeftRadius: 30,
+  },
 
-  dotsRow: { position: "absolute", bottom: 10, alignSelf: "center", flexDirection: "row", gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#bbb", opacity: 0.6 },
+  dotsRow: {
+    marginTop: 8,
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#bbb",
+    opacity: 0.6,
+  },
   dotActive: { backgroundColor: "#EF534E", opacity: 1, width: 8, height: 8, borderRadius: 4, marginTop: -1 },
 
-  captionPill: { marginTop: 10, backgroundColor: "#F1F2F5", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 15 },
-  captionText: { color: "#101318", fontSize: 13 },
+  captionPill: {
+    marginTop: 10,
+    backgroundColor: "#F1F2F5",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 15,
+  },
+  captionText: { color: "#000", fontSize: 12 },
 
   actionsRow: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   actionsLeft: { flexDirection: "row", alignItems: "center" },
@@ -739,14 +810,54 @@ const styles = StyleSheet.create({
   actionCount: { marginLeft: 6, fontSize: 12, color: "#101318" },
   actionsRight: { flexDirection: "row", alignItems: "center" },
   visitBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
-  visitBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  visitBtnText: { color: "#fff", fontSize: 10, fontWeight: "700" },
 
   /* Comments / options shared styles */
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
-  sheet: { backgroundColor: "#fff", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  sheetHandle: { alignSelf: "center", width: 68, height: 6, borderRadius: 999, backgroundColor: "#D8DCE2", marginBottom: 6 },
-  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
-  sheetTitle: { fontSize: 18, fontWeight: "700", color: "#101318" },
+  sheet: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 68,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#D8DCE2",
+    marginBottom: 6,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#000",
+    textAlign: "center",
+    marginLeft: 160,
+  },
+   optionRow: {
+    height: 56,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    justifyContent: "space-between",
+    elevation: 1,
+  },
+  optionRowDanger: { borderColor: "#FDE2E0", backgroundColor: "#FFF8F8" },
+  optionLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  optionLabel: { fontSize: 15, color: "#000" },
 
   commentRow: { flexDirection: "row", paddingVertical: 10 },
   commentAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
@@ -784,4 +895,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
+  iconRow: { flexDirection: "row" },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });
