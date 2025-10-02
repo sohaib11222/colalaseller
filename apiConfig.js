@@ -79,6 +79,12 @@ const API_ENDPOINTS = {
 
     Share: (id) => `${API_DOMAIN}/posts/${id}/share`, // POST
   },
+  SETTINGS: {
+    Balance: `${API_DOMAIN}/buyer/getBalance`, // GET
+    FAQs: `${API_DOMAIN}/faqs/category/name/general`, // GET
+    Escrow_Wallet: `${API_DOMAIN}/faqs/escrow`, // GET
+    Escrow_History: `${API_DOMAIN}/faqs/escrow/history`, // GET
+  },
 };
 
 export { API_DOMAIN, API_ENDPOINTS };

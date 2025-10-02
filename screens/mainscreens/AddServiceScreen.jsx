@@ -1,5 +1,5 @@
 // screens/services/AddServiceScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +10,8 @@ import {
   SafeAreaView,
   Modal,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -17,7 +19,16 @@ import { StatusBar } from "expo-status-bar";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 
-const toSrc = (v) => (typeof v === "number" ? v : v ? { uri: String(v) } : undefined);
+//Code Related to the integration
+import { getStoreCategories } from "../../utils/queries/seller";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../contexts/AuthContext";
+import { getOnboardingToken } from "../../utils/tokenStorage";
+import { createService } from "../../utils/mutations/services";
+import { useMutation } from "@tanstack/react-query";
+
+const toSrc = (v) =>
+  typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
 
 export default function AddServiceScreen({ navigation }) {
   const { theme } = useTheme();
@@ -59,13 +70,205 @@ export default function AddServiceScreen({ navigation }) {
     Array.from({ length: 7 }, () => ({ name: "", from: "", to: "" }))
   );
 
+  // Get onboarding token
+  const [onboardingToken, setOnboardingToken] = useState(null);
+  
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        const token = await getOnboardingToken();
+        setOnboardingToken(token);
+        console.log("Retrieved onboarding token for services:", token ? "Token present" : "No token");
+      } catch (error) {
+        console.error("Error getting onboarding token:", error);
+        setOnboardingToken(null);
+      }
+    };
+    getToken();
+  }, []);
+
+  // Fetch store categories using React Query
+  const { 
+    data: categoriesData, 
+    isLoading: categoriesLoading, 
+    error: categoriesError 
+  } = useQuery({
+    queryKey: ['storeCategories', onboardingToken],
+    queryFn: () => getStoreCategories(onboardingToken),
+    enabled: !!onboardingToken, // Only run query when token is available
+  });
+
+  const categories = categoriesData?.selected || [];
+
+  // Create service mutation
+  const createServiceMutation = useMutation({
+    mutationFn: (formData) => createService(formData, onboardingToken),
+    onSuccess: (data) => {
+      console.log("Service created successfully:", data);
+      Alert.alert("Success", "Service created successfully!");
+      // Navigate back or reset form
+      navigation.goBack();
+    },
+    onError: (error) => {
+      console.error("Create service error:", error);
+      console.error("Error details:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      console.error("Error message:", error.message);
+      
+      let errorMessage = "Failed to create service. Please try again.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
   const canPost =
     !!video &&
     images.length >= 3 &&
     name.trim().length > 0 &&
-    category.trim().length > 0 &&
+    category && // category is now an ID (number), so just check if it exists
     priceFrom.trim().length > 0 &&
     priceTo.trim().length > 0;
+
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (!canPost || createServiceMutation.isPending) return;
+    
+    try {
+      // Check if token is available
+      if (!onboardingToken) {
+        Alert.alert("Error", "Authentication token not available. Please try again.");
+        return;
+      }
+
+      // Create FormData
+      const formData = new FormData();
+      
+      // Add required fields
+      formData.append('category_id', category);
+      formData.append('name', name.trim());
+      
+      // Add optional fields
+      if (shortDesc.trim()) {
+        formData.append('short_description', shortDesc.trim());
+      }
+      if (fullDesc.trim()) {
+        formData.append('full_description', fullDesc.trim());
+      }
+      if (priceFrom.trim()) {
+        formData.append('price_from', parseFloat(priceFrom));
+      }
+      if (priceTo.trim()) {
+        formData.append('price_to', parseFloat(priceTo));
+      }
+      if (discountPrice.trim()) {
+        formData.append('discount_price', parseFloat(discountPrice));
+      }
+
+      // Add media files with dot notation (media.0, media.1, etc.)
+      let mediaIndex = 0;
+      
+      if (video) {
+        console.log("Adding video file:", video.uri);
+        console.log("Video file exists:", video.uri ? "Yes" : "No");
+        console.log("Raw video object:", video);
+        // Create proper file object with all required properties
+        const videoFile = {
+          uri: video.uri,
+          type: 'video/mp4',
+          name: 'service_video.mp4'
+        };
+        formData.append(`media.${mediaIndex}`, videoFile);
+        mediaIndex++;
+      }
+      
+      images.forEach((image, index) => {
+        // Determine file type from URI
+        const getFileType = (uri) => {
+          const extension = uri.split('.').pop().toLowerCase();
+          switch (extension) {
+            case 'jpg':
+            case 'jpeg':
+              return 'image/jpeg';
+            case 'png':
+              return 'image/png';
+            case 'gif':
+              return 'image/gif';
+            default:
+              return 'image/jpeg';
+          }
+        };
+        
+        const fileName = `service_image_${index + 1}.${image.uri.split('.').pop()}`;
+        console.log(`Adding image file ${index + 1}:`, image.uri);
+        console.log(`Image file ${index + 1} exists:`, image.uri ? "Yes" : "No");
+        console.log(`Image file ${index + 1} type:`, getFileType(image.uri));
+        console.log(`Raw image object ${index + 1}:`, image);
+        // Create proper file object with all required properties
+        const imageFile = {
+          uri: image.uri,
+          type: getFileType(image.uri),
+          name: fileName
+        };
+        formData.append(`media.${mediaIndex}`, imageFile);
+        mediaIndex++;
+      });
+
+      // Add sub-services
+      const validSubServices = subservices.filter(sub => sub.name.trim());
+      if (validSubServices.length > 0) {
+        validSubServices.forEach((sub, index) => {
+          formData.append(`sub_services[${index}][name]`, sub.name.trim());
+          if (sub.from.trim()) {
+            formData.append(`sub_services[${index}][price_from]`, parseFloat(sub.from));
+          }
+          if (sub.to.trim()) {
+            formData.append(`sub_services[${index}][price_to]`, parseFloat(sub.to));
+          }
+        });
+      }
+
+      console.log("Submitting service with FormData:", {
+        category_id: category,
+        category_title: categories.find(cat => cat.id === category)?.title,
+        name: name.trim(),
+        hasVideo: !!video,
+        videoUri: video?.uri,
+        imageCount: images.length,
+        imageUris: images.map(img => img.uri),
+        subServicesCount: validSubServices.length
+      });
+
+      // Debug: Log FormData entries
+      console.log("FormData entries:");
+      for (let pair of formData._parts) {
+        console.log(`${pair[0]}:`, pair[1]);
+      }
+      
+      // Count media entries
+      const mediaEntries = formData._parts.filter(pair => pair[0].startsWith('media'));
+      console.log(`Total media entries in FormData: ${mediaEntries.length}`);
+      console.log("Media field names:", mediaEntries.map(pair => pair[0]));
+      
+      // Debug: Check if files are being sent as proper file objects
+      mediaEntries.forEach((entry, index) => {
+        console.log(`Media entry ${index}:`, {
+          fieldName: entry[0],
+          value: entry[1],
+          isFileObject: entry[1] && typeof entry[1] === 'object' && entry[1].uri
+        });
+      });
+
+      createServiceMutation.mutate(formData);
+    } catch (error) {
+      console.error("Error preparing form data:", error);
+      Alert.alert("Error", "Failed to prepare form data. Please try again.");
+    }
+  };
 
   /* media pickers */
   async function ensurePerms() {
@@ -96,24 +299,35 @@ export default function AddServiceScreen({ navigation }) {
     }
   };
 
-  const removeImage = (idx) => setImages((prev) => prev.filter((_, i) => i !== idx));
+  const removeImage = (idx) =>
+    setImages((prev) => prev.filter((_, i) => i !== idx));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style="dark" />
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.line, backgroundColor: C.card }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: C.line, backgroundColor: C.card },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.hIcon, { borderColor: C.line }]}
           onPress={() => navigation?.goBack?.()}
         >
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: C.text }]}>Add New Service</ThemedText>
+        <ThemedText style={[styles.headerTitle, { color: C.text }]}>
+          Add New Service
+        </ThemedText>
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 14 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 14 }}
+      >
         {/* Video */}
         <ThemedText style={[styles.label, { color: C.text }]}>
           Upload at least 1 Video of your product
@@ -122,7 +336,10 @@ export default function AddServiceScreen({ navigation }) {
           <TouchableOpacity
             onPress={pickVideo}
             activeOpacity={0.85}
-            style={[styles.mediaTile, { borderColor: C.line, backgroundColor: C.card }]}
+            style={[
+              styles.mediaTile,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
           >
             {video ? (
               <>
@@ -130,7 +347,10 @@ export default function AddServiceScreen({ navigation }) {
                 <View style={styles.playOverlay}>
                   <Ionicons name="play" size={20} color="#fff" />
                 </View>
-                <TouchableOpacity style={styles.closeDot} onPress={() => setVideo(null)}>
+                <TouchableOpacity
+                  style={styles.closeDot}
+                  onPress={() => setVideo(null)}
+                >
                   <Ionicons name="close" size={16} color="#fff" />
                 </TouchableOpacity>
               </>
@@ -148,14 +368,23 @@ export default function AddServiceScreen({ navigation }) {
           <TouchableOpacity
             onPress={pickImages}
             activeOpacity={0.85}
-            style={[styles.imageTile, { borderColor: C.line, backgroundColor: C.card }]}
+            style={[
+              styles.imageTile,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
           >
             <Ionicons name="camera-outline" size={20} color={C.sub} />
           </TouchableOpacity>
           {images.map((img, i) => (
-            <View key={i} style={[styles.imageTile, { backgroundColor: "#000" }]}>
+            <View
+              key={i}
+              style={[styles.imageTile, { backgroundColor: "#000" }]}
+            >
               <Image source={toSrc(img.uri)} style={styles.imageImg} />
-              <TouchableOpacity style={styles.closeDot} onPress={() => removeImage(i)}>
+              <TouchableOpacity
+                style={styles.closeDot}
+                onPress={() => removeImage(i)}
+              >
                 <Ionicons name="close" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -163,17 +392,35 @@ export default function AddServiceScreen({ navigation }) {
         </View>
 
         {/* Fields */}
-        <Field value={name} onChangeText={setName} placeholder="Service Name" C={C} style={{ marginTop: 14 }} />
+        <Field
+          value={name}
+          onChangeText={setName}
+          placeholder="Service Name"
+          C={C}
+          style={{ marginTop: 14 }}
+        />
 
         <PickerField
-          label={category || "Category"}
+          label={category ? (categories.find(cat => cat.id === category)?.title || "Category") : "Category"}
           empty={!category}
-          onPress={() => setCatOpen(true)}
+          onPress={() => {
+            if (categories.length === 0 && !categoriesLoading) {
+              Alert.alert("Error", "No categories available. Please try again.");
+              return;
+            }
+            setCatOpen(true);
+          }}
           C={C}
           style={{ marginTop: 10 }}
         />
 
-        <Field value={shortDesc} onChangeText={setShortDesc} placeholder="Short description" C={C} style={{ marginTop: 10 }} />
+        <Field
+          value={shortDesc}
+          onChangeText={setShortDesc}
+          placeholder="Short description"
+          C={C}
+          style={{ marginTop: 10 }}
+        />
         <Field
           value={fullDesc}
           onChangeText={setFullDesc}
@@ -187,7 +434,9 @@ export default function AddServiceScreen({ navigation }) {
         <PickerField
           label={
             priceFrom && priceTo
-              ? `₦${Number(priceFrom || 0).toLocaleString()} - ₦${Number(priceTo || 0).toLocaleString()}`
+              ? `₦${Number(priceFrom || 0).toLocaleString()} - ₦${Number(
+                  priceTo || 0
+                ).toLocaleString()}`
               : "Price range"
           }
           empty={!(priceFrom && priceTo)}
@@ -206,26 +455,41 @@ export default function AddServiceScreen({ navigation }) {
         />
 
         {/* Sub-services */}
-        <ThemedText style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}>
+        <ThemedText
+          style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}
+        >
           Add Sub-Service (Optional)
         </ThemedText>
         <ThemedText style={{ color: C.sub, fontSize: 11, marginBottom: 8 }}>
           You can add subservices name and prices for more clarity to your users
         </ThemedText>
 
-        <View style={{ flexDirection: "row", paddingHorizontal: 4, marginBottom: 6 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            paddingHorizontal: 4,
+            marginBottom: 6,
+          }}
+        >
           <ThemedText style={{ color: C.text, width: "52%" }}>Name</ThemedText>
-          <ThemedText style={{ color: C.text, width: "48%" }}>Price Range</ThemedText>
+          <ThemedText style={{ color: C.text, width: "48%" }}>
+            Price Range
+          </ThemedText>
         </View>
 
         {subservices.map((row, idx) => (
-          <View key={idx} style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+          <View
+            key={idx}
+            style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}
+          >
             <MiniField
               C={C}
               style={{ flex: 1.1 }}
               value={row.name}
               onChangeText={(v) =>
-                setSubservices((list) => list.map((r, i) => (i === idx ? { ...r, name: v } : r)))
+                setSubservices((list) =>
+                  list.map((r, i) => (i === idx ? { ...r, name: v } : r))
+                )
               }
               placeholder="Subservice name"
             />
@@ -235,7 +499,9 @@ export default function AddServiceScreen({ navigation }) {
                 keyboardType="numeric"
                 value={row.from}
                 onChangeText={(v) =>
-                  setSubservices((list) => list.map((r, i) => (i === idx ? { ...r, from: v } : r)))
+                  setSubservices((list) =>
+                    list.map((r, i) => (i === idx ? { ...r, from: v } : r))
+                  )
                 }
                 placeholder="From"
               />
@@ -244,7 +510,9 @@ export default function AddServiceScreen({ navigation }) {
                 keyboardType="numeric"
                 value={row.to}
                 onChangeText={(v) =>
-                  setSubservices((list) => list.map((r, i) => (i === idx ? { ...r, to: v } : r)))
+                  setSubservices((list) =>
+                    list.map((r, i) => (i === idx ? { ...r, to: v } : r))
+                  )
                 }
                 placeholder="To"
               />
@@ -255,14 +523,20 @@ export default function AddServiceScreen({ navigation }) {
         {/* Post button */}
         <TouchableOpacity
           activeOpacity={0.9}
-          disabled={!canPost}
+          disabled={!canPost || createServiceMutation.isPending}
           style={[
             styles.postBtn,
             { backgroundColor: canPost ? C.primary : "#E9A0A7", marginTop: 10 },
           ]}
-          onPress={() => console.log("Post service")}
+          onPress={handleSubmit}
         >
-          <ThemedText style={{ color: "#fff", fontWeight: "700" }}>Post Service</ThemedText>
+          {createServiceMutation.isPending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              Post Service
+            </ThemedText>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -270,10 +544,17 @@ export default function AddServiceScreen({ navigation }) {
       <CategorySheet
         visible={catOpen}
         onClose={() => setCatOpen(false)}
-        onSelect={(v) => {
-          setCategory(v);
+        onSelect={(categoryId) => {
+          console.log("Selected category ID:", categoryId);
+          console.log("Available categories:", categories);
+          const selectedCategory = categories.find(cat => cat.id === categoryId);
+          console.log("Selected category object:", selectedCategory);
+          setCategory(categoryId);
           setCatOpen(false);
         }}
+        categories={categories}
+        isLoading={categoriesLoading}
+        error={categoriesError}
         C={C}
       />
 
@@ -304,7 +585,11 @@ const Field = ({ C, big, style, ...rest }) => (
     <TextInput
       {...rest}
       placeholderTextColor="#9BA0A6"
-      style={[styles.input, { color: C.text }, big && { height: "100%", textAlignVertical: "top" }]}
+      style={[
+        styles.input,
+        { color: C.text },
+        big && { height: "100%", textAlignVertical: "top" },
+      ]}
       multiline={!!big || rest.multiline}
     />
   </View>
@@ -314,10 +599,16 @@ const PickerField = ({ label, empty = false, onPress, C, style }) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.85}
-    style={[styles.fieldWrap, { backgroundColor: C.card, borderColor: C.line }, style]}
+    style={[
+      styles.fieldWrap,
+      { backgroundColor: C.card, borderColor: C.line },
+      style,
+    ]}
   >
     <View style={{ flex: 1 }}>
-      <ThemedText style={{ color: empty ? "#9BA0A6" : C.text }}>{label}</ThemedText>
+      <ThemedText style={{ color: empty ? "#9BA0A6" : C.text }}>
+        {label}
+      </ThemedText>
     </View>
     <Ionicons name="chevron-forward" size={18} color={C.text} />
   </TouchableOpacity>
@@ -334,48 +625,57 @@ const MiniField = ({ C, style, ...rest }) => (
     <TextInput
       {...rest}
       placeholderTextColor="#9BA0A6"
-      style={{ color: "#111827", fontSize: 13, paddingVertical: Platform.OS === "ios" ? 8 : 6 }}
+      style={{
+        color: "#111827",
+        fontSize: 13,
+        paddingVertical: Platform.OS === "ios" ? 8 : 6,
+      }}
     />
   </View>
 );
 
 /* --------------------------------- Modals ---------------------------------- */
 
-function CategorySheet({ visible, onClose, onSelect, C }) {
-  const popular = ["Fashion Desgning", "Electronics Repair", "Gardening"];
-  const all = [
-    "Fashion Desgning",
-    "Electronics Repair",
-    "Janitorial Services",
-    "Design Services",
-    "Hair Stylist",
-    "Gardening",
-  ];
+function CategorySheet({ visible, onClose, onSelect, categories, isLoading, error, C }) {
   const [q, setQ] = useState("");
 
   const filter = (list) =>
-    list.filter((s) => s.toLowerCase().includes(q.trim().toLowerCase()));
+    list.filter((s) => s.title.toLowerCase().includes(q.trim().toLowerCase()));
 
-  const Row = ({ label }) => (
+  const Row = ({ category }) => (
     <TouchableOpacity
-      onPress={() => onSelect(label)}
-      style={[styles.sheetRow, { borderColor: C.line, backgroundColor: "#EFEFF0" }]}
+      onPress={() => onSelect(category.id)}
+      style={[
+        styles.sheetRow,
+        { borderColor: C.line, backgroundColor: "#EFEFF0" },
+      ]}
       activeOpacity={0.9}
     >
-      <ThemedText style={{ color: C.text }}>{label}</ThemedText>
+      <ThemedText style={{ color: C.text }}>{category.title}</ThemedText>
     </TouchableOpacity>
   );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
+            <ThemedText
+              font="oleo"
+              style={[styles.sheetTitle, { color: C.text }]}
+            >
               Categroies
             </ThemedText>
-            <TouchableOpacity onPress={onClose} style={[styles.sheetClose, { borderColor: C.line }]}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.sheetClose, { borderColor: C.line }]}
+            >
               <Ionicons name="close" size={18} color={C.text} />
             </TouchableOpacity>
           </View>
@@ -390,19 +690,36 @@ function CategorySheet({ visible, onClose, onSelect, C }) {
             />
           </View>
 
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
-            Popular Categories
-          </ThemedText>
-          {filter(popular).map((p) => (
-            <Row key={p} label={p} />
-          ))}
-
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>All Categories</ThemedText>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {filter(all).map((x) => (
-              <Row key={x} label={x} />
-            ))}
-          </ScrollView>
+          {isLoading ? (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={{ color: C.sub, marginTop: 16 }}>
+                Loading categories...
+              </ThemedText>
+            </View>
+          ) : error ? (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ThemedText style={{ color: "#E53E3E", textAlign: "center" }}>
+                Error loading categories. Please try again.
+              </ThemedText>
+            </View>
+          ) : (
+            <>
+              <ThemedText style={[styles.sheetSection, { color: C.text }]}>
+                Available Categories
+              </ThemedText>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {filter(categories).map((category) => (
+                  <Row key={category.id} category={category} />
+                ))}
+                {filter(categories).length === 0 && (
+                  <ThemedText style={{ color: C.sub, textAlign: "center", marginTop: 20 }}>
+                    No categories found
+                  </ThemedText>
+                )}
+              </ScrollView>
+            </>
+          )}
         </View>
       </View>
     </Modal>
@@ -411,21 +728,37 @@ function CategorySheet({ visible, onClose, onSelect, C }) {
 
 function PriceRangeSheet({ visible, onClose, from, to, setFrom, setTo, C }) {
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.priceSheet, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
+            <ThemedText
+              font="oleo"
+              style={[styles.sheetTitle, { color: C.text }]}
+            >
               Price Range
             </ThemedText>
-            <TouchableOpacity onPress={onClose} style={[styles.sheetClose, { borderColor: C.line }]}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.sheetClose, { borderColor: C.line }]}
+            >
               <Ionicons name="close" size={18} color={C.text} />
             </TouchableOpacity>
           </View>
 
           <View style={{ flexDirection: "row", gap: 14 }}>
-            <View style={[styles.fieldWrap, { flex: 1, backgroundColor: C.card, borderColor: C.line }]}>
+            <View
+              style={[
+                styles.fieldWrap,
+                { flex: 1, backgroundColor: C.card, borderColor: C.line },
+              ]}
+            >
               <TextInput
                 placeholder="From"
                 placeholderTextColor="#9BA0A6"
@@ -435,7 +768,12 @@ function PriceRangeSheet({ visible, onClose, from, to, setFrom, setTo, C }) {
                 onChangeText={setFrom}
               />
             </View>
-            <View style={[styles.fieldWrap, { flex: 1, backgroundColor: C.card, borderColor: C.line }]}>
+            <View
+              style={[
+                styles.fieldWrap,
+                { flex: 1, backgroundColor: C.card, borderColor: C.line },
+              ]}
+            >
               <TextInput
                 placeholder="To"
                 placeholderTextColor="#9BA0A6"
@@ -450,9 +788,14 @@ function PriceRangeSheet({ visible, onClose, from, to, setFrom, setTo, C }) {
           <TouchableOpacity
             onPress={onClose}
             activeOpacity={0.9}
-            style={[styles.applyBtn, { backgroundColor: C.primary, marginTop: 16 }]}
+            style={[
+              styles.applyBtn,
+              { backgroundColor: C.primary, marginTop: 16 },
+            ]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Save</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Save
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -544,7 +887,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom:15
+    marginBottom: 15,
   },
 
   // bottom sheets
