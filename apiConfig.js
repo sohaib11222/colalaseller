@@ -40,6 +40,9 @@ const API_ENDPOINTS = {
 
   PRODUCTS: {
     GetAll: `${API_DOMAIN}/seller/products`, // GET
+    Product_Details: (id) => `${API_DOMAIN}/buyer/product-details/${id}`, // GET
+    Get_Product_Chart_Data: (id) => `${API_DOMAIN}/seller/products/${id}/stats`, // GET
+    Get_Product_Statistics: (id) => `${API_DOMAIN}/seller/products/${id}/stats/totals`, // GET
     Create: `${API_DOMAIN}/seller/products/create`, // POST
     Update: (id) => `${API_DOMAIN}/seller/products/update/${id}`, // POST
     Delete: (id) => `${API_DOMAIN}/seller/products/delete/${id}`, // DELETE
@@ -59,6 +62,9 @@ const API_ENDPOINTS = {
 
   SERVICES: {
     GetAll: `${API_DOMAIN}/seller/service`, // GET
+    Service_Details: (id) => `${API_DOMAIN}/seller/service/${id}`, // GET
+    Get_Service_Chart_Data: (id) => `${API_DOMAIN}/seller/services/${id}/stats`, // GET
+    Get_Service_Statistics: (id) => `${API_DOMAIN}/seller/services/${id}/stats/totals`, // GET
     Create: `${API_DOMAIN}/seller/service/create`, // POST
     Update: (id) => `${API_DOMAIN}/seller/service/update/${id}`, // POST
     Delete: (id) => `${API_DOMAIN}/seller/service/delete/${id}`, // DELETE
@@ -119,6 +125,9 @@ const API_ENDPOINTS = {
     Delete_Card: (id) => `${API_DOMAIN}/seller/cards/${id}`, // DELETE
     Active_Card: (id) => `${API_DOMAIN}/seller/cards/${id}/active`, // PATCH
     Autodebit_Card: (id) => `${API_DOMAIN}/seller/cards/${id}/autodebit`, // PATCH
+
+    //Reviews
+    List_Of_Reviews: `${API_DOMAIN}/user-reveiws`, // GET
 
   },
   CHATS: {

@@ -38,3 +38,6 @@ export const getSubscriptionStatus = async (token) =>
 
 export const getCards = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Cards, "GET", undefined, token);
+
+export const getReviews = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Reviews, "GET", undefined, token);

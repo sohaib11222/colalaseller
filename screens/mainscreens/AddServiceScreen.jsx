@@ -26,12 +26,17 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getOnboardingToken } from "../../utils/tokenStorage";
 import { createService } from "../../utils/mutations/services";
 import { useMutation } from "@tanstack/react-query";
+import { updateService } from "../../utils/mutations/services";
 
 const toSrc = (v) =>
   typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
 
-export default function AddServiceScreen({ navigation }) {
+export default function AddServiceScreen({ navigation, route }) {
   const { theme } = useTheme();
+  const { token } = useAuth();
+  
+  // Get route params for edit mode
+  const { mode, serviceId, serviceData, isEdit } = route?.params || {};
 
   const C = useMemo(
     () => ({
@@ -70,39 +75,72 @@ export default function AddServiceScreen({ navigation }) {
     Array.from({ length: 7 }, () => ({ name: "", from: "", to: "" }))
   );
 
-  // Get onboarding token
-  const [onboardingToken, setOnboardingToken] = useState(null);
-  
+  // Debug logging for edit mode
+  console.log("AddServiceScreen - Mode:", mode);
+  console.log("AddServiceScreen - Service ID:", serviceId);
+  console.log("AddServiceScreen - Is Edit:", isEdit);
+  console.log("AddServiceScreen - Service Data:", serviceData);
+
+  // Populate form with existing data when in edit mode
   useEffect(() => {
-    const getToken = async () => {
-      try {
-        const token = await getOnboardingToken();
-        setOnboardingToken(token);
-        console.log("Retrieved onboarding token for services:", token ? "Token present" : "No token");
-      } catch (error) {
-        console.error("Error getting onboarding token:", error);
-        setOnboardingToken(null);
+    if (isEdit && serviceData) {
+      console.log("Populating form with service data:", serviceData);
+      
+      // Populate basic fields
+      setName(serviceData.name || "");
+      setCategory(serviceData.category_id?.toString() || "");
+      setShortDesc(serviceData.short_description || "");
+      setFullDesc(serviceData.full_description || "");
+      setDiscountPrice(serviceData.discount_price || "");
+      setPriceFrom(serviceData.price_from || "");
+      setPriceTo(serviceData.price_to || "");
+
+      // Populate media
+      if (serviceData.media && serviceData.media.length > 0) {
+        const mediaImages = serviceData.media
+          .filter(media => media.type === "image")
+          .map(media => ({ uri: `https://colala.hmstech.xyz/storage/${media.path}` }));
+        setImages(mediaImages);
+
+        const videoMedia = serviceData.media.find(media => media.type === "video");
+        if (videoMedia) {
+          setVideo({ uri: `https://colala.hmstech.xyz/storage/${videoMedia.path}` });
+        }
       }
-    };
-    getToken();
-  }, []);
+
+      // Populate sub-services
+      if (serviceData.sub_services && serviceData.sub_services.length > 0) {
+        const populatedSubServices = serviceData.sub_services.map(sub => ({
+          name: sub.name || "",
+          from: sub.price_from || "",
+          to: sub.price_to || ""
+        }));
+        
+        // Fill remaining slots with empty objects
+        const remainingSlots = 7 - populatedSubServices.length;
+        const emptySlots = Array.from({ length: remainingSlots }, () => ({ name: "", from: "", to: "" }));
+        
+        setSubservices([...populatedSubServices, ...emptySlots]);
+      }
+    }
+  }, [isEdit, serviceData]);
 
   // Fetch store categories using React Query
-  const { 
-    data: categoriesData, 
-    isLoading: categoriesLoading, 
-    error: categoriesError 
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    error: categoriesError,
   } = useQuery({
-    queryKey: ['storeCategories', onboardingToken],
-    queryFn: () => getStoreCategories(onboardingToken),
-    enabled: !!onboardingToken, // Only run query when token is available
+    queryKey: ["storeCategories", token],
+    queryFn: () => getStoreCategories(token),
+    enabled: !!token, // Only run query when token is available
   });
 
   const categories = categoriesData?.selected || [];
 
   // Create service mutation
   const createServiceMutation = useMutation({
-    mutationFn: (formData) => createService(formData, onboardingToken),
+    mutationFn: (formData) => createService(formData, token),
     onSuccess: (data) => {
       console.log("Service created successfully:", data);
       Alert.alert("Success", "Service created successfully!");
@@ -114,64 +152,118 @@ export default function AddServiceScreen({ navigation }) {
       console.error("Error details:", error.response?.data);
       console.error("Error status:", error.response?.status);
       console.error("Error message:", error.message);
-      
+
       let errorMessage = "Failed to create service. Please try again.";
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       Alert.alert("Error", errorMessage);
     },
   });
 
-  const canPost =
+  // Update service mutation
+  const updateServiceMutation = useMutation({
+    mutationFn: (formData) => updateService(serviceId, formData, token),
+    onSuccess: (data) => {
+      console.log("Service updated successfully:", data);
+      Alert.alert("Success", "Service updated successfully!");
+      // Navigate back
+      navigation.goBack();
+    },
+    onError: (error) => {
+      console.error("Update service error:", error);
+      console.error("Error details:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      console.error("Error message:", error.message);
+
+      let errorMessage = "Failed to update service. Please try again.";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Different validation for create vs edit mode
+  const canPost = isEdit ? (
+    // For edit mode, only require basic fields
+    name.trim().length > 0 &&
+    category && // category is now an ID (number), so just check if it exists
+    priceFrom.trim().length > 0 &&
+    priceTo.trim().length > 0
+  ) : (
+    // For create mode, require video and images
     !!video &&
     images.length >= 3 &&
     name.trim().length > 0 &&
     category && // category is now an ID (number), so just check if it exists
     priceFrom.trim().length > 0 &&
-    priceTo.trim().length > 0;
+    priceTo.trim().length > 0
+  );
+
+  // Debug logging for validation
+  console.log("Validation Debug:", {
+    isEdit,
+    canPost,
+    name: name.trim().length > 0,
+    category: !!category,
+    priceFrom: priceFrom.trim().length > 0,
+    priceTo: priceTo.trim().length > 0,
+    video: !!video,
+    images: images.length,
+    requiredImages: isEdit ? "N/A" : ">= 3"
+  });
 
   // Handle form submission
   const handleSubmit = async () => {
-    if (!canPost || createServiceMutation.isPending) return;
+    const isEditMode = isEdit && serviceId;
+    const isPending = isEditMode ? updateServiceMutation.isPending : createServiceMutation.isPending;
     
+    if (!canPost || isPending) return;
+
     try {
       // Check if token is available
-      if (!onboardingToken) {
-        Alert.alert("Error", "Authentication token not available. Please try again.");
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not available. Please try again."
+        );
         return;
       }
 
       // Create FormData
       const formData = new FormData();
-      
+
       // Add required fields
-      formData.append('category_id', category);
-      formData.append('name', name.trim());
-      
+      formData.append("category_id", category);
+      formData.append("name", name.trim());
+
       // Add optional fields
       if (shortDesc.trim()) {
-        formData.append('short_description', shortDesc.trim());
+        formData.append("short_description", shortDesc.trim());
       }
       if (fullDesc.trim()) {
-        formData.append('full_description', fullDesc.trim());
+        formData.append("full_description", fullDesc.trim());
       }
       if (priceFrom.trim()) {
-        formData.append('price_from', parseFloat(priceFrom));
+        formData.append("price_from", parseFloat(priceFrom));
       }
       if (priceTo.trim()) {
-        formData.append('price_to', parseFloat(priceTo));
+        formData.append("price_to", parseFloat(priceTo));
       }
       if (discountPrice.trim()) {
-        formData.append('discount_price', parseFloat(discountPrice));
+        formData.append("discount_price", parseFloat(discountPrice));
       }
 
       // Add media files with dot notation (media.0, media.1, etc.)
       let mediaIndex = 0;
-      
+
       if (video) {
         console.log("Adding video file:", video.uri);
         console.log("Video file exists:", video.uri ? "Yes" : "No");
@@ -179,68 +271,79 @@ export default function AddServiceScreen({ navigation }) {
         // Create proper file object with all required properties
         const videoFile = {
           uri: video.uri,
-          type: 'video/mp4',
-          name: 'service_video.mp4'
+          type: "video/mp4",
+          name: "service_video.mp4",
         };
         formData.append(`media.${mediaIndex}`, videoFile);
         mediaIndex++;
       }
-      
+
       images.forEach((image, index) => {
         // Determine file type from URI
         const getFileType = (uri) => {
-          const extension = uri.split('.').pop().toLowerCase();
+          const extension = uri.split(".").pop().toLowerCase();
           switch (extension) {
-            case 'jpg':
-            case 'jpeg':
-              return 'image/jpeg';
-            case 'png':
-              return 'image/png';
-            case 'gif':
-              return 'image/gif';
+            case "jpg":
+            case "jpeg":
+              return "image/jpeg";
+            case "png":
+              return "image/png";
+            case "gif":
+              return "image/gif";
             default:
-              return 'image/jpeg';
+              return "image/jpeg";
           }
         };
-        
-        const fileName = `service_image_${index + 1}.${image.uri.split('.').pop()}`;
+
+        const fileName = `service_image_${index + 1}.${image.uri
+          .split(".")
+          .pop()}`;
         console.log(`Adding image file ${index + 1}:`, image.uri);
-        console.log(`Image file ${index + 1} exists:`, image.uri ? "Yes" : "No");
+        console.log(
+          `Image file ${index + 1} exists:`,
+          image.uri ? "Yes" : "No"
+        );
         console.log(`Image file ${index + 1} type:`, getFileType(image.uri));
         console.log(`Raw image object ${index + 1}:`, image);
         // Create proper file object with all required properties
         const imageFile = {
           uri: image.uri,
           type: getFileType(image.uri),
-          name: fileName
+          name: fileName,
         };
         formData.append(`media.${mediaIndex}`, imageFile);
         mediaIndex++;
       });
 
       // Add sub-services
-      const validSubServices = subservices.filter(sub => sub.name.trim());
+      const validSubServices = subservices.filter((sub) => sub.name.trim());
       if (validSubServices.length > 0) {
         validSubServices.forEach((sub, index) => {
           formData.append(`sub_services[${index}][name]`, sub.name.trim());
           if (sub.from.trim()) {
-            formData.append(`sub_services[${index}][price_from]`, parseFloat(sub.from));
+            formData.append(
+              `sub_services[${index}][price_from]`,
+              parseFloat(sub.from)
+            );
           }
           if (sub.to.trim()) {
-            formData.append(`sub_services[${index}][price_to]`, parseFloat(sub.to));
+            formData.append(
+              `sub_services[${index}][price_to]`,
+              parseFloat(sub.to)
+            );
           }
         });
       }
 
       console.log("Submitting service with FormData:", {
         category_id: category,
-        category_title: categories.find(cat => cat.id === category)?.title,
+        category_title: categories.find((cat) => cat.id === category)?.title,
         name: name.trim(),
         hasVideo: !!video,
         videoUri: video?.uri,
         imageCount: images.length,
-        imageUris: images.map(img => img.uri),
-        subServicesCount: validSubServices.length
+        imageUris: images.map((img) => img.uri),
+        subServicesCount: validSubServices.length,
       });
 
       // Debug: Log FormData entries
@@ -248,22 +351,33 @@ export default function AddServiceScreen({ navigation }) {
       for (let pair of formData._parts) {
         console.log(`${pair[0]}:`, pair[1]);
       }
-      
+
       // Count media entries
-      const mediaEntries = formData._parts.filter(pair => pair[0].startsWith('media'));
+      const mediaEntries = formData._parts.filter((pair) =>
+        pair[0].startsWith("media")
+      );
       console.log(`Total media entries in FormData: ${mediaEntries.length}`);
-      console.log("Media field names:", mediaEntries.map(pair => pair[0]));
-      
+      console.log(
+        "Media field names:",
+        mediaEntries.map((pair) => pair[0])
+      );
+
       // Debug: Check if files are being sent as proper file objects
       mediaEntries.forEach((entry, index) => {
         console.log(`Media entry ${index}:`, {
           fieldName: entry[0],
           value: entry[1],
-          isFileObject: entry[1] && typeof entry[1] === 'object' && entry[1].uri
+          isFileObject:
+            entry[1] && typeof entry[1] === "object" && entry[1].uri,
         });
       });
 
-      createServiceMutation.mutate(formData);
+      // Use appropriate mutation based on edit mode
+      if (isEditMode) {
+        updateServiceMutation.mutate(formData);
+      } else {
+        createServiceMutation.mutate(formData);
+      }
     } catch (error) {
       console.error("Error preparing form data:", error);
       Alert.alert("Error", "Failed to prepare form data. Please try again.");
@@ -401,11 +515,19 @@ export default function AddServiceScreen({ navigation }) {
         />
 
         <PickerField
-          label={category ? (categories.find(cat => cat.id === category)?.title || "Category") : "Category"}
+          label={
+            category
+              ? categories.find((cat) => cat.id === category)?.title ||
+                "Category"
+              : "Category"
+          }
           empty={!category}
           onPress={() => {
             if (categories.length === 0 && !categoriesLoading) {
-              Alert.alert("Error", "No categories available. Please try again.");
+              Alert.alert(
+                "Error",
+                "No categories available. Please try again."
+              );
               return;
             }
             setCatOpen(true);
@@ -484,7 +606,7 @@ export default function AddServiceScreen({ navigation }) {
           >
             <MiniField
               C={C}
-              style={{ flex: 1.1 }}
+              style={{ flex: 0.8}}
               value={row.name}
               onChangeText={(v) =>
                 setSubservices((list) =>
@@ -530,11 +652,11 @@ export default function AddServiceScreen({ navigation }) {
           ]}
           onPress={handleSubmit}
         >
-          {createServiceMutation.isPending ? (
+          {(createServiceMutation.isPending || updateServiceMutation.isPending) ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-              Post Service
+              {isEdit ? "Update Service" : "Post Service"}
             </ThemedText>
           )}
         </TouchableOpacity>
@@ -547,7 +669,9 @@ export default function AddServiceScreen({ navigation }) {
         onSelect={(categoryId) => {
           console.log("Selected category ID:", categoryId);
           console.log("Available categories:", categories);
-          const selectedCategory = categories.find(cat => cat.id === categoryId);
+          const selectedCategory = categories.find(
+            (cat) => cat.id === categoryId
+          );
           console.log("Selected category object:", selectedCategory);
           setCategory(categoryId);
           setCatOpen(false);
@@ -636,7 +760,15 @@ const MiniField = ({ C, style, ...rest }) => (
 
 /* --------------------------------- Modals ---------------------------------- */
 
-function CategorySheet({ visible, onClose, onSelect, categories, isLoading, error, C }) {
+function CategorySheet({
+  visible,
+  onClose,
+  onSelect,
+  categories,
+  isLoading,
+  error,
+  C,
+}) {
   const [q, setQ] = useState("");
 
   const filter = (list) =>
@@ -691,14 +823,26 @@ function CategorySheet({ visible, onClose, onSelect, categories, isLoading, erro
           </View>
 
           {isLoading ? (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <ActivityIndicator size="large" color={C.primary} />
               <ThemedText style={{ color: C.sub, marginTop: 16 }}>
                 Loading categories...
               </ThemedText>
             </View>
           ) : error ? (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <ThemedText style={{ color: "#E53E3E", textAlign: "center" }}>
                 Error loading categories. Please try again.
               </ThemedText>
@@ -713,7 +857,9 @@ function CategorySheet({ visible, onClose, onSelect, categories, isLoading, erro
                   <Row key={category.id} category={category} />
                 ))}
                 {filter(categories).length === 0 && (
-                  <ThemedText style={{ color: C.sub, textAlign: "center", marginTop: 20 }}>
+                  <ThemedText
+                    style={{ color: C.sub, textAlign: "center", marginTop: 20 }}
+                  >
                     No categories found
                   </ThemedText>
                 )}

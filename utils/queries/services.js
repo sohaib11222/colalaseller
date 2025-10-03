@@ -5,6 +5,22 @@ import { API_ENDPOINTS } from "../../apiConfig";
 export const getProgress = async (token) =>
   await apiCall(API_ENDPOINTS.SELLER.Progress, "GET", undefined, token);
 
+// Get services
+export const getServices = async (token) =>
+  await apiCall(API_ENDPOINTS.SERVICES.GetAll, "GET", undefined, token);
+
+// Get service details
+export const getServiceDetails = async (id, token) =>
+  await apiCall(API_ENDPOINTS.SERVICES.Service_Details(id), "GET", undefined, token);
+
+//Stats Data
+export const getServiceChartData = async (id, token) =>
+  await apiCall(API_ENDPOINTS.SERVICES.Get_Service_Chart_Data(id), "GET", undefined, token);
+
+export const getServiceStatistics = async (id, token) =>
+  await apiCall(API_ENDPOINTS.SERVICES.Get_Service_Statistics(id), "GET", undefined, token);
+
+
 // Store overview
 export const getStoreOverview = async (token) =>
   await apiCall(API_ENDPOINTS.SELLER.StoreOverview, "GET", undefined, token);

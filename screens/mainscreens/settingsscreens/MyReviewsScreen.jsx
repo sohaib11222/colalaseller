@@ -10,12 +10,21 @@ import {
   Modal,
   KeyboardAvoidingView,
   TextInput,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
+
+//Code Relate to this screen
+import { useQuery } from "@tanstack/react-query";
+import { getReviews } from "../../../utils/queries/settings";
+import { useAuth } from "../../../contexts/AuthContext";
+
+
 
 /* ---------- Demo data (replace with API) ---------- */
 const AV = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop";
@@ -121,6 +130,8 @@ const ReviewCard = ({ C, item, type = "store", onPress, onPressRight }) => {
 export default function MyReviewsScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const { token } = useAuth();
+
   const C = useMemo(
     () => ({
       primary: theme.colors?.primary || "#E53E3E",
@@ -133,10 +144,74 @@ export default function MyReviewsScreen() {
     [theme]
   );
 
+  // Fetch reviews using React Query
+  const { 
+    data: reviewsData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
+    queryKey: ['reviews', token],
+    queryFn: () => getReviews(token),
+    enabled: !!token,
+  });
+
   const [tab, setTab] = useState("store"); // 'store' | 'product'
-  const [storeReviews] = useState(STORE_REVIEWS);
-  const [productReviews] = useState(PRODUCT_REVIEWS);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (error) {
+      console.error("Error refreshing reviews:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Transform API data to match component expectations
+  const transformReviewData = (reviews) => {
+    if (!reviews || !Array.isArray(reviews)) return [];
+    
+    return reviews.map(review => ({
+      id: review.id,
+      user: review.user?.full_name || "Unknown User",
+      avatar: review.user?.profile_picture ? `https://colala.hmstech.xyz/storage/${review.user.profile_picture}` : AV,
+      rating: review.rating,
+      time: new Date(review.created_at).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit', 
+        year: '2-digit'
+      }) + "/" + new Date(review.created_at).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }).replace(/AM|PM/, (match) => match === 'AM' ? 'AM' : 'PM'),
+      body: review.comment,
+      store: {
+        name: "Store Name", // You might want to get this from store data
+        rating: 4.5,
+        image: P1
+      },
+      gallery: review.images ? review.images.map(img => `https://colala.hmstech.xyz/storage/${img}`) : []
+    }));
+  };
+
+  // Use API data if available, otherwise fallback to dummy data
+  const storeReviews = reviewsData?.data?.store_reviews ? 
+    transformReviewData(reviewsData.data.store_reviews) : STORE_REVIEWS;
+  const productReviews = reviewsData?.data?.product_reviews ? 
+    transformReviewData(reviewsData.data.product_reviews) : PRODUCT_REVIEWS;
+  
   const data = tab === "store" ? storeReviews : productReviews;
+  
+  // Check if we have real API data but it's empty
+  const hasApiData = reviewsData?.data;
+  const isStoreReviewsEmpty = hasApiData && reviewsData.data.store_reviews?.length === 0;
+  const isProductReviewsEmpty = hasApiData && reviewsData.data.product_reviews?.length === 0;
+  const isCurrentTabEmpty = tab === "store" ? isStoreReviewsEmpty : isProductReviewsEmpty;
 
   // view modal state
   const [activeReview, setActiveReview] = useState(null);
@@ -193,21 +268,77 @@ export default function MyReviewsScreen() {
       </View>
 
       {/* List */}
-      <FlatList
-        data={data}
-        keyExtractor={(i) => String(i.id)}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 18 }}
-        renderItem={({ item }) => (
-          <ReviewCard
-            C={C}
-            item={item}
-            type={tab}
-            onPress={() => openView(item)}
-            onPressRight={() => {}}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+            Loading reviews...
+          </ThemedText>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
+          <ThemedText style={[styles.errorTitle, { color: C.text }]}>
+            Failed to load reviews
+          </ThemedText>
+          <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
+            {error.message || "Something went wrong. Please try again."}
+          </ThemedText>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={[styles.retryButton, { backgroundColor: C.primary }]}
+          >
+            <ThemedText style={[styles.retryButtonText, { color: C.card }]}>
+              Try Again
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : isCurrentTabEmpty ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="star-outline" size={64} color={C.sub} />
+          <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+            No {tab === "store" ? "Store" : "Product"} Reviews Yet
+          </ThemedText>
+          <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+            {tab === "store" 
+              ? "You haven't received any store reviews yet. Keep providing great service to get your first review!"
+              : "You haven't received any product reviews yet. Keep selling quality products to get your first review!"
+            }
+          </ThemedText>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={[styles.refreshButton, { backgroundColor: C.primary }]}
+          >
+            <ThemedText style={[styles.refreshButtonText, { color: C.card }]}>
+              Refresh
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={(i) => String(i.id)}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 18 }}
+          renderItem={({ item }) => (
+            <ReviewCard
+              C={C}
+              item={item}
+              type={tab}
+              onPress={() => openView(item)}
+              onPressRight={() => {}}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[C.primary]}
+              tintColor={C.primary}
+            />
+          }
+        />
+      )}
 
       {/* ===== View Modal ===== */}
       <Modal visible={viewVisible} transparent animationType="slide" onRequestClose={() => setViewVisible(false)}>
@@ -367,5 +498,77 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 6,
+  },
+
+  // Loading and error states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  errorMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // Empty state styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptyMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  refreshButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  refreshButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
