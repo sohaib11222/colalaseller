@@ -43,3 +43,77 @@ export const addSubscription = async (payload, token) =>
 
 export const cancelSubscription = async (id, token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Cancel_Subscription(id), "PATCH", undefined, token);
+
+
+
+//Cards
+export const createCard = async ({ payload, token }) => {
+  console.log("Create Card - Payload:", payload);
+  console.log("Create Card - Token:", token);
+  console.log("Create Card - URL:", API_ENDPOINTS.SETTINGS.Create_Card);
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Create_Card, "POST", payload, token);
+    console.log("Create Card - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Create Card - Error:", error);
+    throw error;
+  }
+};
+
+export const updateCard = async ({ id, payload, token }) => {
+  console.log("Update Card - ID:", id);
+  console.log("Update Card - Payload:", payload);
+  console.log("Update Card - Token:", token);
+  console.log("Update Card - URL:", API_ENDPOINTS.SETTINGS.Update_Card(id));
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Update_Card(id), "POST", payload, token);
+    console.log("Update Card - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Update Card - Error:", error);
+    throw error;
+  }
+};
+
+export const deleteCard = async ({ id, token }) => {
+  console.log("Delete Card - ID:", id);
+  console.log("Delete Card - Token:", token);
+  console.log("Delete Card - URL:", API_ENDPOINTS.SETTINGS.Delete_Card(id));
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Delete_Card(id), "DELETE", undefined, token);
+    console.log("Delete Card - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Delete Card - Error:", error);
+    throw error;
+  }
+};
+
+export const activeCard = async ({ id, token }) => {
+  console.log("Active Card - ID:", id);
+  console.log("Active Card - Token:", token);
+  console.log("Active Card - URL:", API_ENDPOINTS.SETTINGS.Active_Card(id));
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Active_Card(id), "PATCH", undefined, token);
+    console.log("Active Card - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Active Card - Error:", error);
+    throw error;
+  }
+};
+
+export const autodebitCard = async ({ id, token }) => {
+  console.log("Autodebit Card - ID:", id);
+  console.log("Autodebit Card - Token:", token);
+  console.log("Autodebit Card - URL:", API_ENDPOINTS.SETTINGS.Autodebit_Card(id));
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Autodebit_Card(id), "PATCH", undefined, token);
+    console.log("Autodebit Card - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Autodebit Card - Error:", error);
+    throw error;
+  }
+};

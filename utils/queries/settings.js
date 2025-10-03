@@ -35,3 +35,6 @@ export const getPlans = async (token) =>
 
 export const getSubscriptionStatus = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Get_Subcription_Status, "GET", undefined, token);
+
+export const getCards = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Cards, "GET", undefined, token);

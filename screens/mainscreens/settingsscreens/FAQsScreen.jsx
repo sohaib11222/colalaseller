@@ -21,7 +21,6 @@ import { StatusBar } from "expo-status-bar";
 //Code Related to the integration
 import { getFAQs } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
-import { getOnboardingToken } from "../../../utils/tokenStorage";
 import { useAuth } from "../../../contexts/AuthContext";
 
 
@@ -29,7 +28,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 export default function FAQsScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const [onboardingToken, setOnboardingToken] = useState(null);
+  const { token } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
@@ -44,20 +43,6 @@ export default function FAQsScreen() {
     [theme]
   );
 
-  // Get onboarding token
-  useEffect(() => {
-    const getToken = async () => {
-      try {
-        const token = await getOnboardingToken();
-        setOnboardingToken(token);
-        console.log("Retrieved onboarding token for FAQs:", token ? "Token present" : "No token");
-      } catch (error) {
-        console.error("Error getting onboarding token:", error);
-        setOnboardingToken(null);
-      }
-    };
-    getToken();
-  }, []);
 
   // Fetch FAQs using React Query
   const { 
@@ -66,9 +51,9 @@ export default function FAQsScreen() {
     error, 
     refetch 
   } = useQuery({
-    queryKey: ['faqs', onboardingToken],
-    queryFn: () => getFAQs(onboardingToken),
-    enabled: !!onboardingToken, // Only run query when token is available
+    queryKey: ['faqs', token],
+    queryFn: () => getFAQs(token),
+    enabled: !!token, // Only run query when token is available
   });
 
   const [openId, setOpenId] = useState(null);

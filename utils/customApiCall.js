@@ -25,6 +25,10 @@ const apiCall = async (url, method, data, token) => {
   }
 
   try {
+    console.log(`Making ${method} request to:`, url);
+    console.log("Headers:", headers);
+    console.log("Data:", data);
+    
     let response;
     switch (method) {
       case 'GET':
@@ -36,6 +40,9 @@ const apiCall = async (url, method, data, token) => {
       case 'PUT':
         response = await axios.put(url, data, { headers });
         break;
+      case 'PATCH':
+        response = await axios.patch(url, data, { headers });
+        break;
       case 'DELETE':
         response = await axios.delete(url, { headers });
         break;
@@ -46,8 +53,11 @@ const apiCall = async (url, method, data, token) => {
     // Return the response data
     return response.data;
   } catch (error) {
-    console.log(error);
+    console.log("Full error object:", error);
     if (axios.isAxiosError(error) && error.response) {
+      console.log("Response data:", error.response.data);
+      console.log("Response status:", error.response.status);
+      console.log("Response headers:", error.response.headers);
       // Handle Axios errors
       throw new ApiError(
         error.response.data,

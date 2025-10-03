@@ -112,6 +112,14 @@ const API_ENDPOINTS = {
     Add_Subscription: `${API_DOMAIN}/seller/subscriptions`, // POST
     Cancel_Subscription: (id) => `${API_DOMAIN}/seller/subscriptions/${id}/cancel`, // PATCH
 
+    //Cards
+    List_Of_Cards: `${API_DOMAIN}/seller/cards`, // GET
+    Create_Card: `${API_DOMAIN}/seller/cards`, // POST
+    Update_Card: (id) => `${API_DOMAIN}/seller/cards/${id}`, // POST
+    Delete_Card: (id) => `${API_DOMAIN}/seller/cards/${id}`, // DELETE
+    Active_Card: (id) => `${API_DOMAIN}/seller/cards/${id}/active`, // PATCH
+    Autodebit_Card: (id) => `${API_DOMAIN}/seller/cards/${id}/autodebit`, // PATCH
+
   },
   CHATS: {
     List: `${API_DOMAIN}/seller/chat`,
