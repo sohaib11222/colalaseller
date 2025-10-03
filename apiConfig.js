@@ -85,6 +85,33 @@ const API_ENDPOINTS = {
     Escrow_Wallet: `${API_DOMAIN}/faqs/escrow`, // GET
     Escrow_History: `${API_DOMAIN}/faqs/escrow/history`, // GET
     Transaction_History: `${API_DOMAIN}/user/transactions`, // GET
+    Notifications: `${API_DOMAIN}/notifications`, // GET
+    Mark_As_Read_Notification: (id) => `${API_DOMAIN}/notifications/mark-as-read/${id}`, // POST
+
+    //Announcements
+    List_Of_Announcements: `${API_DOMAIN}/seller/announcements`, // GET
+    Create_Announcement: `${API_DOMAIN}/seller/announcements`, // POST
+    Update_Announcement: (id) => `${API_DOMAIN}/seller/announcements/${id}`, // POST
+    Delete_Announcement: (id) => `${API_DOMAIN}/seller/announcements/${id}`, // DELETE
+
+    //Banners
+    List_Of_Banners: `${API_DOMAIN}/seller/banners`, // GET
+    Create_Banner: `${API_DOMAIN}/seller/banners`, // POST
+    Update_Banner: (id) => `${API_DOMAIN}/seller/banners/${id}`, // POST
+    Delete_Banner: (id) => `${API_DOMAIN}/seller/banners/${id}`, // DELETE
+
+    //Coupons
+    List_Of_Coupons: `${API_DOMAIN}/seller/coupons`, // GET
+    Create_Coupon: `${API_DOMAIN}/seller/coupons`, // POST
+    Update_Coupon: (id) => `${API_DOMAIN}/seller/coupons/${id}`, // POST
+    Delete_Coupon: (id) => `${API_DOMAIN}/seller/coupons/${id}`, // DELETE
+
+    //Plans + Subcriptions
+    Get_All_Plans: `${API_DOMAIN}/seller/plans`, // GET
+    Get_Subcription_Status: `${API_DOMAIN}/seller/subscriptions`, // GET
+    Add_Subscription: `${API_DOMAIN}/seller/subscriptions`, // POST
+    Cancel_Subscription: (id) => `${API_DOMAIN}/seller/subscriptions/${id}/cancel`, // PATCH
+
   },
 };
 

@@ -11,12 +11,26 @@ import {
   Platform,
   Image,
   Linking,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
+
+
+
+//Code Related to the integration
+import { getAnnouncements, getBanners } from "../../../utils/queries/settings";
+import { createAnnouncement, createBanner, updateAnnouncement, updateBanner, deleteAnnouncement, deleteBanner } from "../../../utils/mutations/settings";
+import { useQuery } from "@tanstack/react-query";
+import { getOnboardingToken } from "../../../utils/tokenStorage";
+import { useAuth } from "../../../contexts/AuthContext";
+import { useMutation } from "@tanstack/react-query";
+
 
 /* helpers */
 const pad = (n) => String(n).padStart(2, "0");
@@ -34,6 +48,12 @@ const fmt = (d) => {
 /* ───────────────────────── Main Screen ───────────────────────── */
 export default function AnnouncementsScreen({ navigation }) {
   const { theme } = useTheme();
+  const { user, token: authToken } = useAuth();
+  const [onboardingToken, setOnboardingToken] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+
   const C = useMemo(
     () => ({
       primary: theme.colors?.primary || "#EF4444",
@@ -48,81 +68,200 @@ export default function AnnouncementsScreen({ navigation }) {
 
   const [tab, setTab] = useState("push"); // 'push' | 'banners'
 
-  /* Push announcements */
+  // Get token for API calls
+  const token = authToken || onboardingToken;
+
+  // Load onboarding token on component mount
+  React.useEffect(() => {
+    const loadOnboardingToken = async () => {
+      try {
+        const token = await getOnboardingToken();
+        setOnboardingToken(token);
+      } catch (error) {
+        console.error("Error loading onboarding token:", error);
+      }
+    };
+    
+    if (!authToken) {
+      loadOnboardingToken();
+    }
+  }, [authToken]);
+
+  // Fetch announcements using React Query
+  const {
+    data: announcementsData,
+    isLoading: announcementsLoading,
+    isError: announcementsError,
+    refetch: refetchAnnouncements,
+  } = useQuery({
+    queryKey: ["announcements", token],
+    queryFn: () => getAnnouncements(token),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  // Fetch banners using React Query
+  const {
+    data: bannersData,
+    isLoading: bannersLoading,
+    isError: bannersError,
+    refetch: refetchBanners,
+  } = useQuery({
+    queryKey: ["banners", token],
+    queryFn: () => getBanners(token),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  // Extract data from API responses
+  const announcements = announcementsData?.data || [];
+  const banners = bannersData?.data || [];
+
+  // Announcement mutations
+  const createAnnouncementMutation = useMutation({
+    mutationFn: ({ payload }) => createAnnouncement(payload, token),
+    onSuccess: () => {
+      refetchAnnouncements();
+    },
+    onError: (error) => {
+      console.error('Error creating announcement:', error);
+      Alert.alert('Error', 'Failed to create announcement');
+    },
+  });
+
+  const updateAnnouncementMutation = useMutation({
+    mutationFn: ({ id, payload }) => updateAnnouncement(id, payload, token),
+    onSuccess: () => {
+      refetchAnnouncements();
+    },
+    onError: (error) => {
+      console.error('Error updating announcement:', error);
+      Alert.alert('Error', 'Failed to update announcement');
+    },
+  });
+
+  const deleteAnnouncementMutation = useMutation({
+    mutationFn: ({ id }) => deleteAnnouncement(id, token),
+    onSuccess: () => {
+      refetchAnnouncements();
+      setDeleteModalVisible(false);
+      setItemToDelete(null);
+    },
+    onError: (error) => {
+      console.error('Error deleting announcement:', error);
+      Alert.alert('Error', 'Failed to delete announcement');
+    },
+  });
+
+  // Banner mutations
+  const createBannerMutation = useMutation({
+    mutationFn: ({ payload }) => createBanner(payload, token),
+    onSuccess: () => {
+      refetchBanners();
+    },
+    onError: (error) => {
+      console.error('Error creating banner:', error);
+      Alert.alert('Error', 'Failed to create banner');
+    },
+  });
+
+  const updateBannerMutation = useMutation({
+    mutationFn: ({ id, payload }) => updateBanner(id, payload, token),
+    onSuccess: () => {
+      refetchBanners();
+    },
+    onError: (error) => {
+      console.error('Error updating banner:', error);
+      Alert.alert('Error', 'Failed to update banner');
+    },
+  });
+
+  const deleteBannerMutation = useMutation({
+    mutationFn: ({ id }) => deleteBanner(id, token),
+    onSuccess: () => {
+      refetchBanners();
+      setDeleteModalVisible(false);
+      setItemToDelete(null);
+    },
+    onError: (error) => {
+      console.error('Error deleting banner:', error);
+      Alert.alert('Error', 'Failed to delete banner');
+    },
+  });
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (tab === "push") {
+        await refetchAnnouncements();
+      } else {
+        await refetchBanners();
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Modal states
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: "a1",
-      text: "Get 10% discount when you use the code NEW123",
-      createdAt: new Date(),
-      impressions: 25,
-    },
-  ]);
-
-  const onSaveAnnouncement = (payload) => {
-    if (editing) {
-      setAnnouncements((prev) =>
-        prev.map((a) => (a.id === editing.id ? { ...a, text: payload.text } : a))
-      );
-    } else {
-      setAnnouncements((prev) => [
-        { id: String(Date.now()), text: payload.text, createdAt: new Date(), impressions: 0 },
-        ...prev,
-      ]);
-    }
-  };
-
-  /* Banners */
   const [bannerOpen, setBannerOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [editingBanner, setEditingBanner] = useState(null);
-  const [banners, setBanners] = useState([
-    {
-      id: "b1",
-      image:
-        "https://images.unsplash.com/photo-1585386959984-a41552231605?q=80&w=1200&auto=format&fit=crop",
-      link: "https://www.colola.com/sashastores",
-      createdAt: new Date(),
-      impressions: 25,
-    },
-    {
-      id: "b2",
-      image:
-        "https://images.unsplash.com/photo-1603575449299-0e7551f1cb3d?q=80&w=1200&auto=format&fit=crop",
-      link: "https://www.colola.com/sashastores",
-      createdAt: new Date(),
-      impressions: 25,
-    },
-  ]);
-
-  const onSaveBanner = (payload) => {
-    if (editingBanner) {
-      setBanners((prev) =>
-        prev.map((b) =>
-          b.id === editingBanner.id ? { ...b, image: payload.image, link: payload.link } : b
-        )
-      );
-    } else {
-      setBanners((prev) => [
-        {
-          id: String(Date.now()),
-          image: payload.image,
-          link: payload.link,
-          createdAt: new Date(),
-          impressions: 0,
-        },
-        ...prev,
-      ]);
-    }
-  };
 
   const openCreateAnnouncement = (record = null) => {
     setEditing(record);
     setCreateOpen(true);
   };
+
   const openCreateBanner = (record = null) => {
     setEditingBanner(record);
     setBannerOpen(true);
+  };
+
+  const handleDelete = (item, type) => {
+    setItemToDelete({ item, type });
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      if (itemToDelete.type === 'announcement') {
+        deleteAnnouncementMutation.mutate({ id: itemToDelete.item.id });
+      } else {
+        deleteBannerMutation.mutate({ id: itemToDelete.item.id });
+      }
+    }
+  };
+
+  const onSaveAnnouncement = (payload) => {
+    if (editing) {
+      updateAnnouncementMutation.mutate({ 
+        id: editing.id, 
+        payload: { message: payload.text } 
+      });
+    } else {
+      createAnnouncementMutation.mutate({ 
+        payload: { message: payload.text } 
+      });
+    }
+    setCreateOpen(false);
+    setEditing(null);
+  };
+
+  const onSaveBanner = (payload) => {
+    if (editingBanner) {
+      updateBannerMutation.mutate({ 
+        id: editingBanner.id, 
+        payload: payload 
+      });
+    } else {
+      createBannerMutation.mutate({ payload });
+    }
+    setBannerOpen(false);
+    setEditingBanner(null);
   };
 
   return (
@@ -134,7 +273,7 @@ export default function AnnouncementsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack?.()} style={[styles.hIcon, { borderColor: C.line }]}>
           <Ionicons name="chevron-back" size={20} color={C.text} />
         </TouchableOpacity>
-        <ThemedText style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Coupons/Points</ThemedText>
+        <ThemedText style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>Announcements/Banners</ThemedText>
         <View style={{ width: 36 }} />
       </View>
 
@@ -171,27 +310,102 @@ export default function AnnouncementsScreen({ navigation }) {
       </View>
 
       {/* Body */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[C.primary]}
+            tintColor={C.primary}
+          />
+        }
+      >
         {tab === "push" ? (
-          announcements.map((a) => (
-            <AnnouncementCard
-              key={a.id}
-              C={C}
-              data={a}
-              onEdit={() => openCreateAnnouncement(a)}
-              onDelete={() => setAnnouncements((prev) => prev.filter((x) => x.id !== a.id))}
-            />
-          ))
+          announcementsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+                Loading announcements...
+              </ThemedText>
+            </View>
+          ) : announcementsError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
+              <ThemedText style={[styles.errorText, { color: C.text }]}>
+                Failed to load announcements
+              </ThemedText>
+              <TouchableOpacity
+                style={[styles.retryButton, { backgroundColor: C.primary }]}
+                onPress={() => refetchAnnouncements()}
+              >
+                <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+              </TouchableOpacity>
+            </View>
+          ) : announcements.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="megaphone-outline" size={48} color={C.sub} />
+              <ThemedText style={[styles.emptyText, { color: C.text }]}>
+                No announcements yet
+              </ThemedText>
+              <ThemedText style={[styles.emptySubtext, { color: C.sub }]}>
+                Create your first announcement to get started
+              </ThemedText>
+            </View>
+          ) : (
+            announcements.map((a) => (
+              <AnnouncementCard
+                key={a.id}
+                C={C}
+                data={a}
+                onEdit={() => openCreateAnnouncement(a)}
+                onDelete={() => handleDelete(a, 'announcement')}
+              />
+            ))
+          )
         ) : (
-          banners.map((b) => (
-            <BannerCard
-              key={b.id}
-              C={C}
-              data={b}
-              onEdit={() => openCreateBanner(b)}
-              onDelete={() => setBanners((prev) => prev.filter((x) => x.id !== b.id))}
-            />
-          ))
+          bannersLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+                Loading banners...
+              </ThemedText>
+            </View>
+          ) : bannersError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
+              <ThemedText style={[styles.errorText, { color: C.text }]}>
+                Failed to load banners
+              </ThemedText>
+              <TouchableOpacity
+                style={[styles.retryButton, { backgroundColor: C.primary }]}
+                onPress={() => refetchBanners()}
+              >
+                <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+              </TouchableOpacity>
+            </View>
+          ) : banners.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="image-outline" size={48} color={C.sub} />
+              <ThemedText style={[styles.emptyText, { color: C.text }]}>
+                No banners yet
+              </ThemedText>
+              <ThemedText style={[styles.emptySubtext, { color: C.sub }]}>
+                Create your first banner to get started
+              </ThemedText>
+            </View>
+          ) : (
+            banners.map((b) => (
+              <BannerCard
+                key={b.id}
+                C={C}
+                data={b}
+                onEdit={() => openCreateBanner(b)}
+                onDelete={() => handleDelete(b, 'banner')}
+              />
+            ))
+          )
         )}
       </ScrollView>
 
@@ -208,40 +422,83 @@ export default function AnnouncementsScreen({ navigation }) {
       {/* Modals */}
       <CreateAnnouncementModal
         visible={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSave={(payload) => {
-          onSaveAnnouncement(payload);
+        onClose={() => {
           setCreateOpen(false);
+          setEditing(null);
         }}
-        initialText={editing?.text || ""}
+        onSave={onSaveAnnouncement}
+        initialText={editing?.message || ""}
         editing={!!editing}
         C={C}
+        isLoading={createAnnouncementMutation.isPending || updateAnnouncementMutation.isPending}
       />
 
       <CreateBannerModal
         visible={bannerOpen}
-        onClose={() => setBannerOpen(false)}
-        onSave={(payload) => {
-          onSaveBanner(payload);
+        onClose={() => {
           setBannerOpen(false);
+          setEditingBanner(null);
         }}
+        onSave={onSaveBanner}
         initialData={editingBanner}
         C={C}
+        isLoading={createBannerMutation.isPending || updateBannerMutation.isPending}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.deleteModal, { backgroundColor: C.card }]}>
+            <Ionicons name="warning-outline" size={48} color={C.primary} />
+            <ThemedText style={[styles.deleteModalTitle, { color: C.text }]}>
+              Delete {itemToDelete?.type === 'announcement' ? 'Announcement' : 'Banner'}?
+            </ThemedText>
+            <ThemedText style={[styles.deleteModalText, { color: C.sub }]}>
+              This action cannot be undone. Are you sure you want to delete this {itemToDelete?.type === 'announcement' ? 'announcement' : 'banner'}?
+            </ThemedText>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.cancelButton, { borderColor: C.line }]}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <ThemedText style={[styles.cancelButtonText, { color: C.text }]}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteButton, { backgroundColor: C.primary }]}
+                onPress={confirmDelete}
+                disabled={deleteAnnouncementMutation.isPending || deleteBannerMutation.isPending}
+              >
+                {deleteAnnouncementMutation.isPending || deleteBannerMutation.isPending ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 /* ───────────── Push Announcement Card & Modal ───────────── */
 function AnnouncementCard({ C, data, onEdit, onDelete }) {
+  const createdDate = new Date(data.created_at);
+  
   return (
     <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, shadowColor: "#000" }]}>
       <View style={[styles.msgBox, { borderColor: C.line, backgroundColor: "#fff" }]}>
-        <ThemedText style={{ color: C.text }}>{data.text}</ThemedText>
+        <ThemedText style={{ color: C.text }}>{data.message}</ThemedText>
       </View>
       <View style={styles.row}>
         <ThemedText style={styles.kvLabel}>Date Created</ThemedText>
-        <ThemedText style={styles.kvValue}>{fmt(data.createdAt)}</ThemedText>
+        <ThemedText style={styles.kvValue}>{fmt(createdDate)}</ThemedText>
       </View>
       <View style={[styles.row, { marginBottom: 8 }]}>
         <ThemedText style={styles.kvLabel}>Impressions</ThemedText>
@@ -255,7 +512,7 @@ function AnnouncementCard({ C, data, onEdit, onDelete }) {
   );
 }
 
-function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editing, C }) {
+function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editing, C, isLoading }) {
   const [text, setText] = useState(initialText || "");
   const MAX = 200;
   useEffect(() => setText(initialText || ""), [initialText, visible]);
@@ -283,6 +540,7 @@ function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editin
               value={text}
               onChangeText={(t) => setText(t.slice(0, MAX))}
               maxLength={MAX}
+              editable={!isLoading}
             />
             <ThemedText style={styles.counterText}>{`${text.length}/${MAX}`}</ThemedText>
           </View>
@@ -290,11 +548,23 @@ function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editin
 
         <View style={[styles.footer, { backgroundColor: C.bg }]}>
           <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: C.primary }]}
+            style={[
+              styles.primaryBtn, 
+              { 
+                backgroundColor: C.primary,
+                opacity: (!text.trim() || isLoading) ? 0.6 : 1
+              }
+            ]}
             onPress={() => onSave({ text })}
-            disabled={!text.trim()}
+            disabled={!text.trim() || isLoading}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Save</ThemedText>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                {editing ? "Update" : "Create"}
+              </ThemedText>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -304,15 +574,17 @@ function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editin
 
 /* ───────────── Banner Card & Modal ───────────── */
 function BannerCard({ C, data, onEdit, onDelete }) {
+  const createdDate = new Date(data.created_at);
+  
   return (
     <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, shadowColor: "#000" }]}>
       <View style={styles.bannerWrap}>
-        <Image source={{ uri: data.image }} style={styles.bannerImage} />
+        <Image source={{ uri: data.image_url }} style={styles.bannerImage} />
       </View>
 
       <View style={styles.row}>
         <ThemedText style={styles.kvLabel}>Date Created</ThemedText>
-        <ThemedText style={styles.kvValue}>{fmt(data.createdAt)}</ThemedText>
+        <ThemedText style={styles.kvValue}>{fmt(createdDate)}</ThemedText>
       </View>
       <View style={styles.row}>
         <ThemedText style={styles.kvLabel}>Impressions</ThemedText>
@@ -335,13 +607,15 @@ function BannerCard({ C, data, onEdit, onDelete }) {
   );
 }
 
-function CreateBannerModal({ visible, onClose, onSave, initialData, C }) {
-  const [imageUri, setImageUri] = useState(initialData?.image || "");
+function CreateBannerModal({ visible, onClose, onSave, initialData, C, isLoading }) {
+  const [imageUri, setImageUri] = useState(initialData?.image_url || "");
   const [link, setLink] = useState(initialData?.link || "");
+  const [imageFile, setImageFile] = useState(null);
 
   useEffect(() => {
-    setImageUri(initialData?.image || "");
+    setImageUri(initialData?.image_url || "");
     setLink(initialData?.link || "");
+    setImageFile(null);
   }, [initialData, visible]);
 
   useEffect(() => {
@@ -357,7 +631,27 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C }) {
       aspect: [16, 9],
       quality: 0.9,
     });
-    if (!res.canceled && res.assets?.[0]?.uri) setImageUri(res.assets[0].uri);
+    if (!res.canceled && res.assets?.[0]?.uri) {
+      setImageUri(res.assets[0].uri);
+      setImageFile(res.assets[0]);
+    }
+  };
+
+  const handleSave = () => {
+    if (imageFile) {
+      // Create FormData for new image upload
+      const formData = new FormData();
+      formData.append('image', {
+        uri: imageFile.uri,
+        type: 'image/jpeg',
+        name: 'banner.jpg',
+      });
+      formData.append('link', link);
+      onSave(formData);
+    } else {
+      // For editing without new image, just send the link
+      onSave({ link });
+    }
   };
 
   return (
@@ -367,7 +661,9 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C }) {
           <TouchableOpacity onPress={onClose} style={[styles.hIcon, { borderColor: C.line }]}>
             <Ionicons name="chevron-back" size={20} color={C.text} />
           </TouchableOpacity>
-        <ThemedText style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>New Banner</ThemedText>
+          <ThemedText style={{ color: C.text, fontWeight: "800", fontSize: 16 }}>
+            {initialData ? "Edit Banner" : "New Banner"}
+          </ThemedText>
           <View style={{ width: 36 }} />
         </View>
 
@@ -376,6 +672,7 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C }) {
             activeOpacity={0.9}
             onPress={pickBanner}
             style={[styles.bannerPicker, { backgroundColor: "#fff", borderColor: "#EAECF0" }]}
+            disabled={isLoading}
           >
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%", borderRadius: 14 }} />
@@ -395,17 +692,30 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C }) {
               onChangeText={setLink}
               style={{ flex: 1, color: "#111", fontSize: 15, paddingVertical: Platform.OS === "ios" ? 14 : 10 }}
               autoCapitalize="none"
+              editable={!isLoading}
             />
           </View>
         </ScrollView>
 
         <View style={[styles.footer, { backgroundColor: C.bg }]}>
           <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: C.primary }]}
-            onPress={() => onSave({ image: imageUri, link })}
-            disabled={!imageUri || !link.trim()}
+            style={[
+              styles.primaryBtn, 
+              { 
+                backgroundColor: C.primary,
+                opacity: (!imageUri || !link.trim() || isLoading) ? 0.6 : 1
+              }
+            ]}
+            onPress={handleSave}
+            disabled={!imageUri || !link.trim() || isLoading}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Save</ThemedText>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                {initialData ? "Update" : "Create"}
+              </ThemedText>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -532,4 +842,116 @@ const styles = StyleSheet.create({
   /* footer button */
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 14 },
   primaryBtn: { height: 54, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+
+  /* Loading and Error States */
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
+  /* Delete Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  deleteModal: {
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    maxWidth: 320,
+    width: "100%",
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  deleteModalText: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  deleteModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  deleteButton: {
+    // backgroundColor set dynamically
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  deleteButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });

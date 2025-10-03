@@ -17,3 +17,21 @@ export const getBalance = async (token) =>
 
 export const getTransactionHistory = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Transaction_History, "GET", undefined, token);
+
+export const getNotifications = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Notifications, "GET", undefined, token);
+
+export const getAnnouncements = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Announcements, "GET", undefined, token);
+
+export const getBanners = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Banners, "GET", undefined, token);
+
+export const getCoupons = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Coupons, "GET", undefined, token);
+
+export const getPlans = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Get_All_Plans, "GET", undefined, token);
+
+export const getSubscriptionStatus = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Get_Subcription_Status, "GET", undefined, token);

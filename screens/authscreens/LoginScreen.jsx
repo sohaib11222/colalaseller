@@ -29,8 +29,8 @@ const LoginScreen = () => {
   const { login: authLogin } = useAuth();
 
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("test121@gmail.com");
+  const [password, setPassword] = useState("11221122");
 
   // Login mutation
   const loginMutation = useMutation({
