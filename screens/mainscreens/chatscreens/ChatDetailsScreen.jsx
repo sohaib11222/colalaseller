@@ -1,4 +1,3 @@
-// screens/ChatDetailsScreen.js
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -17,52 +16,82 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ThemedText from '../../../components/ThemedText';
 import { useTheme } from '../../../components/ThemeProvider';
 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getToken } from '../../../utils/tokenStorage';
+import * as ChatQueries from '../../../utils/queries/chats';      // getChatDetails(chatId, token)
+import * as ChatMutations from '../../../utils/mutations/chats';  // sendMessage(chatId, payload|FormData, token)
+import { API_DOMAIN } from '../../../apiConfig';
+
+// ---------- debug helper ----------
+const D = (...args) => console.log('[ChatDetails]', ...args);
+
 /* ---------- helpers ---------- */
 const toSrc = (v) => (typeof v === 'number' ? v : v ? { uri: String(v) } : undefined);
+const absUrl = (maybePath) =>
+  !maybePath
+    ? null
+    : maybePath.startsWith('http')
+    ? maybePath
+    : `${API_DOMAIN.replace(/\/api$/, '')}${maybePath.startsWith('/') ? '' : '/'}${maybePath}`;
 
-/* ---------- demo cart data (replace with real data) ---------- */
-const CART = {
-  items: [
-    {
-      id: 'ci1',
-      title: 'Iphone 16 pro max - Black',
-      price: '₦2,500,000',
-      qty: 1,
-      image:
-        'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=200&auto=format&fit=crop',
-    },
-    {
-      id: 'ci2',
-      title: 'Iphone 16 pro max - Black',
-      price: '₦2,500,000',
-      qty: 1,
-      image:
-        'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=200&auto=format&fit=crop',
-    },
-  ],
-  total: '₦5,000,000',
+const formatClock = (iso) => {
+  if (!iso) return '07:22AM'; // not in response → keep hardcoded when missing
+  try {
+    const d = new Date(iso);
+    let h = d.getHours();
+    const m = `${d.getMinutes()}`.padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = ((h + 11) % 12) + 1;
+    return `${h}:${m}${ampm}`;
+  } catch {
+    return '07:22AM';
+  }
 };
 
-function CartSummaryCard({ C }) {
+// Map API message -> UI bubble
+const mapMsg = (m) => ({
+  id: String(m?.id ?? `${m?.created_at ?? ''}-${Math.random()}`),
+  text: m?.message ?? '',                                  // API key is "message"
+  sender: m?.sender_type === 'store' ? 'me' : 'store',     // store == me (seller)
+  time: formatClock(m?.created_at),                        // if missing -> hardcoded
+});
+
+/* ---------- Cart summary (renders ONLY if cart prop is provided) ---------- */
+function CartSummaryCard({ C, cart }) {
+  if (!cart) return null;
+
+  // Expecting something like:
+  // {
+  //   items: [{ id, title, price, qty, image }, ...],
+  //   total: "₦..."
+  // }
+  const items = Array.isArray(cart.items) ? cart.items : [];
+
   return (
     <View style={[styles.cartWrap, { borderColor: C.primary + '55', backgroundColor: '#FFF1F1' }]}>
       <View style={styles.cartHeaderRow}>
         <ThemedText style={[styles.cartHeaderText, { color: C.text }]}>
-          Items in cart ({CART.items.length})
+          Items in cart ({items.length})
         </ThemedText>
-        <ThemedText style={[styles.cartTotal, { color: C.primary }]}>{CART.total}</ThemedText>
+        <ThemedText style={[styles.cartTotal, { color: C.primary }]}>
+          {cart.total ?? ''}
+        </ThemedText>
       </View>
 
-      {CART.items.map((it) => (
-        <View key={it.id} style={[styles.cartItemRow, { backgroundColor: '#FFE6E6' }]}>
-          <Image source={toSrc(it.image)} style={styles.cartThumb} />
+      {items.map((it, idx) => (
+        <View key={String(it?.id ?? idx)} style={[styles.cartItemRow, { backgroundColor: '#FFE6E6' }]}>
+          <Image source={toSrc(it?.image)} style={styles.cartThumb} />
           <View style={{ flex: 1 }}>
             <ThemedText style={[styles.cartTitle, { color: C.text }]} numberOfLines={1}>
-              {it.title}
+              {it?.title ?? ''}
             </ThemedText>
-            <ThemedText style={[styles.cartPrice, { color: C.primary }]}>{it.price}</ThemedText>
+            <ThemedText style={[styles.cartPrice, { color: C.primary }]}>
+              {it?.price ?? ''}
+            </ThemedText>
           </View>
-          <ThemedText style={[styles.cartQty, { color: C.text }]}>Qty : {it.qty}</ThemedText>
+          <ThemedText style={[styles.cartQty, { color: C.text }]}>
+            {typeof it?.qty === 'number' ? `Qty : ${it.qty}` : ''}
+          </ThemedText>
         </View>
       ))}
     </View>
@@ -74,6 +103,7 @@ export default function ChatDetailsScreen() {
   const { params } = useRoute();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const qc = useQueryClient();
 
   const C = useMemo(
     () => ({
@@ -87,16 +117,11 @@ export default function ChatDetailsScreen() {
     [theme]
   );
 
-  const store = params?.store || {};
-  const avatarSrc = toSrc(store?.profileImage);
+  const chatId = params?.chat_id;
+  const routeStore = params?.store || {};
 
   const [headerH, setHeaderH] = useState(0);
-  const [messages, setMessages] = useState([
-    { id: 1, text: 'How will i get the product delivered', sender: 'me', time: '07:22AM' },
-    { id: 2, text: 'Thank you for purchasing from us', sender: 'store', time: '07:22AM' },
-    { id: 3, text: 'I will arrange a dispatch rider soon and i will contact you', sender: 'store', time: '07:22AM' },
-    { id: 4, text: 'Okay i will be expecting.', sender: 'me', time: '07:29AM' },
-  ]);
+  const [messages, setMessages] = useState([]); // hydrated from API
   const [inputText, setInputText] = useState('');
 
   const listRef = useRef(null);
@@ -111,36 +136,222 @@ export default function ChatDetailsScreen() {
     };
   }, []);
 
+  /* ---------------- Fetch details (robust unwrap + logs) ---------------- */
+  const { data: detail, error: detailErr, isLoading: detailLoading } = useQuery({
+    queryKey: ['chat', 'detail', chatId],
+    enabled: !!chatId,
+    queryFn: async () => {
+      D('fetch detail:start', { chatId });
+      const token = await getToken();
+      const res = await ChatQueries.getChatDetails(chatId, token);
+      try {
+        D('fetch detail:raw (short)', {
+          hasData: !!res?.data,
+          keys: res ? Object.keys(res || {}) : null,
+          dataKeys: res?.data ? Object.keys(res.data || {}) : null,
+        });
+        const preview = JSON.stringify(res?.data ?? res).slice(0, 1500);
+        D('fetch detail:raw preview', preview);
+      } catch {}
+
+      // Accept res | res.data | res.data.data
+      const root = res?.data?.data ?? res?.data ?? res ?? {};
+      const payload = {
+        messages: Array.isArray(root?.messages)
+          ? root.messages
+          : Array.isArray(root?.data?.messages)
+          ? root.data.messages
+          : [],
+        user: root?.user ?? root?.data?.user ?? null,
+        dispute: root?.dispute ?? root?.data?.dispute ?? null,
+
+        // NEW: try to find cart in common places, else undefined → component won’t render
+        cart:
+          root?.cart ??
+          root?.data?.cart ??
+          undefined,
+      };
+      D('fetch detail:unwrapped', {
+        msgCount: payload.messages.length,
+        hasUser: !!payload.user,
+        hasDispute: !!payload.dispute,
+        hasCart: !!payload.cart,
+      });
+      return payload;
+    },
+    staleTime: 10_000,
+  });
+
+  // hydrate messages when fetched
+  useEffect(() => {
+    if (!detailLoading) {
+      const mapped = (detail?.messages || []).map(mapMsg);
+      D('hydrate messages: mapped', { count: mapped.length, sample: mapped[0] });
+      setMessages(mapped);
+    }
+  }, [detail?.messages, detailLoading]);
+
+  if (detailErr) {
+    D('fetch detail:error', detailErr);
+  }
+
+  // prefer avatar/name from route; if missing, take from details.user
+  const fallbackName =
+    routeStore?.name ||
+    detail?.user?.full_name ||
+    detail?.user?.user_name ||
+    'Store';
+  const fallbackAvatar =
+    routeStore?.profileImage ||
+    absUrl(detail?.user?.profile_picture) ||
+    null;
+
+  const avatarSrc = toSrc(fallbackAvatar);
+  const store = { ...routeStore, name: fallbackName, profileImage: fallbackAvatar };
+
+  /* ---------------- Send message (FormData + optimistic + logs) ---------------- */
+  const sendMut = useMutation({
+    mutationFn: async ({ text }) => {
+      const token = await getToken();
+      const fd = new FormData();
+      fd.append('message', text);
+
+      D('send:request', {
+        chatId,
+        fields: ['message'],
+        messageLen: text.length,
+      });
+
+      const res = await ChatMutations.sendMessage(chatId, fd, token);
+
+      try {
+        const preview = JSON.stringify(res?.data ?? res).slice(0, 1200);
+        D('send:response preview', preview);
+      } catch {}
+      return res;
+    },
+    onMutate: async ({ text }) => {
+      const optimistic = {
+        id: `optimistic-${Date.now()}`,
+        text,
+        sender: 'me',
+        time: formatClock(new Date().toISOString()),
+      };
+      D('send:onMutate -> optimistic add', optimistic);
+
+      setMessages((prev) => {
+        const next = [...prev, optimistic];
+        D('send:onMutate -> UI count', { prev: prev.length, next: next.length });
+        return next;
+      });
+      setInputText('');
+      scrollToEnd();
+
+      // Also reflect in cache (shape similar to backend)
+      qc.setQueryData(['chat', 'detail', chatId], (old) => {
+        const base = old || { messages: [], user: null, dispute: null, cart: undefined };
+        const nextMsgs = [
+          ...(base.messages || []),
+          {
+            id: optimistic.id,
+            message: optimistic.text,
+            sender_type: 'store',
+            created_at: new Date().toISOString(),
+          },
+        ];
+        D('send:onMutate -> cache add', { cachePrev: (base.messages || []).length, cacheNext: nextMsgs.length });
+        return { ...base, messages: nextMsgs };
+      });
+
+      return { optimisticId: optimistic.id };
+    },
+    onError: (err, _vars, ctx) => {
+      D('send:onError', err?.message || err);
+      if (ctx?.optimisticId) {
+        setMessages((prev) => {
+          const next = prev.filter((m) => m.id !== ctx.optimisticId);
+          D('send:onError -> remove optimistic UI', { prev: prev.length, next: next.length });
+          return next;
+        });
+        qc.setQueryData(['chat', 'detail', chatId], (old) => {
+          if (!old) return old;
+          const nextMsgs = (old.messages || []).filter((m) => String(m.id) !== String(ctx.optimisticId));
+          D('send:onError -> remove optimistic cache', { cachePrev: (old.messages || []).length, cacheNext: nextMsgs.length });
+          return { ...old, messages: nextMsgs };
+        });
+      }
+    },
+    onSuccess: (res, _vars, ctx) => {
+      // Unwrap server message (single object)
+      const raw = res?.data?.data ?? res?.data ?? res;
+      const real = raw ? mapMsg(raw) : null;
+      D('send:onSuccess -> mapped', { real, hadOptimistic: !!ctx?.optimisticId });
+
+      // Replace optimistic in UI
+      if (real && ctx?.optimisticId) {
+        setMessages((prev) => {
+          const next = prev.map((m) => (m.id === ctx.optimisticId ? real : m));
+          D('send:onSuccess -> replace in UI', { prev: prev.length, next: next.length });
+          return next;
+        });
+      } else if (real) {
+        setMessages((prev) => [...prev, real]);
+      }
+
+      // Replace optimistic in cache
+      qc.setQueryData(['chat', 'detail', chatId], (old) => {
+        const base = old || { messages: [], user: null, dispute: null, cart: undefined };
+        const oldMsgs = base.messages || [];
+        const replaced = oldMsgs.map((m) =>
+          String(m.id) === String(ctx?.optimisticId) ? raw : m
+        );
+        const found = oldMsgs.some((m) => String(m.id) === String(ctx?.optimisticId));
+        const nextMsgs = found ? replaced : [...oldMsgs, raw];
+        D('send:onSuccess -> cache merge', { cachePrev: oldMsgs.length, cacheNext: nextMsgs.length, replaced: found });
+        return { ...base, messages: nextMsgs };
+      });
+
+      scrollToEnd();
+    },
+  });
+
   const handleSend = () => {
     const v = inputText.trim();
-    if (!v) return;
-    const now = new Date();
-    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
-    setMessages((prev) => [...prev, { id: Date.now(), text: v, sender: 'me', time }]);
-    setInputText('');
-    scrollToEnd();
+    if (!v || !chatId) {
+      D('send:blocked', { hasText: !!v, hasChatId: !!chatId });
+      return;
+    }
+    sendMut.mutate({ text: v });
   };
 
   const KAV_OFFSET = Platform.OS === 'ios' ? insets.top + headerH : 0;
 
   const renderMessage = ({ item }) => {
-    if (item.type === 'dispute') {
-      // If you later re-add disputes, they will render here.
-      return null;
-    }
+    if (item.type === 'dispute') return null; // not in response -> keep hidden
     const mine = item.sender === 'me';
     return (
       <View
         style={[
           styles.bubble,
-          mine ? [styles.bubbleRight, { backgroundColor: C.primary }] : [styles.bubbleLeft, { backgroundColor: C.lightPink }],
+          mine
+            ? [styles.bubbleRight, { backgroundColor: C.primary }]
+            : [styles.bubbleLeft, { backgroundColor: C.lightPink }],
         ]}
       >
-        <ThemedText style={[styles.msg, { color: mine ? '#fff' : '#000' }]}>{item.text}</ThemedText>
-        <ThemedText style={[styles.time, { color: mine ? '#fff' : '#000' }]}>{item.time}</ThemedText>
+        <ThemedText style={[styles.msg, { color: mine ? '#fff' : '#000' }]}>
+          {item.text || ''}
+        </ThemedText>
+        <ThemedText style={[styles.time, { color: mine ? '#fff' : '#000' }]}>
+          {item.time || '07:22AM'}
+        </ThemedText>
       </View>
     );
   };
+
+  // Log every render batch size for clarity
+  useEffect(() => {
+    D('FlatList data size', messages.length);
+  }, [messages.length]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'bottom']}>
@@ -158,19 +369,25 @@ export default function ChatDetailsScreen() {
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </TouchableOpacity>
 
-          <View style={styles.headerCenter}>
-            <Image source={avatarSrc} style={styles.avatar} />
+          <View className="center" style={styles.headerCenter}>
+            <Image source={toSrc(store?.profileImage)} style={styles.avatar} />
             <View>
-              <ThemedText style={[styles.storeName, { color: C.text }]}>{store?.name || 'Store'}</ThemedText>
+              <ThemedText style={[styles.storeName, { color: C.text }]}>
+                {store?.name || 'Store'}
+              </ThemedText>
+              {/* Not provided by API → keep hardcoded */}
               <ThemedText style={[styles.lastSeen, { color: C.sub }]}>Last seen 2 mins ago</ThemedText>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.hIcon} onPress={() => { /* navigate to cart screen if available */ }}>
-  <Image
-                source={require("../../../assets/cart-black.png")}
-                style={styles.iconImg}
-              />          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.hIcon}
+            onPress={() => {
+              // navigate to cart screen if available
+            }}
+          >
+            <Image source={require('../../../assets/cart-black.png')} style={styles.iconImg} />
+          </TouchableOpacity>
         </View>
 
         {/* Messages */}
@@ -179,7 +396,10 @@ export default function ChatDetailsScreen() {
           data={messages}
           keyExtractor={(i) => String(i.id)}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8 + insets.bottom }}
-          ListHeaderComponent={<CartSummaryCard C={C} />}
+          ListHeaderComponent={
+            // ← Only render cart if backend sends it
+            <CartSummaryCard C={C} cart={detail?.cart} />
+          }
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           renderItem={renderMessage}
@@ -201,7 +421,7 @@ export default function ChatDetailsScreen() {
             onSubmitEditing={handleSend}
             returnKeyType="send"
           />
-          <TouchableOpacity onPress={handleSend}>
+          <TouchableOpacity onPress={handleSend} disabled={sendMut.isPending}>
             <Ionicons name="send" size={20} color={C.text} />
           </TouchableOpacity>
         </View>
@@ -210,7 +430,7 @@ export default function ChatDetailsScreen() {
   );
 }
 
-/* ---------- styles ---------- */
+/* ---------- styles (UI unchanged) ---------- */
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,

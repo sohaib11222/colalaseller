@@ -113,6 +113,11 @@ const API_ENDPOINTS = {
     Cancel_Subscription: (id) => `${API_DOMAIN}/seller/subscriptions/${id}/cancel`, // PATCH
 
   },
+  CHATS: {
+    List: `${API_DOMAIN}/seller/chat`,
+    Details: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/messages`,
+    Send: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/send`,
+  }
 };
 
 export { API_DOMAIN, API_ENDPOINTS };

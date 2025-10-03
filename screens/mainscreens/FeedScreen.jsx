@@ -931,6 +931,8 @@ const absUrl = (maybePath) =>
       ? maybePath
       : `${API_DOMAIN.replace(/\/api$/, "")}${maybePath.startsWith("/") ? "" : "/"}${maybePath}`;
 
+
+
 const timeAgo = (iso) => {
   if (!iso) return "now";
   const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -943,12 +945,25 @@ const timeAgo = (iso) => {
   return `${d}d ago`;
 };
 
+const addQuery = (url, kv) => {
+  const [base, qs] = url.split("?");
+  const search = new URLSearchParams(qs || "");
+  Object.entries(kv).forEach(([k, v]) => search.set(k, String(v)));
+  return `${base}?${search.toString()}`;
+};
+
+
 const mapPost = (p) => {
   const storeName = p?.user?.store?.store_name || p?.user?.full_name || "Store";
   const avatar = absUrl(p?.user?.profile_picture) || "https://via.placeholder.com/80";
+  const ver = p?.updated_at ? new Date(p.updated_at).getTime() : Date.now();
+
   const images = (p?.media_urls || [])
     .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
-    .map((m) => absUrl(m.url))
+    .map((m) => {
+      const u = absUrl(m.url);
+      return u ? addQuery(u, { v: ver }) : null;
+    })
     .filter(Boolean);
 
   return {
@@ -1186,7 +1201,11 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, C }) {
         <View style={styles.carouselWrap} onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}>
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onScroll={onCarouselScroll} scrollEventThrottle={16}>
             {images.map((uri, idx) => (
-              <Image key={`${item.id}-img-${idx}`} source={{ uri }} style={[styles.postImage, { width: carouselW || "100%" }]} />
+              <Image
+                key={`${item.id}-${idx}-${uri}`}  // <- include uri in key
+                source={{ uri }}
+                style={[styles.postImage, { width: carouselW || "100%" }]}
+              />
             ))}
           </ScrollView>
 
@@ -1517,6 +1536,7 @@ function useCreatePost() {
 
 function useUpdatePost() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: async ({ id, body, files = [], visibility = "public" }) => {
       const token = await getToken();
@@ -1527,9 +1547,38 @@ function useUpdatePost() {
       files.forEach((f) => fd.append("media[]", f));
       return PostMutations.updatePost(id, fd, token);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["posts", "lists"] }),
+    onSuccess: (res, vars) => {
+      // 1) Map the updated post from server
+      const updatedRaw = res?.data?.data;
+      const updated = updatedRaw ? mapPost(updatedRaw) : null;
+      if (!updated) {
+        // fallback: still refetch if something is off
+        qc.invalidateQueries({ queryKey: ["posts", "lists"] });
+        return;
+      }
+
+      // 2) Patch cache immediately so UI swaps to the new media_urls
+      qc.setQueryData(["posts", "lists"], (prev) => {
+        if (!prev || (typeof prev !== "object")) return prev;
+        const replace = (arr) =>
+          Array.isArray(arr)
+            ? arr.map((p) => (p.id === String(vars.id) ? updated : p))
+            : [];
+        return {
+          posts: replace(prev.posts),
+          myPosts: replace(prev.myPosts),
+        };
+      });
+    },
+    onSettled: () => {
+      // keep server as source of truth
+      qc.invalidateQueries({ queryKey: ["posts", "lists"] });
+    },
   });
 }
+
+
+
 
 function useDeletePost() {
   const qc = useQueryClient();
@@ -1598,8 +1647,8 @@ export default function FeedScreen() {
   const likeMut = useToggleLikeMutation();
 
   const posts = data?.posts || [];
-  theMyPosts = data?.myPosts || [];
-  const listData = tab === "my" ? theMyPosts : posts;
+  const myPosts = data?.myPosts || [];
+  const listData = tab === "my" ? myPosts : posts;
 
   const openComments = (post) => {
     setActivePost(post);
@@ -1641,8 +1690,8 @@ export default function FeedScreen() {
       <StatusBar barStyle="dark-content" />
       <FlatList
         data={listData}
-        keyExtractor={(it) => it.id}
-        ListHeaderComponent={
+        extraData={listData}
+        keyExtractor={(it) => `${it.id}-${it._raw?.updated_at || ""}`} ListHeaderComponent={
           <>
             <FeedHeader C={C} />
             <View style={styles.tabsWrap}>
@@ -1713,7 +1762,11 @@ export default function FeedScreen() {
         onSubmit={async ({ body, newFiles /* keptUrls, removedUrls */ }) => {
           // NOTE: backend delete/replace behavior is unknown.
           // We upload new files with caption update. Tell me if it needs "replace_media" or "remove_media_ids[]".
-          await update.mutateAsync({ id: activePost.id, body, files: newFiles });
+          const res = await update.mutateAsync({ id: activePost.id, body, files: newFiles });
+          const updated = res?.data?.data ? mapPost(res.data.data) : null;
+          if (updated) {
+            setActivePost(updated);
+          }
           setEditVisible(false);
         }}
       />
