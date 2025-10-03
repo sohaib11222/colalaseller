@@ -117,3 +117,17 @@ export const autodebitCard = async ({ id, token }) => {
     throw error;
   }
 };
+
+
+export const previewBoost = async ({ payload, token }) => {
+  await apiCall(API_ENDPOINTS.SETTINGS.Boost_Preview, "POST", payload, token);
+};
+
+export const createBoost = async ({ payload, token }) => {
+  await apiCall(API_ENDPOINTS.SETTINGS.Boost_Create, "POST", payload, token);
+};
+
+export const updateBoostStatus = async ({ id, payload, token }) => {
+  await apiCall(API_ENDPOINTS.SETTINGS.Boost_Status(id), "PATCH", payload, token);
+};
+

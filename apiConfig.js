@@ -129,6 +129,13 @@ const API_ENDPOINTS = {
     //Reviews
     List_Of_Reviews: `${API_DOMAIN}/user-reveiws`, // GET
 
+
+    //Boosts Data
+    Boosts_List: `${API_DOMAIN}/seller/boosts`, // GET
+    Boost_Preview: `${API_DOMAIN}/seller/boosts/preview`, // POST
+    Boost_Create: `${API_DOMAIN}/seller/boosts`, // POST
+    Single_Boost: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // GET
+    Boost_Status: (id) => `${API_DOMAIN}/seller/boosts/${id}/status`, // PATCH
   },
   CHATS: {
     List: `${API_DOMAIN}/seller/chat`,

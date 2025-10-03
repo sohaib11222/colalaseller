@@ -41,3 +41,10 @@ export const getCards = async (token) =>
 
 export const getReviews = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Reviews, "GET", undefined, token);
+
+//Boost
+export const getBoostsList = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Boosts_List, "GET", undefined, token);
+
+export const getSingleBoost = async (token, id) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Single_Boost(id), "GET", undefined, token);

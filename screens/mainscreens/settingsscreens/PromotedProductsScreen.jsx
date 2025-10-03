@@ -10,6 +10,9 @@ import {
   Modal,
   Platform,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +20,14 @@ import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
+
+//Code Related to the integration
+import { getBoostsList } from "../../../utils/queries/settings";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../../contexts/AuthContext";
+import { getSingleBoost } from "../../../utils/queries/settings";
+import { updateBoostStatus } from "../../../utils/mutations/settings";
+import { useMutation } from "@tanstack/react-query";
 
 /* ---------- helpers ---------- */
 const shadow = (e = 10) =>
@@ -59,9 +70,52 @@ const PRODUCTS = Array.from({ length: 8 }).map((_, i) => ({
   location: "Lagos, Nigeria",
 }));
 
+// Transform boost data from API to UI format
+const transformBoostData = (boosts) => {
+  if (!boosts || !Array.isArray(boosts)) return [];
+  
+  return boosts.map(boost => ({
+    id: boost?.id?.toString() || Math.random().toString(),
+    title: boost?.product?.name || `Product Boost #${boost?.id || 'Unknown'}`,
+    oldPrice: boost?.budget || 0,
+    price: boost?.total_amount || 0,
+    impressions: boost?.impressions || 0,
+    expands: boost?.clicks || 0,
+    messages: 0, // This might not be in the API response
+    image: boost?.product?.images?.[0]?.url || PHONES[boost?.id % PHONES.length] || PHONES[0], // Use product image or fallback
+    sponsored: true,
+    categories: ["Promoted"],
+    store: "Your Store",
+    rating: "4.5",
+    location: boost?.location || "Unknown",
+    // Additional boost-specific data
+    duration: boost?.duration || 0,
+    reach: boost?.reach || 0,
+    cpc: boost?.cpc || "0.00",
+    status: boost?.status || "unknown",
+    paymentStatus: boost?.payment_status || "unknown",
+    paymentMethod: boost?.payment_method || "unknown",
+    startDate: boost?.start_date,
+    createdAt: boost?.created_at,
+    productId: boost?.product_id,
+    // Product data
+    product: boost?.product || null,
+  }));
+};
+
 /* ---------- small bits ---------- */
 const SearchBox = ({ value, onChange, C }) => (
-  <View style={[styles.input, { borderColor: "#CDCDCD", backgroundColor: C.card, flex: 1, borderWidth:0.5 }]}>
+  <View
+    style={[
+      styles.input,
+      {
+        borderColor: "#CDCDCD",
+        backgroundColor: C.card,
+        flex: 1,
+        borderWidth: 0.5,
+      },
+    ]}
+  >
     {/* <Ionicons name="search" size={16} color={C.sub} /> */}
     <TextInput
       value={value}
@@ -77,7 +131,10 @@ const PickerLike = ({ label, onPress, C }) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.9}
-    style={[styles.input, { borderColor: C.line, backgroundColor: C.card, width: 140 }]}
+    style={[
+      styles.input,
+      { borderColor: C.line, backgroundColor: C.card, width: 140 },
+    ]}
   >
     <ThemedText style={{ color: C.sub, flex: 1 }}>{label}</ThemedText>
     <Ionicons name="chevron-down" size={18} color={C.sub} />
@@ -85,7 +142,13 @@ const PickerLike = ({ label, onPress, C }) => (
 );
 
 const Metric = ({ label, value, C }) => (
-  <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 6,
+    }}
+  >
     <ThemedText style={{ color: C.sub, fontSize: 8 }}>{label}</ThemedText>
     <ThemedText style={{ color: C.text, fontSize: 8 }}>{value}</ThemedText>
   </View>
@@ -93,7 +156,13 @@ const Metric = ({ label, value, C }) => (
 
 /* ---------- Product Card ---------- */
 const ProductCard = ({ item, C, onPress }) => (
-  <View style={[styles.card, { borderColor: C.line, backgroundColor: C.card }, shadow(8)]}>
+  <View
+    style={[
+      styles.card,
+      { borderColor: C.line, backgroundColor: C.card },
+      shadow(8),
+    ]}
+  >
     {/* Top image */}
     <View style={styles.imgWrap}>
       <Image source={{ uri: item.image }} style={styles.img} />
@@ -107,13 +176,20 @@ const ProductCard = ({ item, C, onPress }) => (
 
     {/* Body */}
     <View style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 }}>
-      <ThemedText numberOfLines={1} style={{ color: C.text, fontWeight: "700", fontSize: 10 }}>
+      <ThemedText
+        numberOfLines={1}
+        style={{ color: C.text, fontWeight: "700", fontSize: 10 }}
+      >
         {item.title}
       </ThemedText>
 
       {/* price row */}
-      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
-        <ThemedText style={{ color: "#E53E3E", fontWeight: "800", fontSize: 12 }}>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}
+      >
+        <ThemedText
+          style={{ color: "#E53E3E", fontWeight: "800", fontSize: 12 }}
+        >
           ₦{item.price.toLocaleString()}
         </ThemedText>
         <ThemedText
@@ -130,8 +206,25 @@ const ProductCard = ({ item, C, onPress }) => (
 
       {/* tag images */}
       <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
-        <Image source={IMG_FREE} style={{ height: 16, width: 70, resizeMode: "contain", marginLeft:3, borderRadius:4 }} />
-        <Image source={IMG_BULK} style={{ height: 16, width: 80, resizeMode: "contain", borderRadius:4 }} />
+        <Image
+          source={IMG_FREE}
+          style={{
+            height: 16,
+            width: 70,
+            resizeMode: "contain",
+            marginLeft: 3,
+            borderRadius: 4,
+          }}
+        />
+        <Image
+          source={IMG_BULK}
+          style={{
+            height: 16,
+            width: 80,
+            resizeMode: "contain",
+            borderRadius: 4,
+          }}
+        />
       </View>
 
       {/* divider under tags (as requested) */}
@@ -156,16 +249,34 @@ const ProductCard = ({ item, C, onPress }) => (
 );
 
 /* ---------- Bottom sheet for Categories ---------- */
-const CategorySheet = ({ visible, onClose, options, selected, onToggle, C }) => {
+const CategorySheet = ({
+  visible,
+  onClose,
+  options,
+  selected,
+  onToggle,
+  C,
+}) => {
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View style={[styles.sheet, { backgroundColor: C.card }]}>
           <View style={styles.handle} />
           <View style={{ padding: 16 }}>
-            <ThemedText style={{ fontSize: 18, fontWeight: "700", color: C.text, marginBottom: 6 }}>
+            <ThemedText
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                color: C.text,
+                marginBottom: 6,
+              }}
+            >
               Categories
             </ThemedText>
             {options.map((cat) => {
@@ -199,8 +310,38 @@ const CategorySheet = ({ visible, onClose, options, selected, onToggle, C }) => 
 };
 
 /* ---------- Full-screen Promotion Details modal ---------- */
-const PromotionDetailsModal = ({ visible, onClose, item, C }) => {
+const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   if (!visible || !item) return null;
+
+  // Get single boost details
+  const { data: boostDetails, isLoading: isLoadingDetails } = useQuery({
+    queryKey: ['singleBoost', item.id, token],
+    queryFn: () => getSingleBoost(token, item.id),
+    enabled: !!token && !!item.id && visible,
+  });
+
+  // Update boost status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, action }) => {
+      console.log("updateBoostStatus called with:", { id, payload: { action }, token });
+      return updateBoostStatus({ id, payload: { action }, token });
+    },
+    onSuccess: (data) => {
+      console.log("Boost status updated successfully:", data);
+      const currentStatus = boostDetails?.data?.status || item.status;
+      const action = (currentStatus === "running" || currentStatus === "active") ? "paused" : "resumed";
+      Alert.alert("Success", `Boost has been ${action} successfully!`);
+    },
+    onError: (error) => {
+      console.error("Failed to update boost status:", error);
+      Alert.alert("Error", "Failed to update boost status. Please try again.");
+    },
+  });
+
+  const handleStatusUpdate = (action) => {
+    console.log("handleStatusUpdate called with:", { id: item.id, action });
+    updateStatusMutation.mutate({ id: item.id, action });
+  };
 
   const Row = ({ label, value, green }) => (
     <View
@@ -216,31 +357,53 @@ const PromotionDetailsModal = ({ visible, onClose, item, C }) => {
       }}
     >
       <ThemedText style={{ color: C.sub }}>{label}</ThemedText>
-      <ThemedText style={{ color: green ? "#18A957" : C.text, fontWeight: "600" }}>
+      <ThemedText
+        style={{ color: green ? "#18A957" : C.text, fontWeight: "600" }}
+      >
         {value}
       </ThemedText>
     </View>
   );
 
   return (
-    <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: "#fff", borderBottomColor: C.line }]}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: "#fff", borderBottomColor: C.line },
+          ]}
+        >
           <TouchableOpacity
             onPress={onClose}
-            style={[styles.iconBtn, { borderColor: C.line, backgroundColor: "#fff" }]}
+            style={[
+              styles.iconBtn,
+              { borderColor: C.line, backgroundColor: "#fff" },
+            ]}
           >
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </TouchableOpacity>
-          <ThemedText style={[styles.headerTitle, { color: C.text }]} pointerEvents="none">
+          <ThemedText
+            style={[styles.headerTitle, { color: C.text }]}
+            pointerEvents="none"
+          >
             Promotion Details
           </ThemedText>
           <View style={{ width: 40, height: 10 }} />
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 20 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 10,
+            paddingBottom: 20,
+          }}
           showsVerticalScrollIndicator={false}
         >
           {/* Preview card (image + tiny header & tags) */}
@@ -254,7 +417,12 @@ const PromotionDetailsModal = ({ visible, onClose, item, C }) => {
             }}
           >
             <View style={{ height: 180, backgroundColor: "#EEE" }}>
-              <Image source={{ uri: item.image }} style={{ width: "100%", height: "100%" }} />
+              <Image
+                source={{ 
+                  uri: boostDetails?.data?.product?.images?.[0]?.url || item.image 
+                }}
+                style={{ width: "100%", height: "100%" }}
+              />
               <View style={[styles.sponsoredPill, { left: 10, top: 10 }]}>
                 <Image source={IMG_FLAME} style={styles.flame} />
                 <ThemedText style={styles.sponsoredTxt}>Sponsored</ThemedText>
@@ -262,22 +430,47 @@ const PromotionDetailsModal = ({ visible, onClose, item, C }) => {
             </View>
 
             <View style={{ padding: 10 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
                 <Image
-                  source={{ uri: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&q=60" }}
-                  style={{ width: 16, height: 16, borderRadius: 4, marginRight: 6 }}
+                  source={{
+                    uri: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&q=60",
+                  }}
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 4,
+                    marginRight: 6,
+                  }}
                 />
-                <ThemedText style={{ color: C.sub, fontSize: 11 }}>{item.store}</ThemedText>
+                <ThemedText style={{ color: C.sub, fontSize: 11 }}>
+                  {item.store}
+                </ThemedText>
                 <View style={{ flex: 1 }} />
                 <Ionicons name="star" size={12} color="#F59E0B" />
-                <ThemedText style={{ color: C.sub, fontSize: 11, marginLeft: 4 }}>
+                <ThemedText
+                  style={{ color: C.sub, fontSize: 11, marginLeft: 4 }}
+                >
                   {item.rating}
                 </ThemedText>
               </View>
 
-              <ThemedText style={{ color: C.text, fontWeight: "700" }}>{item.title}</ThemedText>
+              <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                {boostDetails?.data?.product?.name || item.title}
+              </ThemedText>
 
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 6,
+                }}
+              >
                 <ThemedText style={{ color: "#E53E3E", fontWeight: "800" }}>
                   ₦{item.price.toLocaleString()}
                 </ThemedText>
@@ -294,34 +487,104 @@ const PromotionDetailsModal = ({ visible, onClose, item, C }) => {
               </View>
 
               <View style={{ flexDirection: "row", gap: 6, marginTop: 6 }}>
-                <Image source={IMG_FREE} style={{ height: 16, width: 78, resizeMode: "contain" }} />
-                <Image source={IMG_BULK} style={{ height: 16, width: 110, resizeMode: "contain" }} />
+                <Image
+                  source={IMG_FREE}
+                  style={{ height: 16, width: 78, resizeMode: "contain" }}
+                />
+                <Image
+                  source={IMG_BULK}
+                  style={{ height: 16, width: 110, resizeMode: "contain" }}
+                />
               </View>
 
               <View style={[styles.divider, { backgroundColor: C.line }]} />
 
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
                 <Ionicons name="location-outline" size={12} color={C.sub} />
-                <ThemedText style={{ color: C.sub, fontSize: 11 }}>{item.location}</ThemedText>
+                <ThemedText style={{ color: C.sub, fontSize: 11 }}>
+                  {item.location}
+                </ThemedText>
               </View>
             </View>
           </View>
 
           {/* Stats rows */}
-          <Row label="Reach" value="2,000" />
-          <Row label="Impressions" value="2,000" />
-          <Row label="Cost/Click" value="₦10" />
-          <Row label="Amount Spent" value="₦5,000" />
-          <Row label="Date Created" value="07/22/25 - 08:22 AM" />
-          <Row label="End Date" value="07/22/25 - 08:22 AM" />
-          <Row label="Days Remaining" value="7 Days" />
-          <Row label="Status" value="Active" green />
+          <Row 
+            label="Reach" 
+            value={boostDetails?.data?.reach ? boostDetails.data.reach.toLocaleString() : (item.reach ? item.reach.toLocaleString() : "N/A")} 
+          />
+          <Row 
+            label="Impressions" 
+            value={boostDetails?.data?.impressions ? boostDetails.data.impressions.toLocaleString() : (item.impressions ? item.impressions.toLocaleString() : "N/A")} 
+          />
+          <Row 
+            label="Cost/Click" 
+            value={boostDetails?.data?.cpc ? `₦${boostDetails.data.cpc}` : (item.cpc ? `₦${item.cpc}` : "N/A")} 
+          />
+          <Row 
+            label="Amount Spent" 
+            value={boostDetails?.data?.total_amount ? `₦${boostDetails.data.total_amount.toLocaleString()}` : (item.price ? `₦${item.price.toLocaleString()}` : "N/A")} 
+          />
+          <Row 
+            label="Date Created" 
+            value={boostDetails?.data?.created_at ? new Date(boostDetails.data.created_at).toLocaleDateString() : "N/A"} 
+          />
+          <Row 
+            label="Duration" 
+            value={boostDetails?.data?.duration ? `${boostDetails.data.duration} days` : (item.duration ? `${item.duration} days` : "N/A")} 
+          />
+          <Row 
+            label="Budget" 
+            value={boostDetails?.data?.budget ? `₦${boostDetails.data.budget.toLocaleString()}` : (item.oldPrice ? `₦${item.oldPrice.toLocaleString()}` : "N/A")} 
+          />
+          <Row 
+            label="Status" 
+            value={boostDetails?.data?.status || item.status || "N/A"} 
+            green={(boostDetails?.data?.status === "running" || boostDetails?.data?.status === "active") || (item.status === "running" || item.status === "active")} 
+          />
 
           {/* Footer actions */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 16 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginTop: 16,
+            }}
+          >
             <View style={{ flexDirection: "row", gap: 10 }}>
               <MiniIconBtn icon="create-outline" C={C} />
-              <MiniIconBtn icon="pause-outline" C={C} />
+              <TouchableOpacity
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: C.line,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: updateStatusMutation.isPending ? C.line : "#fff",
+                }}
+                activeOpacity={0.9}
+                onPress={() => {
+                  const currentStatus = boostDetails?.data?.status || item.status;
+                  const action = (currentStatus === "running" || currentStatus === "active") ? "pause" : "resume";
+                  console.log("Current status:", currentStatus, "Action to send:", action);
+                  handleStatusUpdate(action);
+                }}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? (
+                  <ActivityIndicator size="small" color={C.primary} />
+                ) : (
+                  <Ionicons 
+                    name={(boostDetails?.data?.status === "running" || boostDetails?.data?.status === "active") ? "pause" : "play"} 
+                    size={18} 
+                    color={C.text} 
+                  />
+                )}
+              </TouchableOpacity>
               <MiniIconBtn icon="trash-outline" C={C} />
             </View>
 
@@ -329,7 +592,9 @@ const PromotionDetailsModal = ({ visible, onClose, item, C }) => {
               style={[styles.extendBtn, { backgroundColor: C.primary }]}
               activeOpacity={0.9}
             >
-              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>Extend Promotion</ThemedText>
+              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                Extend Promotion
+              </ThemedText>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -360,6 +625,7 @@ const MiniIconBtn = ({ icon, C }) => (
 export default function PromotedProductsScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const { token } = useAuth();
 
   const C = useMemo(
     () => ({
@@ -379,11 +645,35 @@ export default function PromotedProductsScreen() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeItem, setActiveItem] = useState(null);
 
+  // API queries
+  const { 
+    data: boostsData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
+    queryKey: ['boosts', token],
+    queryFn: () => getBoostsList(token),
+    enabled: !!token,
+  });
+
+  // Transform API data
+  const boosts = boostsData?.data ? transformBoostData(boostsData.data) : [];
+  
+  // Check if we have real API data but it's empty
+  const hasBoostsData = boostsData?.data !== undefined;
+  const isBoostsEmpty = hasBoostsData && Array.isArray(boostsData.data) && boostsData.data.length === 0;
+  const isBoostsTransformedEmpty = boosts.length === 0 && hasBoostsData;
+  const shouldShowEmptyState = isBoostsEmpty || isBoostsTransformedEmpty;
+
   const categories = ["All", "Computers", "Phones", "Accessories"];
+
+  // Use API data if available, otherwise fallback to dummy data
+  const DATA = boosts.length > 0 ? boosts : PRODUCTS;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return PRODUCTS.filter((p) => {
+    return DATA.filter((p) => {
       const okText = !q || p.title.toLowerCase().includes(q);
       const okCat =
         !selectedCats.length ||
@@ -391,50 +681,138 @@ export default function PromotedProductsScreen() {
         p.categories.some((c) => selectedCats.includes(c));
       return okText && okCat;
     });
-  }, [query, selectedCats]);
+  }, [query, selectedCats, DATA]);
+
+  // Pull to refresh
+  const onRefresh = () => {
+    refetch();
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={[""]}>
       <StatusBar style="dark" />
       {/* header */}
-      <View style={[styles.header, { backgroundColor: C.card, borderBottomColor: C.line }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: C.card, borderBottomColor: C.line },
+        ]}
+      >
         <TouchableOpacity
-          onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Home"))}
-          style={[styles.iconBtn, { borderColor: C.line, backgroundColor: C.card }]}
+          onPress={() =>
+            navigation.canGoBack()
+              ? navigation.goBack()
+              : navigation.navigate("Home")
+          }
+          style={[
+            styles.iconBtn,
+            { borderColor: C.line, backgroundColor: C.card },
+          ]}
         >
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: C.text }]} pointerEvents="none">
+        <ThemedText
+          style={[styles.headerTitle, { color: C.text }]}
+          pointerEvents="none"
+        >
           Promoted Products
         </ThemedText>
         <View style={{ width: 40, height: 10 }} />
       </View>
 
       {/* search + categories */}
-      <View style={{ flexDirection: "row", paddingHorizontal: 14, gap: 10, marginTop: 12, marginBottom: 4 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 14,
+          gap: 10,
+          marginTop: 12,
+          marginBottom: 4,
+        }}
+      >
         <SearchBox value={query} onChange={setQuery} C={C} />
-        <PickerLike label="Categories" onPress={() => setSheetOpen(true)} C={C} />
+        <PickerLike
+          label="Categories"
+          onPress={() => setSheetOpen(true)}
+          C={C}
+        />
       </View>
 
+      {/* Loading state */}
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+            Loading promoted products...
+          </ThemedText>
+        </View>
+      )}
+
+      {/* Error state */}
+      {error && !isLoading && (
+        <View style={styles.errorContainer}>
+          <ThemedText style={[styles.errorTitle, { color: C.text }]}>
+            Error Loading Data
+          </ThemedText>
+          <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
+            {error?.message || "Something went wrong. Please try again."}
+          </ThemedText>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: C.primary }]}
+            onPress={() => refetch()}
+          >
+            <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Empty state */}
+      {shouldShowEmptyState && !isLoading && !error && (
+        <View style={styles.emptyContainer}>
+          <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+            No Promoted Products
+          </ThemedText>
+          <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+            You haven't created any product boosts yet. Start promoting your products to reach more customers.
+          </ThemedText>
+          <TouchableOpacity
+            style={[styles.refreshButton, { backgroundColor: C.primary }]}
+            onPress={() => refetch()}
+          >
+            <ThemedText style={styles.refreshButtonText}>Refresh</ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* grid */}
-      <FlatList
-        data={filtered}
-        keyExtractor={(i) => i.id}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 12, paddingHorizontal: 12 }}
-        contentContainerStyle={{ paddingBottom: 18, paddingTop: 8 }}
-        renderItem={({ item }) => (
-          <ProductCard
-            item={item}
-            C={C}
-            onPress={() => {
-              setActiveItem(item);
-              setDetailsOpen(true);
-            }}
-          />
-        )}
-        showsVerticalScrollIndicator={false}
-      />
+      {!isLoading && !error && !shouldShowEmptyState && (
+        <FlatList
+          data={filtered}
+          keyExtractor={(i) => i.id}
+          numColumns={2}
+          columnWrapperStyle={{ gap: 12, paddingHorizontal: 12 }}
+          contentContainerStyle={{ paddingBottom: 18, paddingTop: 8 }}
+          renderItem={({ item }) => (
+            <ProductCard
+              item={item}
+              C={C}
+              onPress={() => {
+                setActiveItem(item);
+                setDetailsOpen(true);
+              }}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={onRefresh}
+              colors={[C.primary]}
+              tintColor={C.primary}
+            />
+          }
+        />
+      )}
 
       <CategorySheet
         visible={sheetOpen}
@@ -442,7 +820,9 @@ export default function PromotedProductsScreen() {
         options={categories}
         selected={selectedCats}
         onToggle={(cat) =>
-          setSelectedCats((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]))
+          setSelectedCats((prev) =>
+            prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+          )
         }
         C={C}
       />
@@ -453,6 +833,7 @@ export default function PromotedProductsScreen() {
         onClose={() => setDetailsOpen(false)}
         item={activeItem}
         C={C}
+        token={token}
       />
     </SafeAreaView>
   );
@@ -499,7 +880,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     marginTop: 12,
-  
   },
   imgWrap: { width: "100%", height: 140, backgroundColor: "#EEE" },
   img: { width: "100%", height: "100%" },
@@ -535,8 +915,16 @@ const styles = StyleSheet.create({
   },
 
   /* bottom sheet */
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" },
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+  },
   handle: {
     alignSelf: "center",
     width: 110,
@@ -563,5 +951,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  // Loading, Error, and Empty states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  refreshButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  refreshButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
 });
