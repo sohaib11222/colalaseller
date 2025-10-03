@@ -194,6 +194,7 @@ export default function StoreAddressesScreen() {
   const nav = useNavigation();
   const route = useRoute();
   const onPick = route.params?.onPickAddress;
+  const { token: authToken } = useAuth();
 
   // Get onboarding token
   const [onboardingToken, setOnboardingToken] = useState(null);
@@ -215,6 +216,9 @@ export default function StoreAddressesScreen() {
     getToken();
   }, []);
 
+  // Use onboarding token if available, otherwise use auth token
+  const token = onboardingToken || authToken;
+
   // Fetch addresses using React Query
   const {
     data: addressesData,
@@ -222,9 +226,9 @@ export default function StoreAddressesScreen() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["addresses", onboardingToken],
-    queryFn: () => getAddresses(onboardingToken),
-    enabled: !!onboardingToken, // Only run query when token is available
+    queryKey: ["addresses", token],
+    queryFn: () => getAddresses(token),
+    enabled: !!token, // Only run query when token is available
   });
 
   const addresses = addressesData?.items || [];
@@ -233,7 +237,7 @@ export default function StoreAddressesScreen() {
 
   // Delete address mutation
   const deleteAddressMutation = useMutation({
-    mutationFn: (addressId) => deleteAddress(addressId, onboardingToken),
+    mutationFn: (addressId) => deleteAddress(addressId, token),
     onSuccess: (data) => {
       console.log("Address deleted successfully:", data);
       // Refetch addresses after successful deletion

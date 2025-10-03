@@ -142,6 +142,9 @@ export default function AddAddressScreen() {
     getToken();
   }, []);
 
+  // Use onboarding token if available, otherwise use auth token
+  const authToken = onboardingToken || token;
+
   const [stateName, setStateName] = useState(editData?.state || "");
   const [lga, setLga] = useState(editData?.local_government || "");
   const [fullAddress, setFullAddress] = useState(editData?.full_address || "");
@@ -232,9 +235,9 @@ export default function AddAddressScreen() {
   // Set Address Mutation
   const setAddressMutation = useMutation({
     mutationFn: (payload) => {
-      console.log("Sending address with token:", onboardingToken ? "Token present" : "No token");
+      console.log("Sending address with token:", authToken ? "Token present" : "No token");
       console.log("Payload:", payload);
-      return setAddress(payload, onboardingToken);
+      return setAddress(payload, authToken);
     },
     onSuccess: (data) => {
       console.log("Address saved successfully:", data);
@@ -247,7 +250,7 @@ export default function AddAddressScreen() {
     },
     onError: (error) => {
       console.error("Set address error:", error);
-      console.error("Token status:", onboardingToken ? "Token present" : "No token");
+      console.error("Token status:", authToken ? "Token present" : "No token");
       // You can add error handling here (Alert, toast, etc.)
     },
   });
@@ -261,7 +264,7 @@ export default function AddAddressScreen() {
     lga: !!lga,
     fullAddress: !!fullAddress.trim(),
     isFormComplete,
-    onboardingToken: !!onboardingToken
+    authToken: !!authToken
   });
 
   // Format hours for API
@@ -282,8 +285,8 @@ export default function AddAddressScreen() {
     if (!isFormComplete) return;
     
     // Check if token is available
-    if (!onboardingToken) {
-      console.error("No onboarding token available");
+    if (!authToken) {
+      console.error("No authentication token available");
       return;
     }
     

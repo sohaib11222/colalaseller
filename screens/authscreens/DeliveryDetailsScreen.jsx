@@ -454,6 +454,7 @@ function NewPriceModal({ visible, onClose, onSave, initial, isLoading = false })
 export default function DeliveryDetailsScreen() {
   const { theme } = useTheme();
   const nav = useNavigation();
+  const { token: authToken } = useAuth();
 
   const [showForm, setShowForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
@@ -478,6 +479,9 @@ export default function DeliveryDetailsScreen() {
     getToken();
   }, []);
 
+  // Use onboarding token if available, otherwise use auth token
+  const token = onboardingToken || authToken;
+
   // Fetch deliveries using React Query
   const { 
     data: deliveriesData, 
@@ -485,9 +489,9 @@ export default function DeliveryDetailsScreen() {
     error, 
     refetch 
   } = useQuery({
-    queryKey: ['deliveries', onboardingToken],
-    queryFn: () => getDeliveries(onboardingToken),
-    enabled: !!onboardingToken, // Only run query when token is available
+    queryKey: ['deliveries', token],
+    queryFn: () => getDeliveries(token),
+    enabled: !!token, // Only run query when token is available
   });
 
   const deliveries = deliveriesData?.items || [];
@@ -500,7 +504,7 @@ export default function DeliveryDetailsScreen() {
 
   // Delete delivery mutation
   const deleteDeliveryMutation = useMutation({
-    mutationFn: (deliveryId) => deleteDelivery(deliveryId, onboardingToken),
+    mutationFn: (deliveryId) => deleteDelivery(deliveryId, token),
     onSuccess: (data) => {
       console.log("Delivery deleted successfully:", data);
       // Refetch deliveries after successful deletion
@@ -516,8 +520,8 @@ export default function DeliveryDetailsScreen() {
   const setDeliveryPricingMutation = useMutation({
     mutationFn: (payload) => {
       console.log("Sending delivery pricing payload:", payload);
-      console.log("Onboarding token present:", !!onboardingToken);
-      return setDeliveryPricing(payload, onboardingToken);
+      console.log("Token present:", !!token);
+      return setDeliveryPricing(payload, token);
     },
     onSuccess: (data) => {
       console.log("Delivery pricing set successfully:", data);
