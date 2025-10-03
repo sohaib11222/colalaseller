@@ -19,6 +19,15 @@ import { StatusBar } from "expo-status-bar";
 
 /* ───────────────────────── utils ───────────────────────── */
 
+//Code Related to the Integration
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../contexts/AuthContext";
+import { createProduct, createProductVariant, setBulkPrices, attachDeliveryOptions } from "../../utils/mutations/products";
+import { Alert, ActivityIndicator } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { getCategories, getBrands } from "../../utils/queries/general";
+
+
 // handles: require(number) | string uri | { uri }
 const toSrc = (v) => {
   if (!v) return undefined;
@@ -68,10 +77,22 @@ const VariantSummaryList = ({ items, C }) => (
     {items.map((it) => (
       <View
         key={it.key}
-        style={[styles.summaryRow, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+        style={[
+          styles.summaryRow,
+          { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+        ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-          <ThemedText style={{ color: "#6B7280", width: 40 }}>{it.kind}</ThemedText>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            flex: 1,
+          }}
+        >
+          <ThemedText style={{ color: "#6B7280", width: 40 }}>
+            {it.kind}
+          </ThemedText>
           {it.kind === "Color" ? (
             <View
               style={{
@@ -103,9 +124,14 @@ const VariantSummaryList = ({ items, C }) => (
             : it.compare}
         </ThemedText>
 
-        <View style={{ marginLeft: 10, flexDirection: "row", alignItems: "center" }}>
+        <View
+          style={{ marginLeft: 10, flexDirection: "row", alignItems: "center" }}
+        >
           {it.image ? (
-            <Image source={toSrc(it.image)} style={{ width: 36, height: 36, borderRadius: 6 }} />
+            <Image
+              source={toSrc(it.image)}
+              style={{ width: 36, height: 36, borderRadius: 6 }}
+            />
           ) : (
             <View
               style={{
@@ -121,7 +147,9 @@ const VariantSummaryList = ({ items, C }) => (
             </View>
           )}
           {it.count > 0 && (
-            <ThemedText style={{ marginLeft: 6, color: "#6B7280" }}>+{it.count}</ThemedText>
+            <ThemedText style={{ marginLeft: 6, color: "#6B7280" }}>
+              +{it.count}
+            </ThemedText>
           )}
         </View>
       </View>
@@ -137,6 +165,8 @@ const FREE_DELIVERY_ICON = require("../../assets/Frame 269.png");
 
 export default function AddProductScreen({ navigation }) {
   const { theme } = useTheme();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
 
   const C = useMemo(
     () => ({
@@ -187,7 +217,8 @@ export default function AddProductScreen({ navigation }) {
   const [variantTypes, setVariantTypes] = useState([]); // ["Color","Size"]
   const [variantColors, setVariantColors] = useState([]); // hex strings
   const [variantSizes, setVariantSizes] = useState([]); // ["S","M",...]
-  const [useDefaultVariantPricing, setUseDefaultVariantPricing] = useState(true);
+  const [useDefaultVariantPricing, setUseDefaultVariantPricing] =
+    useState(true);
 
   // variant details data saved from the details modal
   // { color: { [hex]: { price:'', compare:'', sizes:[], images:[uri...] } },
@@ -202,14 +233,28 @@ export default function AddProductScreen({ navigation }) {
 
   // overall completeness gate
   const isComplete = useMemo(() => {
-    const requiredStrings = [name, category, brand, shortDesc, fullDesc, price, discountPrice];
-    const allStringsFilled = requiredStrings.every((v) => String(v ?? "").trim().length > 0);
+    const requiredStrings = [
+      name,
+      shortDesc,
+      fullDesc,
+      price,
+      discountPrice,
+    ];
+    const allStringsFilled = requiredStrings.every(
+      (v) => String(v ?? "").trim().length > 0
+    );
+    
+    // Check if category and brand are selected (they should be IDs)
+    const categorySelected = !!category;
+    const brandSelected = !!brand;
+    
     return (
-      !!video &&
       images.length >= 3 &&
       availability.length > 0 &&
       delivery.length > 0 &&
-      allStringsFilled
+      allStringsFilled &&
+      categorySelected &&
+      brandSelected
     );
   }, [
     video,
@@ -224,6 +269,297 @@ export default function AddProductScreen({ navigation }) {
     price,
     discountPrice,
   ]);
+
+  /* ───────────────────────── mutations ───────────────────────── */
+  
+  // Create Product Mutation
+  const createProductMutation = useMutation({
+    mutationFn: (payload) => createProduct(payload, token),
+    onSuccess: (data) => {
+      console.log("Product created successfully:", data);
+      if (data.status === true) {
+        Alert.alert("Success", "Product created successfully!");
+        // Invalidate and refetch products list
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        // Navigate back or to products list
+        navigation?.goBack?.();
+      }
+    },
+    onError: (error) => {
+      console.error("Create product error:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create product";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Create Product Variant Mutation
+  const createVariantMutation = useMutation({
+    mutationFn: ({ productId, payload }) => createProductVariant(productId, payload, token),
+    onSuccess: (data) => {
+      console.log("Product variant created successfully:", data);
+    },
+    onError: (error) => {
+      console.error("Create variant error:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create product variant";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Set Bulk Prices Mutation
+  const setBulkPricesMutation = useMutation({
+    mutationFn: ({ productId, payload }) => setBulkPrices(productId, payload, token),
+    onSuccess: (data) => {
+      console.log("Bulk prices set successfully:", data);
+    },
+    onError: (error) => {
+      console.error("Set bulk prices error:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to set bulk prices";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Attach Delivery Options Mutation
+  const attachDeliveryMutation = useMutation({
+    mutationFn: ({ productId, payload }) => attachDeliveryOptions(productId, payload, token),
+    onSuccess: (data) => {
+      console.log("Delivery options attached successfully:", data);
+    },
+    onError: (error) => {
+      console.error("Attach delivery options error:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to attach delivery options";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Combined loading state
+  const isSubmitting = createProductMutation.isPending || 
+                      createVariantMutation.isPending || 
+                      setBulkPricesMutation.isPending || 
+                      attachDeliveryMutation.isPending;
+
+  /* ───────────────────────── API queries ───────────────────────── */
+  
+  // Fetch categories
+  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => getCategories(token),
+    enabled: !!token,
+  });
+
+  // Fetch brands
+  const { data: brandsData, isLoading: brandsLoading, error: brandsError } = useQuery({
+    queryKey: ['brands'],
+    queryFn: () => getBrands(token),
+    enabled: !!token,
+  });
+
+  /* ───────────────────────── submit functions ───────────────────────── */
+  
+  // Create FormData for product creation
+  const createProductFormData = () => {
+    console.log("Creating FormData with values:", {
+      name: name,
+      category: category,
+      brand: brand,
+      description: fullDesc,
+      price: price,
+      discountPrice: discountPrice
+    });
+    
+    const formData = new FormData();
+    
+    // Basic product information
+    formData.append('name', name.trim());
+    formData.append('category_id', category); // Category ID
+    formData.append('brand_id', brand); // Brand ID
+    formData.append('description', fullDesc.trim());
+    formData.append('price', price.toString());
+    formData.append('discount_price', discountPrice.toString());
+    formData.append('has_variants', variantTypes.length > 0 ? '1' : '0');
+    formData.append('status', 'active'); // Default status
+    
+    // Add video if available (optional)
+    if (video?.uri) {
+      formData.append('video', {
+        uri: video.uri,
+        type: 'video/mp4',
+        name: 'product_video.mp4'
+      });
+      console.log("Video added to FormData:", video.uri);
+    } else {
+      console.log("No video provided - video is optional");
+    }
+    
+    // Add images
+    images.forEach((image, index) => {
+      if (image?.uri) {
+        formData.append('images[]', {
+          uri: image.uri,
+          type: 'image/jpeg',
+          name: `product_image_${index}.jpg`
+        });
+      }
+    });
+    
+    return formData;
+  };
+
+  // Create FormData for product variant
+  const createVariantFormData = (variantData) => {
+    const formData = new FormData();
+    
+    formData.append('sku', variantData.sku || '');
+    formData.append('color', variantData.color || '');
+    formData.append('size', variantData.size || '');
+    formData.append('price', variantData.price.toString());
+    formData.append('discount_price', variantData.discount_price.toString());
+    formData.append('stock', variantData.stock.toString());
+    
+    // Add variant images
+    if (variantData.images && variantData.images.length > 0) {
+      variantData.images.forEach((image, index) => {
+        if (image?.uri) {
+          formData.append('images[]', {
+            uri: image.uri,
+            type: 'image/jpeg',
+            name: `variant_image_${index}.jpg`
+          });
+        }
+      });
+    }
+    
+    return formData;
+  };
+
+  // Main submit function
+  const handleSubmitProduct = async () => {
+    if (!isComplete || isSubmitting) return;
+    
+    // Validate required fields
+    if (!name || !category || !brand || !fullDesc || !price || !discountPrice) {
+      Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
+    
+    try {
+      console.log("Starting product creation...");
+      
+      // Step 1: Create the main product
+      const productFormData = createProductFormData();
+      console.log("Product FormData created");
+      
+      const productResult = await createProductMutation.mutateAsync(productFormData);
+      
+      if (productResult?.status !== "success") {
+        throw new Error(productResult?.message || "Failed to create product");
+      }
+      
+      const productId = productResult?.data?.id;
+      if (!productId) {
+        throw new Error("Product ID not returned from server");
+      }
+      
+      console.log("Product created with ID:", productId);
+      
+      // Step 2: Create variants if they exist
+      if (variantTypes.length > 0 && variantDetailData) {
+        console.log("Creating product variants...");
+        
+        // Process color variants
+        if (variantDetailData.color) {
+          for (const [colorHex, colorData] of Object.entries(variantDetailData.color)) {
+            if (variantColors.includes(colorHex)) {
+              const variantPayload = createVariantFormData({
+                sku: `${productId}-${colorHex}`,
+                color: colorHex,
+                price: colorData.price || price,
+                discount_price: colorData.compare || discountPrice,
+                stock: 100, // Default stock
+                images: colorData.images || []
+              });
+              
+              await createVariantMutation.mutateAsync({
+                productId,
+                payload: variantPayload
+              });
+            }
+          }
+        }
+        
+        // Process size variants
+        if (variantDetailData.size) {
+          for (const [size, sizeData] of Object.entries(variantDetailData.size)) {
+            if (variantSizes.includes(size)) {
+              const variantPayload = createVariantFormData({
+                sku: `${productId}-${size}`,
+                size: size,
+                price: sizeData.price || price,
+                discount_price: sizeData.compare || discountPrice,
+                stock: 100, // Default stock
+                images: sizeData.images || []
+              });
+              
+              await createVariantMutation.mutateAsync({
+                productId,
+                payload: variantPayload
+              });
+            }
+          }
+        }
+      }
+      
+      // Step 3: Set bulk prices if tiers exist
+      if (tiers.length > 0) {
+        console.log("Setting bulk prices...");
+        const bulkPricesPayload = {
+          prices: tiers.map(tier => ({
+            min_quantity: parseInt(tier.minQuantity) || 10,
+            amount: parseFloat(tier.amount) || 0,
+            discount_percent: parseFloat(tier.discount) || 0
+          }))
+        };
+        
+        await setBulkPricesMutation.mutateAsync({
+          productId,
+          payload: bulkPricesPayload
+        });
+      }
+      
+      // Step 4: Attach delivery options
+      if (delivery.length > 0) {
+        console.log("Attaching delivery options...");
+        const deliveryOptionIds = delivery.map(d => d.id).filter(id => id);
+        
+        if (deliveryOptionIds.length > 0) {
+          await attachDeliveryMutation.mutateAsync({
+            productId,
+            payload: { delivery_option_ids: deliveryOptionIds }
+          });
+        }
+      }
+      
+      console.log("Product creation completed successfully!");
+      
+      // Show success message to user
+      Alert.alert(
+        "Success", 
+        "Product created successfully!",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Navigate back or reset form
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error("Product creation failed:", error);
+      Alert.alert("Error", error.message || "Failed to create product. Please try again.");
+    }
+  };
 
   /* ────────────────────── media pickers ───────────────────── */
   async function ensurePerms() {
@@ -254,12 +590,16 @@ export default function AddProductScreen({ navigation }) {
     }
   };
 
-  const removeImage = (idx) => setImages((prev) => prev.filter((_, i) => i !== idx));
+  const removeImage = (idx) =>
+    setImages((prev) => prev.filter((_, i) => i !== idx));
   const clearVideo = () => setVideo(null);
 
   // wholesale helpers
   const addTier = () =>
-    setTiers((p) => [...p, { id: Date.now().toString(), min: "", max: "", price: "" }]);
+    setTiers((p) => [
+      ...p,
+      { id: Date.now().toString(), min: "", max: "", price: "" },
+    ]);
   const editTier = (id, key, val) =>
     setTiers((p) => p.map((t) => (t.id === id ? { ...t, [key]: val } : t)));
   const removeTier = (id) => setTiers((p) => p.filter((t) => t.id !== id));
@@ -268,14 +608,21 @@ export default function AddProductScreen({ navigation }) {
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style="dark" />
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.line, backgroundColor: C.card }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: C.line, backgroundColor: C.card },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.hIcon, { borderColor: C.line }]}
           onPress={() => navigation?.goBack?.()}
         >
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
-        <ThemedText style={[styles.headerTitle, { color: C.text }]}>Add New Product</ThemedText>
+        <ThemedText style={[styles.headerTitle, { color: C.text }]}>
+          Add New Product
+        </ThemedText>
         <View style={{ width: 32 }} />
       </View>
 
@@ -285,14 +632,17 @@ export default function AddProductScreen({ navigation }) {
       >
         {/* Upload video */}
         <ThemedText style={[styles.label, { color: C.text }]}>
-          Upload at least 1 Video of your product
+          Upload Video of your product (Optional)
         </ThemedText>
         <View style={{ flexDirection: "row", gap: 12 }}>
           {/* video tile */}
           <TouchableOpacity
             onPress={pickVideo}
             activeOpacity={0.85}
-            style={[styles.mediaTile, { borderColor: C.line, backgroundColor: C.card }]}
+            style={[
+              styles.mediaTile,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
           >
             {video ? (
               <>
@@ -312,7 +662,10 @@ export default function AddProductScreen({ navigation }) {
           {/* optional preview tile of first image, if any */}
           {images[0] ? (
             <View
-              style={[styles.mediaTile, { borderColor: C.line, backgroundColor: "#000" }]}
+              style={[
+                styles.mediaTile,
+                { borderColor: C.line, backgroundColor: "#000" },
+              ]}
             >
               <Image source={toSrc(images[0].uri)} style={styles.mediaImg} />
             </View>
@@ -328,15 +681,24 @@ export default function AddProductScreen({ navigation }) {
           <TouchableOpacity
             onPress={pickImages}
             activeOpacity={0.85}
-            style={[styles.imageTile, { borderColor: C.line, backgroundColor: C.card }]}
+            style={[
+              styles.imageTile,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
           >
             <Ionicons name="camera-outline" size={20} color={C.sub} />
           </TouchableOpacity>
 
           {images.map((img, i) => (
-            <View key={i} style={[styles.imageTile, { backgroundColor: "#000" }]}>
+            <View
+              key={i}
+              style={[styles.imageTile, { backgroundColor: "#000" }]}
+            >
               <Image source={toSrc(img.uri)} style={styles.imageImg} />
-              <TouchableOpacity style={styles.closeDot} onPress={() => removeImage(i)}>
+              <TouchableOpacity
+                style={styles.closeDot}
+                onPress={() => removeImage(i)}
+              >
                 <Ionicons name="close" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -354,7 +716,7 @@ export default function AddProductScreen({ navigation }) {
 
         {/* Category (modal) */}
         <PickerField
-          label={category || "Category"}
+          label={category ? categoriesData?.data?.find(c => c.id === category)?.title || "Category" : "Category"}
           empty={!category}
           onPress={() => setCatOpen(true)}
           C={C}
@@ -363,7 +725,7 @@ export default function AddProductScreen({ navigation }) {
 
         {/* Brand (modal) */}
         <PickerField
-          label={brand || "Brand"}
+          label={brand ? brandsData?.data?.find(b => b.id === brand)?.name || "Brand" : "Brand"}
           empty={!brand}
           onPress={() => setBrandOpen(true)}
           C={C}
@@ -406,15 +768,23 @@ export default function AddProductScreen({ navigation }) {
         />
 
         {/* Wholesale prices link / card */}
-        <TouchableOpacity onPress={() => setWholesaleOpen((v) => !v)} activeOpacity={0.8}>
-          <ThemedText style={{ color: C.primary, marginTop: 12, fontWeight: "700" }}>
+        <TouchableOpacity
+          onPress={() => setWholesaleOpen((v) => !v)}
+          activeOpacity={0.8}
+        >
+          <ThemedText
+            style={{ color: C.primary, marginTop: 12, fontWeight: "700" }}
+          >
             {wholesaleOpen ? "Hide Wholesale Prices" : "Add Wholesale Prices"}
           </ThemedText>
         </TouchableOpacity>
 
         {wholesaleOpen && (
           <View
-            style={[styles.wholesaleCard, { borderColor: C.line, backgroundColor: C.card }]}
+            style={[
+              styles.wholesaleCard,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
           >
             <View style={styles.whHeader}>
               <ThemedText style={[styles.whTitle, { color: C.text }]}>
@@ -438,7 +808,10 @@ export default function AddProductScreen({ navigation }) {
               </View>
             ) : (
               tiers.map((t) => (
-                <View key={t.id} style={[styles.tierRow, { borderColor: C.line }]}>
+                <View
+                  key={t.id}
+                  style={[styles.tierRow, { borderColor: C.line }]}
+                >
                   <MiniField
                     value={t.min}
                     onChangeText={(v) => editTier(t.id, "min", v)}
@@ -474,13 +847,20 @@ export default function AddProductScreen({ navigation }) {
         )}
 
         {/* Add Variants section */}
-        <ThemedText style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}>
+        <ThemedText
+          style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}
+        >
           Add Variants
         </ThemedText>
         <ThemedText style={{ color: C.sub, fontSize: 11, marginBottom: 8 }}>
           Variants include colors and size.
         </ThemedText>
-        <PickerField label="Add New Variant" empty onPress={() => setVariantOpen(true)} C={C} />
+        <PickerField
+          label="Add New Variant"
+          empty
+          onPress={() => setVariantOpen(true)}
+          C={C}
+        />
 
         {/* Show selected variants summary below the input */}
         {screenVariantSummary.length > 0 && (
@@ -502,7 +882,9 @@ export default function AddProductScreen({ navigation }) {
         )}
 
         {/* Promotions */}
-        <ThemedText style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}>
+        <ThemedText
+          style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}
+        >
           Promotions
         </ThemedText>
         <ThemedText style={{ color: C.sub, fontSize: 11, marginBottom: 8 }}>
@@ -517,7 +899,10 @@ export default function AddProductScreen({ navigation }) {
 
         <TouchableOpacity
           onPress={() => setUsePoints((v) => !v)}
-          style={[styles.checkboxRow, { borderColor: C.line, backgroundColor: C.card }]}
+          style={[
+            styles.checkboxRow,
+            { borderColor: C.line, backgroundColor: C.card },
+          ]}
           activeOpacity={0.8}
         >
           <Ionicons
@@ -531,7 +916,9 @@ export default function AddProductScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* Others (tags + locations) */}
-        <ThemedText style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}>
+        <ThemedText
+          style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}
+        >
           Others
         </ThemedText>
 
@@ -559,9 +946,14 @@ export default function AddProductScreen({ navigation }) {
         {/* Availability locations */}
         <PickerField
           label="Availability locations"
-          subLabel={availability.length ? `${availability.length} Selected` : undefined}
+          subLabel={
+            availability.length ? `${availability.length} Selected` : undefined
+          }
           empty={availability.length === 0}
-          onPress={() => setAvailOpen(true)}
+          onPress={() => {
+            console.log("Opening availability modal");
+            setAvailOpen(true);
+          }}
           C={C}
           style={{ marginTop: 10 }}
         />
@@ -571,7 +963,10 @@ export default function AddProductScreen({ navigation }) {
           label="Delivery locations"
           subLabel={delivery.length ? `${delivery.length} Selected` : undefined}
           empty={delivery.length === 0}
-          onPress={() => setDelivOpen(true)}
+          onPress={() => {
+            console.log("Opening delivery modal");
+            setDelivOpen(true);
+          }}
           C={C}
           style={{ marginTop: 10 }}
         />
@@ -579,16 +974,28 @@ export default function AddProductScreen({ navigation }) {
         {/* Post button */}
         <TouchableOpacity
           activeOpacity={0.9}
-          disabled={!isComplete}
+          disabled={!isComplete || isSubmitting}
           style={[
             styles.postBtn,
-            { backgroundColor: isComplete ? C.primary : "#F3A3AA" },
+            { 
+              backgroundColor: (isComplete && !isSubmitting) ? C.primary : "#F3A3AA",
+              opacity: isSubmitting ? 0.7 : 1
+            },
           ]}
-          onPress={() => isComplete && console.log("submit")}
+          onPress={handleSubmitProduct}
         >
-          <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-            Post Product
-          </ThemedText>
+          {isSubmitting ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color="#fff" />
+              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                Creating Product...
+              </ThemedText>
+            </View>
+          ) : (
+            <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              Post Product
+            </ThemedText>
+          )}
         </TouchableOpacity>
 
         {/* Bulk upload */}
@@ -604,13 +1011,18 @@ export default function AddProductScreen({ navigation }) {
             "Bulk Upload Successful",
           ].map((t, i) => (
             <View key={i} style={styles.bulletRow}>
-              <View style={[styles.bulletDot, { backgroundColor: C.primary }]} />
+              <View
+                style={[styles.bulletDot, { backgroundColor: C.primary }]}
+              />
               <ThemedText style={{ color: C.text, flex: 1 }}>{t}</ThemedText>
             </View>
           ))}
 
           <View
-            style={[styles.downloadRow, { borderColor: C.line, backgroundColor: C.card }]}
+            style={[
+              styles.downloadRow,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
           >
             <View style={styles.csvIcon}>
               <Image
@@ -651,6 +1063,9 @@ export default function AddProductScreen({ navigation }) {
           setCatOpen(false);
         }}
         C={C}
+        categoriesData={categoriesData}
+        isLoading={categoriesLoading}
+        error={categoriesError}
       />
       <BrandSheet
         visible={brandOpen}
@@ -660,13 +1075,19 @@ export default function AddProductScreen({ navigation }) {
           setBrandOpen(false);
         }}
         C={C}
+        brandsData={brandsData}
+        isLoading={brandsLoading}
+        error={brandsError}
       />
 
       {/* Location sheets */}
       <AvailableLocationsSheet
         C={C}
         visible={availOpen}
-        onClose={() => setAvailOpen(false)}
+        onClose={() => {
+          console.log("Closing availability modal");
+          setAvailOpen(false);
+        }}
         selected={availability}
         setSelected={setAvailability}
       />
@@ -679,7 +1100,13 @@ export default function AddProductScreen({ navigation }) {
         statesSource={
           availability.length
             ? availability
-            : ["Lagos State", "Oyo State", "Abuja State", "Rivers State", "Kano State"]
+            : [
+                "Lagos State",
+                "Oyo State",
+                "Abuja State",
+                "Rivers State",
+                "Kano State",
+              ]
         }
       />
 
@@ -731,10 +1158,16 @@ const PickerField = ({ label, subLabel, empty = false, onPress, C, style }) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.85}
-    style={[styles.fieldWrap, { backgroundColor: C.card, borderColor: C.line }, style]}
+    style={[
+      styles.fieldWrap,
+      { backgroundColor: C.card, borderColor: C.line },
+      style,
+    ]}
   >
     <View style={{ flex: 1 }}>
-      <ThemedText style={{ color: empty ? "#9BA0A6" : C.text }}>{label}</ThemedText>
+      <ThemedText style={{ color: empty ? "#9BA0A6" : C.text }}>
+        {label}
+      </ThemedText>
       {!!subLabel && (
         <ThemedText style={{ color: "#9BA0A6", fontSize: 11, marginTop: 2 }}>
           {subLabel}
@@ -767,15 +1200,103 @@ const MiniField = ({ C, flex = 1, style, ...rest }) => (
 
 /* ───────────────────────── Brand/Category Sheets ───────────────────────── */
 
-function CategoriesSheet({ visible, onClose, onSelect, C }) {
-  const categories = ["Mobile Phones", "Electronics"];
+function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoading, error }) {
+  console.log("CategoriesSheet visible:", visible, "categoriesData:", categoriesData);
+  
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Categories
+              </ThemedText>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={{ color: C.sub, marginTop: 10 }}>
+                Loading categories...
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Categories
+              </ThemedText>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
+              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+                Failed to load categories. Please try again.
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Get categories from API data
+  const categories = categoriesData?.data || [];
+  
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheet, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
+            <ThemedText
+              font="oleo"
+              style={[styles.sheetTitle, { color: C.text }]}
+            >
               Categories
             </ThemedText>
             <TouchableOpacity
@@ -798,66 +1319,156 @@ function CategoriesSheet({ visible, onClose, onSelect, C }) {
             Categories
           </ThemedText>
 
-          {categories.map((c) => (
-            <TouchableOpacity
-              key={c}
-              onPress={() => onSelect(c)}
-              style={[styles.sheetRow, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
-              activeOpacity={0.9}
-            >
-              <ThemedText style={{ color: C.text }}>{c}</ThemedText>
-            </TouchableOpacity>
-          ))}
+          {categories.length === 0 ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Ionicons name="folder-outline" size={48} color={C.sub} />
+              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+                No categories available
+              </ThemedText>
+            </View>
+          ) : (
+            categories.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                onPress={() => onSelect(category.id)}
+                style={[
+                  styles.sheetRow,
+                  { borderColor: C.line, backgroundColor: "#F3F4F6" },
+                ]}
+                activeOpacity={0.9}
+              >
+                <ThemedText style={{ color: C.text }}>{category.title}</ThemedText>
+                {category.products_count > 0 && (
+                  <ThemedText style={{ color: C.sub, fontSize: 12 }}>
+                    {category.products_count} products
+                  </ThemedText>
+                )}
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </View>
     </Modal>
   );
 }
 
-function BrandSheet({ visible, onClose, onSelect, C }) {
-  const popular = ["iPhone", "Samsung", "Google Pixel"];
-  const allBrands = [
-    "Apple",
-    "Amazon",
-    "Asus",
-    "Blackberry",
-    "Cubot",
-    "Gionee",
-    "HMD",
-    "Huawei",
-    "Infinix",
-    "itel",
-    "Motorola",
-    "Nokia",
-    "OnePlus",
-    "Oppo",
-    "Tecno",
-    "Vivo",
-    "Xiaomi",
-  ];
+function BrandSheet({ visible, onClose, onSelect, C, brandsData, isLoading, error }) {
+  console.log("BrandSheet visible:", visible, "brandsData:", brandsData);
+  
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Brand
+              </ThemedText>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={{ color: C.sub, marginTop: 10 }}>
+                Loading brands...
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
-  const Row = ({ label }) => (
+  // Handle error state
+  if (error) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Brand
+              </ThemedText>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
+              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+                Failed to load brands. Please try again.
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Get brands from API data
+  const brands = brandsData?.data || [];
+
+  const Row = ({ brand }) => (
     <TouchableOpacity
-      onPress={() => onSelect(label)}
-      style={[styles.sheetRow, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
+      onPress={() => onSelect(brand.id)}
+      style={[
+        styles.sheetRow,
+        { borderColor: C.line, backgroundColor: "#F3F4F6" },
+      ]}
       activeOpacity={0.9}
     >
       <View style={{ flex: 1 }}>
-        <ThemedText style={{ color: C.text }}>{label}</ThemedText>
-        <ThemedText style={{ color: C.sub, fontSize: 11, marginTop: 2 }}>
-          5,000 products
-        </ThemedText>
+        <ThemedText style={{ color: C.text }}>{brand.name}</ThemedText>
+        {brand.description && (
+          <ThemedText style={{ color: C.sub, fontSize: 11, marginTop: 2 }}>
+            {brand.description}
+          </ThemedText>
+        )}
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
+            <ThemedText
+              font="oleo"
+              style={[styles.sheetTitle, { color: C.text }]}
+            >
               Brand
             </ThemedText>
             <TouchableOpacity
@@ -876,21 +1487,25 @@ function BrandSheet({ visible, onClose, onSelect, C }) {
             />
           </View>
 
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
-            Popular Brands
-          </ThemedText>
-          {popular.map((p) => (
-            <Row key={p} label={p} />
-          ))}
-
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
-            All Brands
-          </ThemedText>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {allBrands.map((b) => (
-              <Row key={b} label={b} />
-            ))}
-          </ScrollView>
+          {brands.length === 0 ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Ionicons name="business-outline" size={48} color={C.sub} />
+              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+                No brands available
+              </ThemedText>
+            </View>
+          ) : (
+            <>
+              <ThemedText style={[styles.sheetSection, { color: C.text }]}>
+                Available Brands
+              </ThemedText>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {brands.map((brand) => (
+                  <Row key={brand.id} brand={brand} />
+                ))}
+              </ScrollView>
+            </>
+          )}
         </View>
       </View>
     </Modal>
@@ -920,7 +1535,15 @@ function Check({ checked, C }) {
 
 /* ───────────────────────── Available Locations Sheet ───────────────────────── */
 
-function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C }) {
+function AvailableLocationsSheet({
+  visible,
+  onClose,
+  selected,
+  setSelected,
+  C,
+}) {
+  console.log("AvailableLocationsSheet visible:", visible, "selected:", selected);
+  
   const popular = ["All Locations", "Oyo State", "Lagos State", "Rivers State"];
   const allStates = [
     "Abia State",
@@ -964,20 +1587,39 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
   const [q, setQ] = useState("");
 
   const toggle = (opt) => {
-    setSelected((prev) => (prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt]));
+    console.log("Location toggle clicked:", opt, "Current selected:", selected);
+    setSelected((prev) => {
+      const newSelection = prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt];
+      console.log("New location selection:", newSelection);
+      return newSelection;
+    });
   };
 
-  const filter = (list) => list.filter((s) => s.toLowerCase().includes(q.trim().toLowerCase()));
+  const filter = (list) =>
+    list.filter((s) => s.toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
-              Select Available Location
-            </ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Select Available Location
+              </ThemedText>
+              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+                {selected.length} selected
+              </ThemedText>
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.sheetClose, { borderColor: C.line }]}
@@ -986,7 +1628,12 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.searchBar, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}>
+          <View
+            style={[
+              styles.searchBar,
+              { borderColor: C.line, backgroundColor: "#F3F4F6" },
+            ]}
+          >
             <TextInput
               value={q}
               onChangeText={setQ}
@@ -996,7 +1643,9 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
             />
           </View>
 
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>Popular</ThemedText>
+          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
+            Popular
+          </ThemedText>
           {filter(popular).map((opt) => {
             const checked = selected.includes(opt);
             return (
@@ -1004,15 +1653,26 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
                 key={opt}
                 onPress={() => toggle(opt)}
                 activeOpacity={0.9}
-                style={[styles.locationRow, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
+                style={[
+                  styles.locationRow,
+                  { 
+                    borderColor: checked ? C.primary : C.line, 
+                    backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
+                    borderWidth: checked ? 2 : 1,
+                  },
+                ]}
               >
-                <ThemedText style={{ color: C.text, flex: 1 }}>{opt}</ThemedText>
+                <ThemedText style={{ color: C.text, flex: 1 }}>
+                  {opt}
+                </ThemedText>
                 <Check checked={checked} C={C} />
               </TouchableOpacity>
             );
           })}
 
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>All States</ThemedText>
+          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
+            All States
+          </ThemedText>
           <ScrollView showsVerticalScrollIndicator={false}>
             {filter(allStates).map((opt) => {
               const checked = selected.includes(opt);
@@ -1021,9 +1681,18 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
                   key={opt}
                   onPress={() => toggle(opt)}
                   activeOpacity={0.9}
-                  style={[styles.locationRow, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
+                  style={[
+                    styles.locationRow,
+                    { 
+                      borderColor: checked ? C.primary : C.line, 
+                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
+                      borderWidth: checked ? 2 : 1,
+                    },
+                  ]}
                 >
-                  <ThemedText style={{ color: C.text, flex: 1 }}>{opt}</ThemedText>
+                  <ThemedText style={{ color: C.text, flex: 1 }}>
+                    {opt}
+                  </ThemedText>
                   <Check checked={checked} C={C} />
                 </TouchableOpacity>
               );
@@ -1035,7 +1704,9 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
             activeOpacity={0.9}
             style={[styles.applyBtn, { backgroundColor: C.primary }]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Apply</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Apply
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -1045,7 +1716,16 @@ function AvailableLocationsSheet({ visible, onClose, selected, setSelected, C })
 
 /* ───────────────────────── Delivery Price/Location Sheet ───────────────────────── */
 
-function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSource, C }) {
+function DeliveryPriceSheet({
+  visible,
+  onClose,
+  selected,
+  setSelected,
+  statesSource,
+  C,
+}) {
+  console.log("DeliveryPriceSheet visible:", visible, "selected:", selected);
+  
   const DATA = {
     "Lagos State": [
       { area: "Ikeja (light)", group: "Light", price: 5000, free: false },
@@ -1059,9 +1739,15 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
       { area: "Ibadan (light)", group: "Light", price: 4000, free: false },
       { area: "Ibadan (Medium)", group: "Medium", price: 8000, free: true },
     ],
-    "Abuja State": [{ area: "Central (light)", group: "Light", price: 7000, free: false }],
-    "Rivers State": [{ area: "PH City (light)", group: "Light", price: 6000, free: false }],
-    "Kano State": [{ area: "Kano City (light)", group: "Light", price: 5000, free: false }],
+    "Abuja State": [
+      { area: "Central (light)", group: "Light", price: 7000, free: false },
+    ],
+    "Rivers State": [
+      { area: "PH City (light)", group: "Light", price: 6000, free: false },
+    ],
+    "Kano State": [
+      { area: "Kano City (light)", group: "Light", price: 5000, free: false },
+    ],
   };
 
   const tabs = statesSource.length ? statesSource : Object.keys(DATA);
@@ -1071,28 +1757,58 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
   const [showGoodsMenu, setShowGoodsMenu] = useState(false);
 
   const toggle = (item) => {
+    console.log("Delivery toggle clicked:", item.area, "Current selected:", selected);
     const key = `${active}::${item.area}`;
-    setSelected((prev) =>
-      prev.find((x) => x.key === key)
+    setSelected((prev) => {
+      const exists = prev.find((x) => x.key === key);
+      const newSelection = exists
         ? prev.filter((x) => x.key !== key)
-        : [...prev, { key, state: active, area: item.area, price: item.price, free: item.free }]
-    );
+        : [
+            ...prev,
+            {
+              key,
+              state: active,
+              area: item.area,
+              price: item.price,
+              free: item.free,
+            },
+          ];
+      console.log("New delivery selection:", newSelection);
+      return newSelection;
+    });
   };
 
-  const isChecked = (item) => !!selected.find((x) => x.state === active && x.area === item.area);
+  const isChecked = (item) =>
+    !!selected.find((x) => x.state === active && x.area === item.area);
 
   const rowsRaw = DATA[active] || [];
-  const rows = goodsFilter === "All Goods" ? rowsRaw : rowsRaw.filter((r) => `${r.group} Goods` === goodsFilter);
+  const rows =
+    goodsFilter === "All Goods"
+      ? rowsRaw
+      : rowsRaw.filter((r) => `${r.group} Goods` === goodsFilter);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
-              Select Delivery Price/Location
-            </ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Select Delivery Price/Location
+              </ThemedText>
+              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+                {selected.length} selected
+              </ThemedText>
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.sheetClose, { borderColor: C.line }]}
@@ -1102,7 +1818,11 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
           </View>
 
           {/* State chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 10 }}
+          >
             {tabs.map((st) => {
               const activeChip = st === active;
               return (
@@ -1116,7 +1836,12 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
                     },
                   ]}
                 >
-                  <ThemedText style={{ color: activeChip ? "#fff" : "#111827", fontWeight: "700" }}>
+                  <ThemedText
+                    style={{
+                      color: activeChip ? "#fff" : "#111827",
+                      fontWeight: "700",
+                    }}
+                  >
                     {st.replace(" State", "")}
                   </ThemedText>
                 </TouchableOpacity>
@@ -1124,24 +1849,45 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
             })}
           </ScrollView>
 
-          <ThemedText style={{ color: C.text, marginBottom: 6, fontWeight: "600" }}>
+          <ThemedText
+            style={{ color: C.text, marginBottom: 6, fontWeight: "600" }}
+          >
             Delivery prices / Location in {active.replace(" State", "")}
           </ThemedText>
 
           {/* Filter + floating menu */}
-          <View style={{ position: "relative", alignSelf: "flex-start", marginBottom: 10 }}>
+          <View
+            style={{
+              position: "relative",
+              alignSelf: "flex-start",
+              marginBottom: 10,
+            }}
+          >
             <TouchableOpacity
               onPress={() => setShowGoodsMenu((s) => !s)}
               activeOpacity={0.85}
-              style={[styles.goodsFilter, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
+              style={[
+                styles.goodsFilter,
+                { borderColor: C.line, backgroundColor: "#F3F4F6" },
+              ]}
             >
               <ThemedText style={{ color: C.text }}>{goodsFilter}</ThemedText>
               <Ionicons name="chevron-down" size={16} color={C.text} />
             </TouchableOpacity>
 
             {showGoodsMenu && (
-              <View style={[styles.menuCard, { backgroundColor: "#fff", borderColor: C.line }]}>
-                {["All Goods", "Light Goods", "Medium Goods", "Heavy Goods"].map((g) => (
+              <View
+                style={[
+                  styles.menuCard,
+                  { backgroundColor: "#fff", borderColor: C.line },
+                ]}
+              >
+                {[
+                  "All Goods",
+                  "Light Goods",
+                  "Medium Goods",
+                  "Heavy Goods",
+                ].map((g) => (
                   <TouchableOpacity
                     key={g}
                     onPress={() => {
@@ -1157,14 +1903,57 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
             )}
           </View>
 
+          {/* Select All / Clear All buttons */}
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => setSelected(rows)}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: C.primary,
+                borderRadius: 8,
+                alignItems: "center"
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Select All
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setSelected([])}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: C.sub,
+                borderRadius: 8,
+                alignItems: "center"
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Clear All
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
           {/* Rows */}
           <ScrollView showsVerticalScrollIndicator={false}>
             {rows.map((r) => {
               const checked = isChecked(r);
               return (
-                <View
+                <TouchableOpacity
                   key={r.area}
-                  style={[styles.deliveryRow, { backgroundColor: "#F3F4F6", borderColor: C.line }]}
+                  onPress={() => toggle(r)}
+                  style={[
+                    styles.deliveryRow,
+                    { 
+                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6", 
+                      borderColor: checked ? C.primary : C.line,
+                      borderWidth: checked ? 2 : 1,
+                    },
+                  ]}
+                  activeOpacity={0.7}
                 >
                   <View style={{ flex: 1 }}>
                     <ThemedText style={{ color: C.text }}>{r.area}</ThemedText>
@@ -1185,10 +1974,10 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
                     ) : null}
                   </View>
 
-                  <TouchableOpacity onPress={() => toggle(r)} style={{ marginLeft: 6 }}>
+                  <View style={{ marginLeft: 6 }}>
                     <Check checked={checked} C={C} />
-                  </TouchableOpacity>
-                </View>
+                  </View>
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -1198,7 +1987,9 @@ function DeliveryPriceSheet({ visible, onClose, selected, setSelected, statesSou
             activeOpacity={0.9}
             style={[styles.applyBtn, { backgroundColor: C.primary }]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Apply</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Apply
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -1252,7 +2043,9 @@ function AddVariantModal({
           },
         ]}
       >
-        <ThemedText style={{ color: active ? "#fff" : "#111827", fontWeight: "700" }}>
+        <ThemedText
+          style={{ color: active ? "#fff" : "#111827", fontWeight: "700" }}
+        >
           {label}
         </ThemedText>
       </TouchableOpacity>
@@ -1263,14 +2056,18 @@ function AddVariantModal({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.85}
-      style={[styles.actionRow, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+      style={[
+        styles.actionRow,
+        { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+      ]}
     >
       <ThemedText style={{ color: "#111827" }}>{label}</ThemedText>
       <Ionicons name="chevron-forward" size={18} color="#111827" />
     </TouchableOpacity>
   );
 
-  const haveTypes = selectedTypes.includes("Color") || selectedTypes.includes("Size");
+  const haveTypes =
+    selectedTypes.includes("Color") || selectedTypes.includes("Size");
 
   // build summary list from 'details'
   const summary = React.useMemo(
@@ -1279,7 +2076,12 @@ function AddVariantModal({
   );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} presentationStyle="fullScreen">
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      presentationStyle="fullScreen"
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F7FB" }}>
         {/* Header */}
         <View
@@ -1288,10 +2090,15 @@ function AddVariantModal({
             { borderBottomColor: "#E5E7EB", backgroundColor: "#fff" },
           ]}
         >
-          <TouchableOpacity onPress={onClose} style={[styles.hIcon, { borderColor: "#E5E7EB" }]}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.hIcon, { borderColor: "#E5E7EB" }]}
+          >
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
-          <ThemedText style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}>
+          <ThemedText
+            style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}
+          >
             Add Variant
           </ThemedText>
           <View style={{ width: 32 }} />
@@ -1313,9 +2120,18 @@ function AddVariantModal({
 
           {selectedTypes.includes("Color") && (
             <>
-              <ActionRow label="Select Colors" onPress={() => setColorSheetOpen(true)} />
+              <ActionRow
+                label="Select Colors"
+                onPress={() => {
+                  console.log("Opening color sheet");
+                  setColorSheetOpen(true);
+                }}
+              />
               <View
-                style={[styles.previewBox, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+                style={[
+                  styles.previewBox,
+                  { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+                ]}
               >
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {selectedColors.map((hex, i) => (
@@ -1339,9 +2155,18 @@ function AddVariantModal({
 
           {selectedTypes.includes("Size") && (
             <>
-              <ActionRow label="Select Size" onPress={() => setSizeSheetOpen(true)} />
+              <ActionRow
+                label="Select Size"
+                onPress={() => {
+                  console.log("Opening size sheet");
+                  setSizeSheetOpen(true);
+                }}
+              />
               <View
-                style={[styles.previewBox, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+                style={[
+                  styles.previewBox,
+                  { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+                ]}
               >
                 <ScrollView
                   horizontal
@@ -1365,7 +2190,11 @@ function AddVariantModal({
 
           <TouchableOpacity
             onPress={() => setUseDefault((v) => !v)}
-            style={{ flexDirection: "row", alignItems: "center", marginTop: 14 }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 14,
+            }}
             activeOpacity={0.85}
           >
             <Ionicons
@@ -1432,6 +2261,8 @@ function AddVariantModal({
 /* ───────────────────────── Color & Size sheets ───────────────────────── */
 
 function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
+  console.log("ColorPickerSheet visible:", visible, "selected:", selected);
+  
   const base = [
     { name: "Black", hex: "#000000" },
     { name: "Blue", hex: "#0033FF" },
@@ -1444,8 +2275,13 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
   const [hex, setHex] = useState("");
 
   const toggle = (item) => {
+    console.log("Color toggle clicked:", item.hex, "Current selected:", selected);
     const exists = selected.includes(item.hex);
-    setSelected((prev) => (exists ? prev.filter((h) => h !== item.hex) : [...prev, item.hex]));
+    setSelected((prev) => {
+      const newSelection = exists ? prev.filter((h) => h !== item.hex) : [...prev, item.hex];
+      console.log("New selection:", newSelection);
+      return newSelection;
+    });
   };
 
   const addHex = () => {
@@ -1459,14 +2295,27 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
-              Add Color
-            </ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Add Color
+              </ThemedText>
+              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+                {selected.length} selected
+              </ThemedText>
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.sheetClose, { borderColor: C.line }]}
@@ -1475,13 +2324,57 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
             </TouchableOpacity>
           </View>
 
+          {/* Select All / Clear All buttons */}
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => setSelected(base.map(c => c.hex))}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: C.primary,
+                borderRadius: 8,
+                alignItems: "center"
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Select All
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setSelected([])}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: C.sub,
+                borderRadius: 8,
+                alignItems: "center"
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Clear All
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView>
             {base.map((c) => {
               const checked = selected.includes(c.hex);
               return (
-                <View
+                <TouchableOpacity
                   key={c.hex}
-                  style={[styles.sheetRow, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
+                  onPress={() => toggle(c)}
+                  style={[
+                    styles.sheetRow,
+                    { 
+                      borderColor: C.line, 
+                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
+                      borderWidth: checked ? 2 : 1,
+                      borderColor: checked ? C.primary : C.line
+                    },
+                  ]}
+                  activeOpacity={0.7}
                 >
                   <View
                     style={{
@@ -1494,16 +2387,21 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
                       borderColor: "#E5E7EB",
                     }}
                   />
-                  <ThemedText style={{ color: C.text, flex: 1 }}>{c.name}</ThemedText>
-                  <TouchableOpacity onPress={() => toggle(c)}>
-                    <Check checked={checked} C={C} />
-                  </TouchableOpacity>
-                </View>
+                  <ThemedText style={{ color: C.text, flex: 1 }}>
+                    {c.name}
+                  </ThemedText>
+                  <Check checked={checked} C={C} />
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          <View style={[styles.hexRow, { borderColor: C.line, backgroundColor: "#fff" }]}>
+          <View
+            style={[
+              styles.hexRow,
+              { borderColor: C.line, backgroundColor: "#fff" },
+            ]}
+          >
             <TextInput
               value={hex}
               onChangeText={setHex}
@@ -1526,7 +2424,9 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
             activeOpacity={0.9}
             style={[styles.applyBtn, { backgroundColor: C.primary }]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Apply</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Apply
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -1535,21 +2435,41 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
 }
 
 function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
+  console.log("SizePickerSheet visible:", visible, "selected:", selected);
+  
   const sizes = ["S", "M", "L", "XL", "XXL"];
 
   const toggle = (s) => {
-    setSelected((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+    console.log("Size toggle clicked:", s, "Current selected:", selected);
+    setSelected((prev) => {
+      const newSelection = prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s];
+      console.log("New size selection:", newSelection);
+      return newSelection;
+    });
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
-              Add Size
-            </ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                font="oleo"
+                style={[styles.sheetTitle, { color: C.text }]}
+              >
+                Add Size
+              </ThemedText>
+              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+                {selected.length} selected
+              </ThemedText>
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.sheetClose, { borderColor: C.line }]}
@@ -1558,19 +2478,63 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
             </TouchableOpacity>
           </View>
 
+          {/* Select All / Clear All buttons */}
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => setSelected(sizes)}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: C.primary,
+                borderRadius: 8,
+                alignItems: "center"
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Select All
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setSelected([])}
+              style={{
+                flex: 1,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: C.sub,
+                borderRadius: 8,
+                alignItems: "center"
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                Clear All
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView>
             {sizes.map((s) => {
               const checked = selected.includes(s);
               return (
-                <View
+                <TouchableOpacity
                   key={s}
-                  style={[styles.sheetRow, { borderColor: C.line, backgroundColor: "#F3F4F6" }]}
+                  onPress={() => toggle(s)}
+                  style={[
+                    styles.sheetRow,
+                    { 
+                      borderColor: C.line, 
+                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
+                      borderWidth: checked ? 2 : 1,
+                      borderColor: checked ? C.primary : C.line
+                    },
+                  ]}
+                  activeOpacity={0.7}
                 >
-                  <ThemedText style={{ color: C.text, flex: 1 }}>{s}</ThemedText>
-                  <TouchableOpacity onPress={() => toggle(s)}>
-                    <Check checked={checked} C={C} />
-                  </TouchableOpacity>
-                </View>
+                  <ThemedText style={{ color: C.text, flex: 1 }}>
+                    {s}
+                  </ThemedText>
+                  <Check checked={checked} C={C} />
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -1580,7 +2544,9 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
             activeOpacity={0.9}
             style={[styles.applyBtn, { backgroundColor: C.primary }]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Apply</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Apply
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -1590,12 +2556,26 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
 
 /* ───────────────────────── Variant Details full-screen ───────────────────────── */
 
-function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave, C }) {
+function VariantDetailsModal({
+  visible,
+  onClose,
+  colors,
+  sizes,
+  initial,
+  onSave,
+  C,
+}) {
   // normalize initial data
   const initColorMap = React.useMemo(() => {
     const base = {};
     colors.forEach((hex) => {
-      base[hex] = { price: "", compare: "", sizes: [], images: [], ...(initial?.color?.[hex] || {}) };
+      base[hex] = {
+        price: "",
+        compare: "",
+        sizes: [],
+        images: [],
+        ...(initial?.color?.[hex] || {}),
+      };
     });
     return base;
   }, [colors, initial]);
@@ -1603,7 +2583,13 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
   const initSizeMap = React.useMemo(() => {
     const base = {};
     sizes.forEach((s) => {
-      base[s] = { price: "", compare: "", colors: [], images: [], ...(initial?.size?.[s] || {}) };
+      base[s] = {
+        price: "",
+        compare: "",
+        colors: [],
+        images: [],
+        ...(initial?.size?.[s] || {}),
+      };
     });
     return base;
   }, [sizes, initial]);
@@ -1678,7 +2664,12 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} presentationStyle="fullScreen">
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      presentationStyle="fullScreen"
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F7FB" }}>
         {/* Header */}
         <View
@@ -1687,10 +2678,15 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
             { borderBottomColor: "#E5E7EB", backgroundColor: "#fff" },
           ]}
         >
-          <TouchableOpacity onPress={onClose} style={[styles.hIcon, { borderColor: "#E5E7EB" }]}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.hIcon, { borderColor: "#E5E7EB" }]}
+          >
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
-          <ThemedText style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}>
+          <ThemedText
+            style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}
+          >
             Variant Details
           </ThemedText>
           <View style={{ width: 32 }} />
@@ -1703,12 +2699,17 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
               <ThemedText style={{ color: "#111827", fontWeight: "700" }}>
                 Color Variant
               </ThemedText>
-              <ThemedText style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 6 }}>
+              <ThemedText
+                style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 6 }}
+              >
                 Select each color variant and add corresponding price and images
               </ThemedText>
 
               <View
-                style={[styles.previewBox, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+                style={[
+                  styles.previewBox,
+                  { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+                ]}
               >
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {colors.map((hex) => {
@@ -1785,12 +2786,19 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
               {/* chips preview */}
               {colorMap[activeColor]?.sizes?.length ? (
                 <View
-                  style={[styles.previewBox, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+                  style={[
+                    styles.previewBox,
+                    { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+                  ]}
                 >
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  <View
+                    style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+                  >
                     {colorMap[activeColor].sizes.map((s) => (
                       <View key={s} style={styles.sizeChip}>
-                        <ThemedText style={{ color: "#111827" }}>{s}</ThemedText>
+                        <ThemedText style={{ color: "#111827" }}>
+                          {s}
+                        </ThemedText>
                       </View>
                     ))}
                   </View>
@@ -1798,13 +2806,25 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
               ) : null}
 
               {/* images */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  marginTop: 10,
+                }}
+              >
                 <TouchableOpacity
                   onPress={() => pickFor("color")}
                   activeOpacity={0.85}
                   style={[
                     styles.imageTile,
-                    { borderColor: "#E5E7EB", backgroundColor: "#fff", width: 86, height: 86 },
+                    {
+                      borderColor: "#E5E7EB",
+                      backgroundColor: "#fff",
+                      width: 86,
+                      height: 86,
+                    },
                   ]}
                 >
                   <Ionicons name="camera-outline" size={20} color="#6B7280" />
@@ -1812,10 +2832,16 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
                 {(colorMap[activeColor]?.images || []).map((img, i) => (
                   <View
                     key={i}
-                    style={[styles.imageTile, { width: 86, height: 86, backgroundColor: "#000" }]}
+                    style={[
+                      styles.imageTile,
+                      { width: 86, height: 86, backgroundColor: "#000" },
+                    ]}
                   >
                     <Image source={toSrc(img.uri)} style={styles.imageImg} />
-                    <TouchableOpacity style={styles.closeDot} onPress={() => removeImg("color", i)}>
+                    <TouchableOpacity
+                      style={styles.closeDot}
+                      onPress={() => removeImg("color", i)}
+                    >
                       <Ionicons name="close" size={16} color="#fff" />
                     </TouchableOpacity>
                   </View>
@@ -1827,15 +2853,22 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
           {/* Size Variant */}
           {sizes.length > 0 && (
             <>
-              <ThemedText style={{ color: "#111827", fontWeight: "700", marginTop: 16 }}>
+              <ThemedText
+                style={{ color: "#111827", fontWeight: "700", marginTop: 16 }}
+              >
                 Size Variant
               </ThemedText>
-              <ThemedText style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 6 }}>
+              <ThemedText
+                style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 6 }}
+              >
                 Select each size variant and add corresponding price and images
               </ThemedText>
 
               <View
-                style={[styles.previewBox, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+                style={[
+                  styles.previewBox,
+                  { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+                ]}
               >
                 <ScrollView
                   horizontal
@@ -1857,7 +2890,9 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
                           },
                         ]}
                       >
-                        <ThemedText style={{ color: "#111827" }}>{s}</ThemedText>
+                        <ThemedText style={{ color: "#111827" }}>
+                          {s}
+                        </ThemedText>
                       </TouchableOpacity>
                     );
                   })}
@@ -1900,9 +2935,18 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
               />
               {sizeMap[activeSize]?.colors?.length ? (
                 <View
-                  style={[styles.previewBox, { borderColor: "#E5E7EB", backgroundColor: "#fff" }]}
+                  style={[
+                    styles.previewBox,
+                    { borderColor: "#E5E7EB", backgroundColor: "#fff" },
+                  ]}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
                     {sizeMap[activeSize].colors.map((hex) => (
                       <View
                         key={hex}
@@ -1920,13 +2964,25 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
                 </View>
               ) : null}
 
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  marginTop: 10,
+                }}
+              >
                 <TouchableOpacity
                   onPress={() => pickFor("size")}
                   activeOpacity={0.85}
                   style={[
                     styles.imageTile,
-                    { borderColor: "#E5E7EB", backgroundColor: "#fff", width: 86, height: 86 },
+                    {
+                      borderColor: "#E5E7EB",
+                      backgroundColor: "#fff",
+                      width: 86,
+                      height: 86,
+                    },
                   ]}
                 >
                   <Ionicons name="camera-outline" size={20} color="#6B7280" />
@@ -1934,10 +2990,16 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
                 {(sizeMap[activeSize]?.images || []).map((img, i) => (
                   <View
                     key={i}
-                    style={[styles.imageTile, { width: 86, height: 86, backgroundColor: "#000" }]}
+                    style={[
+                      styles.imageTile,
+                      { width: 86, height: 86, backgroundColor: "#000" },
+                    ]}
                   >
                     <Image source={toSrc(img.uri)} style={styles.imageImg} />
-                    <TouchableOpacity style={styles.closeDot} onPress={() => removeImg("size", i)}>
+                    <TouchableOpacity
+                      style={styles.closeDot}
+                      onPress={() => removeImg("size", i)}
+                    >
                       <Ionicons name="close" size={16} color="#fff" />
                     </TouchableOpacity>
                   </View>
@@ -1966,8 +3028,12 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
           setSelected={(updater) =>
             setColorMap((m) => {
               const current = m[activeColor]?.sizes || [];
-              const next = typeof updater === "function" ? updater(current) : updater;
-              return { ...m, [activeColor]: { ...m[activeColor], sizes: next } };
+              const next =
+                typeof updater === "function" ? updater(current) : updater;
+              return {
+                ...m,
+                [activeColor]: { ...m[activeColor], sizes: next },
+              };
             })
           }
         />
@@ -1979,7 +3045,8 @@ function VariantDetailsModal({ visible, onClose, colors, sizes, initial, onSave,
           setSelected={(updater) =>
             setSizeMap((m) => {
               const current = m[activeSize]?.colors || [];
-              const next = typeof updater === "function" ? updater(current) : updater;
+              const next =
+                typeof updater === "function" ? updater(current) : updater;
               return { ...m, [activeSize]: { ...m[activeSize], colors: next } };
             })
           }
@@ -2065,7 +3132,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 12,
   },
-  whHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  whHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   whTitle: { fontWeight: "800" },
   addTierBtn: {
     flexDirection: "row",
@@ -2130,7 +3201,12 @@ const styles = StyleSheet.create({
   },
 
   bulkCard: { marginTop: 18, borderTopWidth: 1, paddingTop: 12 },
-  bulletRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 8 },
+  bulletRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+  },
   bulletDot: { width: 10, height: 10, borderRadius: 5 },
 
   downloadRow: {
@@ -2173,8 +3249,18 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "flex-end",
   },
-  sheet: { padding: 14, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "55%" },
-  sheetTall: { padding: 14, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%" },
+  sheet: {
+    padding: 14,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "55%",
+  },
+  sheetTall: {
+    padding: 14,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "85%",
+  },
   sheetHandle: {
     alignSelf: "center",
     width: 68,

@@ -185,11 +185,11 @@ export default function MyProductsServicesScreen({ navigation }) {
   console.log("Status Filter:", statusFilter);
   console.log("=== END DEBUG ===");
 
-  // Combine data based on current tab
-  const DATA = tab === "products" ? products : services;
-
   /* ───────── UI state ───────── */
   const [tab, setTab] = useState("products"); // products | services
+
+  // Combine data based on current tab
+  const DATA = tab === "products" ? products : services;
   const [query, setQuery] = useState("");
   const [catSheetOpen, setCatSheetOpen] = useState(false);
   const [category, setCategory] = useState("");
