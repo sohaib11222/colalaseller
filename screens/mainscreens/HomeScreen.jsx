@@ -410,7 +410,7 @@
 
 // screens/home/StoreHomeScreen.jsx
 // screens/home/StoreHomeScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -426,11 +426,13 @@ import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 import StoreProfileModal from "../../components/StoreProfileModal";
 import { useNavigation } from "@react-navigation/native";
+import { API_DOMAIN } from "../../apiConfig"; // add this import
+
 
 import { useQuery } from "@tanstack/react-query";
 import { getToken } from "../../utils/tokenStorage";
 import { getStoreBuilder } from "../../utils/queries/stores";
-import * as OrderQueries from "../../utils/queries/orders"; // <-- for latest 3 orders
+import * as OrderQueries from "../../utils/queries/orders"; // latest 3 orders
 
 const { width } = Dimensions.get("window");
 
@@ -442,15 +444,8 @@ const ASSETS = {
   stats_qty: require("../../assets/shop.png"),
   stats_followers: require("../../assets/profile-2user.png"),
   stats_rating: require("../../assets/star.png"),
+  promo_fallback: require("../../assets/Frame 253.png"),
 };
-
-/* Map primary color -> promo image */
-const PROMO_BY_COLOR = {
-  "#E53E3E": require("../../assets/Frame 253.png"),      // red (default)
-  "#0000FF": require("../../assets/Frame 253 (1).png"),  // blue
-  "#800080": require("../../assets/Frame 433 (1).png"),  // purple
-};
-const PROMO_DEFAULT = require("../../assets/Frame 253.png");
 
 /* helpers */
 const pick = (v, fallback, note) => {
@@ -461,6 +456,61 @@ const pick = (v, fallback, note) => {
   return v;
 };
 const formatNaira = (n) => `₦${Number(n || 0).toLocaleString()}`;
+
+  const API_BASE = API_DOMAIN.replace(/\/api\/?$/, ""); // -> https://colala.hmstech.xyz
+const toAbs = (p) => {
+  if (!p) return "";
+  if (typeof p !== "string") p = String(p || "");
+
+  // already absolute
+  if (/^https?:\/\//i.test(p)) return p;
+
+  // normalize (strip leading slashes)
+  const clean = p.replace(/^\/+/, "");
+
+  // common backend returns:
+  //   - "banners/…"
+  //   - "stores/banner_images/…"
+  //   - "stores/profile_images/…"
+  //   - "storage/…"
+  // public URLs live under /storage/*
+  if (
+    clean.startsWith("banners/") ||
+    clean.startsWith("stores/") ||
+    clean.startsWith("store/")   // just in case
+  ) {
+    return `${API_BASE}/storage/${clean}`;
+  }
+
+  // if backend already included "storage/…"
+  if (clean.startsWith("storage/")) {
+    return `${API_BASE}/${clean}`;
+  }
+
+  // last resort
+  return `${API_BASE}/${clean}`;
+};
+
+/** Extracts a usable URL from a banner object or string */
+const getBannerUrl = (b) => {
+  if (!b) return "";
+  if (typeof b === "string") return toAbs(b);
+
+  // Try all likely keys (your payload uses image_path)
+  const raw =
+    b.image_path ||
+    b.image_url ||
+    b.image ||
+    b.url ||
+    b.path ||
+    b.banner_image ||
+    "";
+
+  return toAbs(raw);
+};
+
+// and keep this part the same, it will now resolve correctly:
+
 
 export default function StoreHomeScreen() {
   const { theme } = useTheme();
@@ -480,6 +530,8 @@ export default function StoreHomeScreen() {
 
   const apiStore = builder?.store;
 
+
+
   // derive store UI data with fallbacks
   const store = useMemo(() => {
     const hard = {
@@ -493,6 +545,7 @@ export default function StoreHomeScreen() {
       profile_image: null,
       banner_image: null,
       theme_color: theme?.colors?.primary || "#E53E3E",
+      banners: [],
     };
 
     if (!apiStore) return hard;
@@ -507,28 +560,36 @@ export default function StoreHomeScreen() {
       email: pick(apiStore.store_email, hard.email, "store_email"),
       phone: pick(apiStore.store_phone, hard.phone, "store_phone"),
       categories: catTitles.length ? catTitles.slice(0, 2) : hard.categories,
-      categorytext: "Category", // not in API → keep hardcoded
+      categorytext: "Category",
       stats: {
         qty: pick(apiStore.total_sold, hard.stats.qty, "total_sold"),
         followers: pick(apiStore.followers_count, hard.stats.followers, "followers_count"),
         rating: pick(apiStore.average_rating, hard.stats.rating, "average_rating"),
       },
       profile_image: apiStore.profile_image || null,
-      banner_image: apiStore.banner_image || null,
+      banner_image: apiStore.banner_image || null, // header cover
       theme_color: pick(apiStore.theme_color, hard.theme_color, "theme_color"),
+      banners: Array.isArray(apiStore.banners) ? apiStore.banners : [],
     };
   }, [apiStore, theme?.colors?.primary]);
 
-  // promo image by color
-  const promoSource = useMemo(() => {
-    const key = String(store.theme_color || theme?.colors?.primary || "").toUpperCase();
-    return PROMO_BY_COLOR[key] || PROMO_DEFAULT;
-  }, [store.theme_color, theme?.colors?.primary]);
-
-  // header avatar & cover (use API URLs if present)
+  // sources (API if present, else local assets)
   const headerAvatarSource = store.profile_image ? { uri: store.profile_image } : ASSETS.topAvatar;
   const coverSource = store.banner_image ? { uri: store.banner_image } : ASSETS.cover;
   const ownerAvatarSource = store.profile_image ? { uri: store.profile_image } : ASSETS.owner;
+
+
+
+
+  // promo below the card → use first store.banners[] item (falls back when empty)
+  const firstBannerUrl = useMemo(() => {
+    if (!store.banners?.length) return "";
+    // prefer the first banner that actually has a URL
+    const found = store.banners.map(getBannerUrl).find(Boolean);
+    return found || "";
+  }, [store.banners]);
+
+  const promoBannerSource = firstBannerUrl ? { uri: firstBannerUrl } : ASSETS.promo_fallback;
 
   /* -------- fetch latest orders (show only 3) -------- */
   const { data: latest3 } = useQuery({
@@ -547,13 +608,12 @@ export default function StoreHomeScreen() {
           0;
 
         if (!it?.order?.user_id) {
-          // customer name not provided in list response; keep hardcoded
           console.warn("[StoreHome] 'customer name' not in order list API → using 'Customer'");
         }
 
         return {
           id: String(it?.id ?? ""),
-          customer: "Customer", // kept hardcoded (not in response)
+          customer: "Customer",
           items: itemsCount,
           total: Number(totalRaw || 0),
           created_at: it?.created_at ?? "1970-01-01T00:00:00Z",
@@ -568,8 +628,6 @@ export default function StoreHomeScreen() {
         : [];
 
       const all = [...newRows, ...completedRows];
-
-      // sort desc by created_at and pick first 3
       all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       return all.slice(0, 3);
     },
@@ -581,7 +639,7 @@ export default function StoreHomeScreen() {
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
         {/* header bar */}
-        <View style={[styles.header, { backgroundColor: theme.colors.primary }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.primary }]} >
           <View style={styles.headerLeft}>
             <Image source={headerAvatarSource} style={styles.headerAvatar} />
             <View>
@@ -647,22 +705,12 @@ export default function StoreHomeScreen() {
           {/* chips */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: -3 }}>
             <InfoRow icon="call-outline" text={store.categorytext} />
-            <View
-              style={[
-                styles.chip,
-                { backgroundColor: "#0000FF33", borderWidth: 0.5, borderColor: "#0000FF" },
-              ]}
-            >
+            <View style={[styles.chip, { backgroundColor: "#0000FF33", borderWidth: 0.5, borderColor: "#0000FF" }]}>
               <ThemedText style={[styles.chipText, { color: "#0000FF" }]}>
                 {store.categories[0] ?? "Electronics"}
               </ThemedText>
             </View>
-            <View
-              style={[
-                styles.chip,
-                { backgroundColor: "#FF000033", borderWidth: 0.5, borderColor: "#FF0000" },
-              ]}
-            >
+            <View style={[styles.chip, { backgroundColor: "#FF000033", borderWidth: 0.5, borderColor: "#FF0000" }]}>
               <ThemedText style={[styles.chipText, { color: "#FF0000" }]}>
                 {store.categories[1] ?? "Phones"}
               </ThemedText>
@@ -701,27 +749,26 @@ export default function StoreHomeScreen() {
           </View>
         </View>
 
-        {/* promo changes with theme color */}
-        <Image source={promoSource} style={styles.promoFull} resizeMode="cover" />
+        {/* promo now uses the first item in store.banners[] */}
+        <Image source={promoBannerSource} style={styles.promoFull} resizeMode="cover" />
 
         {/* Latest Orders (now from API, only 3) */}
         <ThemedText style={styles.sectionHeader}>Latest Orders</ThemedText>
         {(latest3 ?? []).map((o, idx) => (
           <OrderRow
             key={`${o.id}-${idx}`}
-            name={o.customer /* kept hardcoded because API list has no customer name */}
+            name={o.customer}
             items={`${o.items} items`}
             price={formatNaira(o.total)}
             color={theme.colors.primary}
             onPress={() =>
               navigation.navigate("ChatNavigator", {
                 screen: "SingleOrderDetails",
-                params: { orderId: o.id },    // ← store order id
+                params: { orderId: o.id },
               })
             }
           />
         ))}
-        {/* If API gave no orders, you’ll simply see nothing here (no UI change). */}
       </ScrollView>
 
       <StoreProfileModal
@@ -756,25 +803,9 @@ function Stat({ img, label, value, divider }) {
     </>
   );
 }
-function MenuTile({ img, title, subtitle, color, onPress }) {
-  return (
-    <TouchableOpacity style={styles.tile} onPress={onPress}>
-      <View style={[styles.tileIconCircle, { backgroundColor: "#FFF1F1" }]}>
-        <Image source={img} style={styles.tileImg} />
-      </View>
-
-      <ThemedText style={[styles.tileTitle, { color }]}>{title}</ThemedText>
-      <ThemedText style={styles.tileSub}>{subtitle}</ThemedText>
-    </TouchableOpacity>
-  );
-}
 function OrderRow({ name, items, price, color, onPress }) {
   return (
-    <TouchableOpacity
-      style={styles.orderRow}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
+    <TouchableOpacity style={styles.orderRow} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.orderLeft}>
         <View style={styles.orderAvatar}>
           <Ionicons name="cart-outline" size={27} color={color} />
@@ -789,8 +820,7 @@ function OrderRow({ name, items, price, color, onPress }) {
   );
 }
 
-
-/* styles (unchanged) */
+/* styles */
 const CARD_RADIUS = 20;
 const COVER_H = 150;
 
@@ -807,7 +837,6 @@ const styles = StyleSheet.create({
   headerAvatar: { width: 60, height: 60, borderRadius: 35, backgroundColor: "#fff" },
   headerName: { color: "#fff", fontWeight: "900", fontSize: 14 },
   headerLocation: { color: "#FFEFEF", fontSize: 10 },
-  bellBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
 
   card: { marginHorizontal: 16, marginTop: -12, borderRadius: CARD_RADIUS, paddingTop: 8 },
   coverWrap: {
@@ -819,8 +848,22 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 8,
   },
-  coverImg: { width: "100%", height: "100%", borderTopRightRadius: CARD_RADIUS, borderTopLeftRadius: CARD_RADIUS },
-  ownerAvatar: { position: "absolute", left: 16, bottom: -26, width: 65, height: 65, borderRadius: 40, backgroundColor: "#fff", zIndex: 10 },
+  coverImg: {
+    width: "100%",
+    height: "100%",
+    borderTopRightRadius: CARD_RADIUS,
+    borderTopLeftRadius: CARD_RADIUS,
+  },
+  ownerAvatar: {
+    position: "absolute",
+    left: 16,
+    bottom: -26,
+    width: 65,
+    height: 65,
+    borderRadius: 40,
+    backgroundColor: "#fff",
+    zIndex: 10,
+  },
 
   topActions: { flexDirection: "row", gap: 10, alignSelf: "flex-end" },
   viewProfileBtn: { backgroundColor: "#000", paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10 },
@@ -833,7 +876,14 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   infoText: { color: "#5C5C5C", fontSize: 12 },
 
-  chip: { paddingVertical: 2, paddingHorizontal: 5, borderRadius: 5, justifyContent: "center", alignItems: "center", marginTop: 10 },
+  chip: {
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 5,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+  },
   chipText: { fontWeight: "700", fontSize: 10 },
 
   statsCard: {
@@ -848,9 +898,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
   },
-  tileImg: { width: 21.75, height: 19.5, resizeMode: "contain" },
-
-  statCell: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 4 },
+  statCell: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
   statImg: { width: 22, height: 22, resizeMode: "contain" },
   statDivider: { width: 1, backgroundColor: "#EFEFEF" },
   statValue: { fontWeight: "800", fontSize: 14, color: "#1A1A1A", lineHeight: 20, textAlign: "left" },
@@ -860,24 +915,35 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, paddingVertical: 15, borderRadius: 15, alignItems: "center" },
   actionBtnText: { color: "#fff", fontWeight: "600", fontSize: 12 },
 
-  promoFull: { width: width - 32, height: 170, borderRadius: 20, overflow: "hidden", alignSelf: "center", marginTop: 16 },
-
-  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: 16, marginTop: 14, gap: 12 },
-  tile: {
-    width: (width - 16 * 2 - 12) / 2,
-    backgroundColor: "#fff",
+  promoFull: {
+    width: width - 32,
+    height: 170,
     borderRadius: 20,
-    padding: 14,
-    height: 190,
+    overflow: "hidden",
+    alignSelf: "center",
+    marginTop: 16,
   },
-  tileIconCircle: { width: 53, height: 53, borderRadius: 35, alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  tileTitle: { fontSize: 14, fontWeight: "800" },
-  tileSub: { fontSize: 10, color: "#7D7D7D", marginTop: 4 },
 
   sectionHeader: { marginHorizontal: 16, marginTop: 16, fontWeight: "800", fontSize: 16, color: "#1A1A1A" },
-  orderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", marginHorizontal: 16, marginTop: 10, padding: 14, borderRadius: 15 },
+  orderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 15,
+  },
   orderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  orderAvatar: { width: 51, height: 51, borderRadius: 30, backgroundColor: "#B9191933", alignItems: "center", justifyContent: "center" },
+  orderAvatar: {
+    width: 51,
+    height: 51,
+    borderRadius: 30,
+    backgroundColor: "#B9191933",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   orderName: { fontWeight: "700", color: "#1A1A1A", fontSize: 14 },
   orderItems: { color: "#8B8B8B", fontSize: 10 },
   orderPrice: { fontWeight: "800", fontSize: 14 },
@@ -885,6 +951,5 @@ const styles = StyleSheet.create({
   iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
-
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });
