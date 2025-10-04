@@ -18,6 +18,12 @@ import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../components/ThemedText";
 import { useTheme } from "../components/ThemeProvider";
 
+/* === NEW: data hooks === */
+import { useQuery } from "@tanstack/react-query";
+import { getToken } from "../utils/tokenStorage";
+import * as SellerQueries from "../utils/queries/seller";
+import { API_DOMAIN } from "../apiConfig";
+
 const { width } = Dimensions.get("window");
 const COVER_H = 210;
 const AVATAR = 65;
@@ -34,6 +40,19 @@ const shadow = (e = 6) =>
       shadowOffset: { width: 0, height: e / 3 },
     },
   });
+
+/* absolute URLs for files returned like "/storage/..." */
+const API_BASE = API_DOMAIN.replace(/\/api\/?$/, ""); // https://colala.hmstech.xyz
+
+// For files returned like "products/..", "/storage/products/..", or full URLs.
+const toFileUrl = (p) => {
+  if (!p) return undefined;
+  if (/^https?:\/\//i.test(p)) return p;                 // already absolute
+  if (p.startsWith("/storage/")) return `${API_BASE}${p}`; // absolute storage path
+  // relative path (e.g. "products/..") -> prefix with /storage/
+  return `${API_BASE}/storage/${p}`;
+};
+
 
 /* icons-as-images for stats row */
 const STATS_ICONS = {
@@ -76,13 +95,43 @@ export default function StoreProfileModal({
     [theme]
   );
 
+  /* === NEW: fetch store overview (GET /seller/onboarding/store/overview) === */
+  const { data: overviewRes } = useQuery({
+    enabled: visible, // only fetch while modal is open
+    queryKey: ["seller", "store_overview"],
+    queryFn: async () => {
+      const token = await getToken();
+      return SellerQueries.getStoreOverview(token);
+    },
+    staleTime: 30_000,
+  });
+
+  // Response normalization (apiCall may wrap data)
+  const root = overviewRes?.data ?? overviewRes ?? {};
+
+  // From API sample: { status, store, business, addresses, delivery, progress }
+  const storeApi = root.store || {};
+  const addressesApi = Array.isArray(root.addresses) ? root.addresses : [];
+
+  /* ======= Top "store" block mapping =======
+     Fields present in API:
+       - store.name, store.email, store.phone, store.location, store.theme_color,
+         store.profile_image, store.banner_image
+     Anything missing stays hardcoded (e.g., "Open Now" schedule text)
+  */
   const store = {
-    name: "Sasha Stores",
-    location: "Lagos, Nigeria",
-    email: "sashastores@gmail.com",
-    phone: "070123456789",
-    ...storeProp,
+    name: storeApi.name || storeProp.name || "Sasha Stores",        // API
+    email: storeApi.email || storeProp.email || "sashastores@gmail.com", // API
+    phone: storeApi.phone || storeProp.phone || "070123456789",     // API
+    location: storeApi.location || storeProp.location || "Lagos, Nigeria", // API
+    avatar: toFileUrl(storeApi.profile_image) || storeProp.avatar || require("../assets/Ellipse 18.png"),
+    cover: toFileUrl(storeApi.banner_image) || storeProp.cover || require("../assets/Rectangle 30.png"),
   };
+
+  // stats (present in API)
+  const statsQtySold = Number(storeApi.total_sold ?? 0);          // API
+  const statsFollowers = Number(storeApi.followers_count ?? 0);   // API
+  const statsRating = Number(storeApi.average_rating ?? 0);       // API
 
   const promoSource =
     PROMO_BY_COLOR[(theme?.colors?.primary || "").toUpperCase()] || PROMO_FALLBACK;
@@ -90,71 +139,103 @@ export default function StoreProfileModal({
   /* tabs */
   const [tab, setTab] = useState("Products");
 
-  /* ---------- PRODUCTS + FILTERS ---------- */
-  const PRODUCTS = [
-    {
-      id: "1",
-      title: "Dell Inspiron Laptop",
-      category: "Laptops",
-      brand: "Dell",
-      store: store.name,
-      store_image: store.avatar || require("../assets/Ellipse 18.png"),
-      location: store.location,
-      rating: 4.5,
-      price: "₦2,000,000",
-      originalPrice: "₦3,000,000",
-      image: require("../assets/Frame 264.png"),
-      tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")],
-      sponsored: true,
-    },
-    {
-      id: "2",
-      title: "HP Spectre x360",
-      category: "Laptops",
-      brand: "HP",
-      store: store.name,
-      store_image: store.avatar || require("../assets/Ellipse 18.png"),
-      location: store.location,
-      rating: 4.5,
-      price: "₦2,000,000",
-      originalPrice: "₦3,000,000",
-      image: require("../assets/Frame 264 (1).png"),
-      tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")],
-      sponsored: true,
-    },
-    {
-      id: "3",
-      title: "MacBook Air M2",
-      category: "Laptops",
-      brand: "Apple",
-      store: store.name,
-      store_image: store.avatar || require("../assets/Ellipse 18.png"),
-      location: "Abuja, Nigeria",
-      rating: 4.7,
-      price: "₦3,500,000",
-      originalPrice: "₦4,000,000",
-      image: require("../assets/Frame 264 (2).png"),
-      tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")],
-      sponsored: true,
-    },
-    {
-      id: "4",
-      title: "RGB Gaming Laptop",
-      category: "Laptops",
-      brand: "MSI",
-      store: store.name,
-      store_image: store.avatar || require("../assets/Ellipse 18.png"),
-      location: "Lagos, Nigeria",
-      rating: 4.2,
-      price: "₦2,800,000",
-      originalPrice: "₦3,300,000",
-      image: require("../assets/Frame 264 (3).png"),
-      tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")],
-      sponsored: true,
-    },
-  ];
+  /* ---------- PRODUCTS (prefer API) + FILTERS (kept hardcoded UI) ---------- */
+  // const PRODUCTS_API = Array.isArray(storeApi.products)
+  //   ? storeApi.products.map((p) => {
+  //     // choose main image first, else first image, else undefined
+  //     const imgMain =
+  //       (p.images || []).find((im) => im.is_main === 1)?.path ||
+  //       (p.images || [])[0]?.path;
+  //     // price/discount display — UI expects price + originalPrice as strings with ₦
+  //     const price = Number(p.discount_price || p.price || 0);
+  //     const original = Number(p.price || 0);
+
+  //     return {
+  //       id: String(p.id),
+  //       title: p.name || "—",                           // API
+  //       category: "Category",                           // 🔔 NOT provided in UI text form; kept generic
+  //       brand: p.brand || "Brand",                      // API returns string like "1" sometimes → kept as-is
+  //       store: store.name,                              // from mapped store
+  //       store_image: store.avatar,
+  //       location: store.location,                       // from mapped store
+  //       rating: 4.5,                                    // 🔔 NOT in product object; kept hardcoded
+  //       price: `₦${price.toLocaleString()}`,
+  //       originalPrice: original ? `₦${original.toLocaleString()}` : "₦0",
+  //       image: toAbs(imgMain) || require("../assets/Frame 264.png"),
+  //       tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")], // 🔔 tags not in API; hardcoded
+  //       sponsored: true,                                // 🔔 not in API; hardcoded
+  //     };
+  //   })
+  //   : [];
+
+  const PRODUCTS_API = Array.isArray(storeApi.products)
+    ? storeApi.products.map((p) => {
+      const imgMain =
+        (p.images || []).find((im) => Number(im.is_main) === 1)?.path ||
+        (p.images || [])[0]?.path;
+
+      const imageUrl = toFileUrl(imgMain); // <-- storage-aware
+      const price = Number(p.discount_price || p.price || 0);
+      const original = Number(p.price || 0);
+
+      return {
+        id: String(p.id),
+        title: p.name || "—",
+        category: "Category",            // 🔔 not provided in product; kept generic
+        brand: p.brand || "Brand",       // API sometimes returns "1" (string) – shown as-is
+        store: store.name,
+        store_image: store.avatar,
+        location: store.location,
+        rating: 4.5,                     // 🔔 not provided; hardcoded
+        price: `₦${price.toLocaleString()}`,
+        originalPrice: original ? `₦${original.toLocaleString()}` : "₦0",
+        image: imageUrl || require("../assets/Frame 264.png"),
+        tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")], // 🔔 hardcoded
+        sponsored: true,                 // 🔔 hardcoded
+      };
+    })
+    : [];
+
+
+  // Fallback demo list only if API has no products
+  const PRODUCTS = PRODUCTS_API.length
+    ? PRODUCTS_API
+    : [
+      // 🔔 Using the same demo items you had before since API has no products
+      {
+        id: "1",
+        title: "Dell Inspiron Laptop",
+        category: "Laptops",
+        brand: "Dell",
+        store: store.name,
+        store_image: store.avatar || require("../assets/Ellipse 18.png"),
+        location: store.location,
+        rating: 4.5,
+        price: "₦2,000,000",
+        originalPrice: "₦3,000,000",
+        image: require("../assets/Frame 264.png"),
+        tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")],
+        sponsored: true,
+      },
+      {
+        id: "2",
+        title: "HP Spectre x360",
+        category: "Laptops",
+        brand: "HP",
+        store: store.name,
+        store_image: store.avatar || require("../assets/Ellipse 18.png"),
+        location: store.location,
+        rating: 4.5,
+        price: "₦2,000,000",
+        originalPrice: "₦3,000,000",
+        image: require("../assets/Frame 264 (1).png"),
+        tagImages: [require("../assets/freedel.png"), require("../assets/bulk.png")],
+        sponsored: true,
+      },
+    ];
 
   const FILTERS = {
+    // 🔔 These filter option lists are not provided by store overview, so kept hardcoded
     category: ["All", "Laptops", "Phones", "Accessories"],
     brand: ["All", "Dell", "HP", "Apple", "MSI"],
     location: ["All", "Lagos, Nigeria", "Abuja, Nigeria"],
@@ -170,7 +251,14 @@ export default function StoreProfileModal({
   const closePicker = () => setPicker({ open: false, key: null });
   const onPick = (value) => {
     const key = picker.key;
-    const v = value === "All" ? (key === "location" ? "Location" : key === "brand" ? "Brand" : "Category") : value;
+    const v =
+      value === "All"
+        ? key === "location"
+          ? "Location"
+          : key === "brand"
+            ? "Brand"
+            : "Category"
+        : value;
     setFilters((p) => ({ ...p, [key]: v }));
     closePicker();
   };
@@ -182,9 +270,8 @@ export default function StoreProfileModal({
       const locOk = filters.location === "Location" || p.location === filters.location;
       return catOk && brandOk && locOk;
     });
-  }, [filters]);
+  }, [filters, PRODUCTS]);
 
-  /* product card */
   const ProductCard = ({ item }) => (
     <View style={styles.card}>
       <View>
@@ -241,7 +328,7 @@ export default function StoreProfileModal({
     </View>
   );
 
-  /* ---------- SOCIAL FEED (same as StoreDetails) ---------- */
+  /* ---------- SOCIAL FEED (prefer API posts) ---------- */
   const DEMO_POSTS = [
     {
       id: "1",
@@ -249,72 +336,40 @@ export default function StoreProfileModal({
       avatar:
         typeof store?.avatar === "number"
           ? store.avatar
-          : store?.avatar || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      location: "Lagos, Nigeria",
-      timeAgo: "20 min ago",
+          : store?.avatar ||
+          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+      location: store.location,
+      timeAgo: "just now", // 🔔 not in API; hardcoded label
       images: [
         "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1200&auto=format&fit=crop",
       ],
       caption: "Get this phone at a cheap price for a limited period",
-      likes: 500,
-      comments: 26,
-      shares: 26,
-    },
-    {
-      id: "2",
-      store: store.name,
-      avatar:
-        typeof store?.avatar === "number"
-          ? store.avatar
-          : store?.avatar || "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?q=80&w=200&auto=format&fit=crop",
-      location: "Lagos, Nigeria",
-      timeAgo: "20 min ago",
-      image:
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop",
-      caption: "Weekend discount on accessories only!",
-      likes: 128,
-      comments: 12,
-      shares: 8,
+      likes: 0,
+      comments: 0,
+      shares: 0,
     },
   ];
 
-  const addresses = storeProp.addresses ?? [
-    {
-      label: "Address 1",
-      isMain: true,
-      state: "Lagos",
-      lga: "Ikeja",
-      fullAddress: "No 2, abcdefght street, opposite abc building, acd bus stop, ikeja",
-      hours: [
-        { day: "Monday", time: "08:00 AM - 07:00PM" },
-        { day: "Tuesday", time: "08:00 AM - 07:00PM" },
-        { day: "Wednesday", time: "08:00 AM - 07:00PM" },
-        { day: "Thursday", time: "08:00 AM - 07:00PM" },
-        { day: "Friday", time: "08:00 AM - 07:00PM" },
-        { day: "Saturday", time: "08:00 AM - 07:00PM" },
-      ],
-      onViewMap: (a) => {
-        // integrate your maps deeplink here
-        // Example: Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(a.fullAddress)}`)
-      },
-    },
-    {
-      label: "Address 2",
-      state: "Lagos",
-      lga: "Ikeja",
-      fullAddress: "No 2, abcdefght street , opposite abc building, acd bus stop, ikeja",
-      hours: [
-        { day: "Monday", time: "08:00 AM - 07:00PM" },
-        { day: "Tuesday", time: "08:00 AM - 07:00PM" },
-        { day: "Wednesday", time: "08:00 AM - 07:00PM" },
-        { day: "Thursday", time: "08:00 AM - 07:00PM" },
-        { day: "Friday", time: "08:00 AM - 07:00PM" },
-        { day: "Saturday", time: "08:00 AM - 07:00PM" },
-      ],
-    },
-  ];
+  const POSTS_API = Array.isArray(storeApi.posts)
+    ? storeApi.posts.map((p) => ({
+      id: String(p.id),
+      store: store.name,
+      avatar: store.avatar,
+      location: store.location,
+      timeAgo: "just now", // 🔔 API has created_at, but no "time ago" → kept as label
+      images:
+        (p.media_urls || [])
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+          .map((m) => toFileUrl(m.url)) || [],
+      caption: p.body || "",
+      likes: Number(p.likes_count ?? 0),
+      comments: Number(p.comments_count ?? 0),
+      shares: Number(p.shares_count ?? 0),
+    }))
+    : [];
+
+  const FEED = POSTS_API.length ? POSTS_API : DEMO_POSTS;
+
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [activePost, setActivePost] = useState(null);
@@ -333,7 +388,7 @@ export default function StoreProfileModal({
     const [liked, setLiked] = useState(false);
     const likeCount = liked ? (item.likes || 0) + 1 : item.likes || 0;
 
-    const images = item.images?.length ? item.images : [item.image];
+    const images = item.images?.length ? item.images : [item.image].filter(Boolean);
     const [activeIdx, setActiveIdx] = useState(0);
     const [carouselW, setCarouselW] = useState(0);
 
@@ -362,7 +417,7 @@ export default function StoreProfileModal({
           style={styles.carouselWrap}
           onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}
         >
-          {carouselW > 0 && (
+          {carouselW > 0 && images.length > 0 && (
             <ScrollView
               horizontal
               pagingEnabled
@@ -433,13 +488,49 @@ export default function StoreProfileModal({
     );
   };
 
+  /* ---------- ADDRESSES: prefer API top-level addresses ---------- */
+  const addresses = addressesApi.length
+    ? addressesApi.map((a, idx) => ({
+      label: `Address ${idx + 1}`,
+      isMain: Boolean(a.is_main),
+      state: a.state || "—",
+      lga: a.local_government || "—",
+      fullAddress: a.full_address || "—",
+      hours: Object.entries(a.opening_hours || {}).map(([day, range]) => ({
+        day: day[0].toUpperCase() + day.slice(1),
+        time: range,
+      })),
+      onViewMap: () => { },
+    }))
+    : [
+      // 🔔 fallback demo if API returns no addresses
+      {
+        label: "Address 1",
+        isMain: true,
+        state: "Lagos",
+        lga: "Ikeja",
+        fullAddress:
+          "No 2, abcdefght street, opposite abc building, acd bus stop, ikeja",
+        hours: [
+          { day: "Monday", time: "08:00 AM - 07:00PM" },
+          { day: "Tuesday", time: "08:00 AM - 07:00PM" },
+          { day: "Wednesday", time: "08:00 AM - 07:00PM" },
+          { day: "Thursday", time: "08:00 AM - 07:00PM" },
+          { day: "Friday", time: "08:00 AM - 07:00PM" },
+          { day: "Saturday", time: "08:00 AM - 07:00PM" },
+        ],
+      },
+    ];
+
   const CommentsSheet = ({ visible, onClose }) => {
     const inputRef = useRef(null);
     const [text, setText] = useState("");
     const [replyTo, setReplyTo] = useState(null);
     const currentUser = {
       name: store.name,
-      avatar: src(store.avatar) || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+      avatar:
+        src(store.avatar) ||
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
     };
 
     const [comments, setComments] = useState([
@@ -510,9 +601,6 @@ export default function StoreProfileModal({
         setText("");
       }
     };
-
-   
-
 
     const ReplyBlock = ({ reply }) => (
       <View style={styles.replyContainer}>
@@ -618,177 +706,178 @@ export default function StoreProfileModal({
     );
   };
 
-   const AddressesModal = ({ visible, onClose, addresses = [], theme }) => {
-      const C = {
-        danger: theme?.colors?.primary || "#E53E3E",
-        text: "#101318",
-        sub: "#6C727A",
-        card: "#FFFFFF",
-        line: "#EFEFEF",
-        chip: "#FFEAEA",
-      };
+  const AddressesModal = ({ visible, onClose, addresses = [], theme }) => {
+    const C2 = {
+      danger: theme?.colors?.primary || "#E53E3E",
+      text: "#101318",
+      sub: "#6C727A",
+      card: "#FFFFFF",
+      line: "#EFEFEF",
+      chip: "#FFEAEA",
+    };
 
-      const Row = ({ label, value }) => (
-        <View style={{ marginBottom: 8 }}>
-          <ThemedText style={{ fontSize: 11, color: C.sub }}>{label}</ThemedText>
-          <ThemedText style={{ fontSize: 14, color: C.text }}>{value}</ThemedText>
+    const Row = ({ label, value }) => (
+      <View style={{ marginBottom: 8 }}>
+        <ThemedText style={{ fontSize: 11, color: C2.sub }}>{label}</ThemedText>
+        <ThemedText style={{ fontSize: 14, color: C2.text }}>{value}</ThemedText>
+      </View>
+    );
+
+    const Hours = ({ hours }) => (
+      <View style={addrStyles.hoursBox}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Ionicons name="time-outline" size={16} color={C2.text} />
+          <ThemedText style={{ marginLeft: 6, fontWeight: "700", color: C2.text }}>
+            Opening Hours
+          </ThemedText>
         </View>
-      );
 
-      const Hours = ({ hours }) => (
-        <View style={addrStyles.hoursBox}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Ionicons name="time-outline" size={16} color={C.text} />
-            <ThemedText style={{ marginLeft: 6, fontWeight: "700", color: C.text }}>
-              Opening Hours
-            </ThemedText>
-          </View>
-
-          <View style={{ marginTop: 8 }}>
-            {hours?.map((h) => (
-              <View key={h.day} style={addrStyles.hoursRow}>
-                <ThemedText style={addrStyles.hoursDay}>{h.day}</ThemedText>
-                <ThemedText style={addrStyles.hoursTime}>{h.time}</ThemedText>
-              </View>
-            ))}
-          </View>
+        <View style={{ marginTop: 8 }}>
+          {hours?.map((h) => (
+            <View key={h.day} style={addrStyles.hoursRow}>
+              <ThemedText style={addrStyles.hoursDay}>{h.day}</ThemedText>
+              <ThemedText style={addrStyles.hoursTime}>{h.time}</ThemedText>
+            </View>
+          ))}
         </View>
-      );
+      </View>
+    );
 
-      return (
-        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-          <View style={addrStyles.overlay}>
-            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-            <View style={addrStyles.sheet}>
-              {/* Header */}
-              <View style={addrStyles.sheetHandle} />
-              <View style={addrStyles.headerRow}>
-                <ThemedText font="oleo" style={addrStyles.title}>Store Addresses</ThemedText>
-                <TouchableOpacity onPress={onClose} style={addrStyles.xBtn}>
-                  <Ionicons name="close" size={18} color={C.text} />
-                </TouchableOpacity>
-              </View>
+    return (
+      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+        <View style={addrStyles.overlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+          <View style={addrStyles.sheet}>
+            {/* Header */}
+            <View style={addrStyles.sheetHandle} />
+            <View style={addrStyles.headerRow}>
+              <ThemedText font="oleo" style={addrStyles.title}>Store Addresses</ThemedText>
+              <TouchableOpacity onPress={onClose} style={addrStyles.xBtn}>
+                <Ionicons name="close" size={18} color={C2.text} />
+              </TouchableOpacity>
+            </View>
 
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {addresses.map((a, i) => (
-                  <View key={`${a.label}-${i}`} style={addrStyles.card}>
-                    {/* Card header */}
-                    <View style={addrStyles.cardHeader}>
-                      <ThemedText style={addrStyles.cardHeaderText}>{a.label}</ThemedText>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {addresses.map((a, i) => (
+                <View key={`${a.label}-${i}`} style={addrStyles.card}>
+                  {/* Card header */}
+                  <View style={addrStyles.cardHeader}>
+                    <ThemedText style={addrStyles.cardHeaderText}>{a.label}</ThemedText>
 
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        {a.isMain && (
-                          <View style={addrStyles.badge}>
-                            <ThemedText style={addrStyles.badgeTxt}>Main Office</ThemedText>
-                          </View>
-                        )}
-                        <TouchableOpacity onPress={() => a.onViewMap?.(a)} style={addrStyles.mapBtn}>
-                          <ThemedText style={addrStyles.mapBtnTxt}>View on Map</ThemedText>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Body */}
-                    <View style={addrStyles.cardBody}>
-                      <Row label="State" value={a.state} />
-                      <Row label="Local Government" value={a.lga} />
-                      <Row label="Full Address" value={a.fullAddress} />
-                      <Hours hours={a.hours} />
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      {a.isMain && (
+                        <View style={addrStyles.badge}>
+                          <ThemedText style={addrStyles.badgeTxt}>Main Office</ThemedText>
+                        </View>
+                      )}
+                      <TouchableOpacity onPress={() => a.onViewMap?.(a)} style={addrStyles.mapBtn}>
+                        <ThemedText style={addrStyles.mapBtnTxt}>View on Map</ThemedText>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                ))}
 
-                <View style={{ height: 12 }} />
-              </ScrollView>
-            </View>
+                  {/* Body */}
+                  <View style={addrStyles.cardBody}>
+                    <Row label="State" value={a.state} />
+                    <Row label="Local Government" value={a.lga} />
+                    <Row label="Full Address" value={a.fullAddress} />
+                    <Hours hours={a.hours} />
+                  </View>
+                </View>
+              ))}
+
+              <View style={{ height: 12 }} />
+            </ScrollView>
           </View>
-        </Modal>
-      );
-    };
-    const addrStyles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "88%",
-    paddingBottom: 16,
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 62,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: "#D8DCE2",
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  headerRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  title: { fontSize: 18, fontWeight: "700", color: "#101318" },
-  xBtn: { borderWidth: 1.2, borderColor: "#000", borderRadius: 18, padding: 4 },
+        </View>
+      </Modal>
+    );
+  };
 
-  card: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 14,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#EDEDED",
-  },
-  cardHeader: {
-    backgroundColor: "#EF534E",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  cardHeaderText: { color: "#fff", fontWeight: "700" },
+  const addrStyles = StyleSheet.create({
+    overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" },
+    sheet: {
+      backgroundColor: "#fff",
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: "88%",
+      paddingBottom: 16,
+    },
+    sheetHandle: {
+      alignSelf: "center",
+      width: 62,
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: "#D8DCE2",
+      marginTop: 8,
+      marginBottom: 6,
+    },
+    headerRow: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    title: { fontSize: 18, fontWeight: "700", color: "#101318" },
+    xBtn: { borderWidth: 1.2, borderColor: "#000", borderRadius: 18, padding: 4 },
 
-  mapBtn: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  mapBtnTxt: { color: "#101318", fontSize: 12, fontWeight: "700" },
+    card: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 14,
+      overflow: "hidden",
+      backgroundColor: "#fff",
+      borderWidth: 1,
+      borderColor: "#EDEDED",
+    },
+    cardHeader: {
+      backgroundColor: "#EF534E",
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    cardHeaderText: { color: "#fff", fontWeight: "700" },
 
-  badge: {
-    backgroundColor: "#FFEAEA",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#FFD5D5",
-  },
-  badgeTxt: { color: "#E53E3E", fontSize: 10, fontWeight: "700" },
+    mapBtn: {
+      backgroundColor: "#fff",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+    },
+    mapBtnTxt: { color: "#101318", fontSize: 12, fontWeight: "700" },
 
-  cardBody: { padding: 12 },
+    badge: {
+      backgroundColor: "#FFEAEA",
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#FFD5D5",
+    },
+    badgeTxt: { color: "#E53E3E", fontSize: 10, fontWeight: "700" },
 
-  hoursBox: {
-    marginTop: 6,
-    backgroundColor: "#FFF4F4",
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#FFE1E1",
-  },
-  hoursRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-  },
-  hoursDay: { color: "#6C727A", fontSize: 12 },
-  hoursTime: { color: "#101318", fontSize: 12 },
-});
+    cardBody: { padding: 12 },
+
+    hoursBox: {
+      marginTop: 6,
+      backgroundColor: "#FFF4F4",
+      borderRadius: 12,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: "#FFE1E1",
+    },
+    hoursRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 4,
+    },
+    hoursDay: { color: "#6C727A", fontSize: 12 },
+    hoursTime: { color: "#101318", fontSize: 12 },
+  });
 
   const OptionsSheet = ({ visible, onClose }) => {
     const Row = ({ icon, label, danger, onPress }) => (
@@ -830,7 +919,7 @@ export default function StoreProfileModal({
     );
   };
 
-  /* ---------- REVIEWS (same as StoreDetails) ---------- */
+  /* ---------- REVIEWS (prefer API storeReveiws) ---------- */
   const Stars = ({ value = 0, size = 16 }) => (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -857,25 +946,6 @@ export default function StoreProfileModal({
         text: "The store is great",
         replies: [],
       },
-      {
-        id: "rs2",
-        user: "Adam Sandler",
-        avatar:
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-        rating: 5,
-        time: "07-16-25/05:33AM",
-        text: "Really great product, i bought from your store",
-        replies: [
-          {
-            id: "rs2-r1",
-            user: store.name,
-            avatar:
-              src(store.avatar) ||
-              "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-            text: "Thanks for the review",
-          },
-        ],
-      },
     ],
     product: [
       {
@@ -891,8 +961,24 @@ export default function StoreProfileModal({
     ],
   };
 
+  const API_STORE_REVIEWS = Array.isArray(storeApi.storeReveiws)
+    ? storeApi.storeReveiws.map((r, i) => ({
+      id: String(r.id ?? i),
+      user: r.user?.name || "User", // 🔔 structure not shown; kept safe
+      avatar:
+        toFileUrl(r.user?.avatar) ||
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
+      rating: Number(r.rating ?? 0),
+      time: r.created_at || "",
+      text: r.text || r.review || "",
+      replies: [], // 🔔 not provided in sample
+    }))
+    : [];
+
   const [reviewScope, setReviewScope] = useState("store");
-  const [reviewsStore, setReviewsStore] = useState(DEMO_REVIEWS.store);
+  const [reviewsStore, setReviewsStore] = useState(
+    API_STORE_REVIEWS.length ? API_STORE_REVIEWS : DEMO_REVIEWS.store
+  );
   const [reviewsProduct, setReviewsProduct] = useState(DEMO_REVIEWS.product);
 
   const [leaveReviewVisible, setLeaveReviewVisible] = useState(false);
@@ -1047,7 +1133,10 @@ export default function StoreProfileModal({
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.sendReviewBtn, { backgroundColor: theme?.colors?.primary }]} onPress={() => onSubmit?.({ rating, text })}>
+            <TouchableOpacity
+              style={[styles.sendReviewBtn, { backgroundColor: theme?.colors?.primary }]}
+              onPress={() => onSubmit?.({ rating, text })}
+            >
               <ThemedText style={styles.sendReviewTxt}>Send Review</ThemedText>
             </TouchableOpacity>
           </View>
@@ -1083,22 +1172,21 @@ export default function StoreProfileModal({
           {/* Open / Follow row */}
           <View style={{ marginTop: 12, marginBottom: 8, marginLeft: 60 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-              <Ionicons name="ellipse" size={8} color={C.success} style={{ marginLeft: 10 }} />
+              {/* <Ionicons name="ellipse" size={8} color={C.success} style={{ marginLeft: 10 }} />
               <ThemedText style={{ color: C.success, fontSize: 12, fontWeight: "700" }}>
                 Open Now · 07:00AM - 08:00PM
-              </ThemedText>
-              <TouchableOpacity style={[styles.followBtn, { backgroundColor: C.primary }]}>
+              </ThemedText> */}
+              {/* <TouchableOpacity style={[styles.followBtn, { backgroundColor: C.primary }]}>
                 <ThemedText style={styles.followTxt}>Follow</ThemedText>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           </View>
 
           {/* Header info */}
           <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <ThemedText style={{ fontSize: 18, fontWeight: "700", color: "#000" }}>{store.name}</ThemedText>
-              <Ionicons name="checkmark-circle" size={18} color={C.primary} />
-            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 17 }}>
+              <ThemedText style={{ fontSize: 18, fontWeight: "700", color: "#000", }}>{store.name}</ThemedText>
+              <Image source={require("../assets/SealCheck.png")} style={styles.iconImg} />            </View>
 
             <View style={styles.metaRow}>
               <Ionicons name="mail-outline" size={16} color={C.sub} />
@@ -1118,18 +1206,37 @@ export default function StoreProfileModal({
                   {"  "}View Store Addresses
                 </ThemedText>
               </TouchableOpacity>
+
+            </View>
+           // right after the location row
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 5, alignItems: "center" }}>
+              <Ionicons name="call-outline" size={16} color={C.sub} />
+              <ThemedText style={styles.metaTxt}>Category</ThemedText>
+
+              {(Array.isArray(storeApi?.categories) ? storeApi.categories : []).map((cat, i) => (
+                <View
+                  key={`${cat.id}-${i}`}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: "#0000FF33", borderWidth: 0.5, borderColor: "#0000FF" },
+                  ]}
+                >
+                  <ThemedText style={[styles.chipText, { color: "#0000FF" }]}>
+                    {cat.title}
+                  </ThemedText>
+                </View>
+              ))}
             </View>
 
           </View>
-
 
           {/* Stats card */}
           <View style={[styles.statsCard, shadow(10)]}>
             <View style={styles.statsTop}>
               {[
-                { icon: STATS_ICONS.sold, label: "Qty Sold", value: 100 },
-                { icon: STATS_ICONS.users, label: "Followers", value: 500 },
-                { icon: STATS_ICONS.star, label: "Ratings", value: 4.7 },
+                { icon: STATS_ICONS.sold, label: "Qty Sold", value: statsQtySold },       // API
+                { icon: STATS_ICONS.users, label: "Followers", value: statsFollowers },   // API
+                { icon: STATS_ICONS.star, label: "Ratings", value: statsRating },         // API
               ].map((s, i) => (
                 <React.Fragment key={s.label}>
                   <View style={styles.statCol}>
@@ -1154,7 +1261,7 @@ export default function StoreProfileModal({
             </View>
           </View>
 
-          {/* Social icons */}
+          {/* Social icons (🔔 API returns social_links array, but icons/sprites not provided → kept as hardcoded) */}
           <View style={styles.socialCard}>
             {[
               { id: "wa", uri: "https://img.icons8.com/color/48/whatsapp--v1.png" },
@@ -1176,20 +1283,17 @@ export default function StoreProfileModal({
           </View>
 
           {/* Action buttons */}
-          <View style={{ marginHorizontal: 16, marginTop: 12 }}>
+          {/* <View style={{ marginHorizontal: 16, marginTop: 12 }}>
             <TouchableOpacity style={[styles.bigBtn, { backgroundColor: C.primary }]}>
-              {/* <Ionicons name="call-outline" size={18} color="#fff" style={styles.bigBtnIcon} /> */}
               <ThemedText style={styles.bigBtnTxt}>Call</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.bigBtn, { backgroundColor: "#000" }]}>
-              {/* <Ionicons name="chatbubble-ellipses-outline" size={18} color="#fff" style={styles.bigBtnIcon} /> */}
               <ThemedText style={styles.bigBtnTxt}>Chat</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.bigBtn, { backgroundColor: "#008000" }]} onPress={() => setLeaveReviewVisible(true)}>
-              {/* <Ionicons name="star-outline" size={18} color="#fff" style={styles.bigBtnIcon} /> */}
               <ThemedText style={styles.bigBtnTxt}>Leave a store review</ThemedText>
             </TouchableOpacity>
-          </View>
+          </View> */}
 
           {/* Tabs */}
           <View style={styles.tabs}>
@@ -1210,7 +1314,7 @@ export default function StoreProfileModal({
           {/* PRODUCTS */}
           {tab === "Products" && (
             <View style={{ marginHorizontal: 16, marginTop: 10 }}>
-              {/* 3 filters row */}
+              {/* 3 filters row (kept hardcoded lists/labels) */}
               <View style={styles.filtersRow}>
                 {["category", "brand", "location"].map((k) => (
                   <TouchableOpacity key={k} style={styles.select} onPress={() => openPicker(k)}>
@@ -1234,16 +1338,16 @@ export default function StoreProfileModal({
             </View>
           )}
 
-          {/* SOCIAL FEED (same as screen) */}
+          {/* SOCIAL FEED */}
           {tab === "Social Feed" && (
             <View style={{ paddingBottom: 20 }}>
-              {DEMO_POSTS.map((p) => (
+              {FEED.map((p) => (
                 <PostCard key={p.id} item={p} />
               ))}
             </View>
           )}
 
-          {/* REVIEWS (same as screen) */}
+          {/* REVIEWS */}
           {tab === "Reviews" && (
             <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
               <View style={styles.revTabsCard}>
@@ -1315,8 +1419,6 @@ export default function StoreProfileModal({
         </View>
       </Modal>
     </Modal>
-
-
   );
 }
 
@@ -1415,6 +1517,9 @@ const styles = StyleSheet.create({
   },
   bigBtnIcon: { marginRight: 10 },
   bigBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  chip: { paddingVertical: 2, paddingHorizontal: 5, borderRadius: 5, justifyContent: "center", alignItems: "center", marginTop: 2 },
+  chipText: { fontWeight: "700", fontSize: 10 },
+
 
   /* tabs */
   tabs: { marginTop: 14, marginHorizontal: 16, borderRadius: 12, flexDirection: "row", padding: 6, gap: 7 },
@@ -1601,7 +1706,6 @@ const styles = StyleSheet.create({
   ratingLeft: { color: "#000", fontWeight: "700" },
   ratingRight: { color: "#000", fontWeight: "700" },
 
-
   commentRow: { flexDirection: "row", paddingVertical: 10 },
   commentAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
   commentName: { fontWeight: "700", color: "#101318" },
@@ -1643,6 +1747,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     ...shadow(1),
   },
+
+
   optionRowDanger: { borderColor: "#FDE2E0", backgroundColor: "#FFF8F8" },
   optionLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   optionLabel: { fontSize: 15, color: "#101318" },
