@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -24,7 +25,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
@@ -86,6 +87,35 @@ const SettingsScreen = () => {
       setRefreshing(false);
       console.log("🔄 Balance pull-to-refresh completed");
     }
+  };
+
+  // Handle logout with confirmation
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Logout",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log("🚪 Starting logout process...");
+              await logout();
+              console.log("✅ Logout successful");
+              // Navigation will be handled automatically by the auth state change
+            } catch (error) {
+              console.error("❌ Error during logout:", error);
+              Alert.alert("Error", "Failed to logout. Please try again.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Extract balance data from API response
@@ -330,7 +360,7 @@ const SettingsScreen = () => {
           label="Logout"
           img={require('../../../assets/Vector (6).png')}
           leftColor="#fff"
-          onPress={() => { }}
+          onPress={handleLogout}
           textColor={C.danger}
           C={C}
         />

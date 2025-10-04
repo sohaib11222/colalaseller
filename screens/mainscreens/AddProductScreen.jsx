@@ -22,11 +22,16 @@ import { StatusBar } from "expo-status-bar";
 //Code Related to the Integration
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
-import { createProduct, createProductVariant, setBulkPrices, attachDeliveryOptions } from "../../utils/mutations/products";
+import {
+  createProduct,
+  setBulkPrices,
+  attachDeliveryOptions,
+} from "../../utils/mutations/products";
 import { Alert, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { getCategories, getBrands } from "../../utils/queries/general";
 import { updateProduct } from "../../utils/mutations/products";
+import { getCoupons } from "../../utils/queries/settings";
 
 // handles: require(number) | string uri | { uri }
 const toSrc = (v) => {
@@ -40,34 +45,72 @@ const toSrc = (v) => {
 // Build a flat list of rows to show in summaries
 const buildVariantSummary = (details, selectedColors, selectedSizes) => {
   const items = [];
+  
+  // Add debugging
+  console.log("buildVariantSummary called with:", {
+    details,
+    selectedColors,
+    selectedSizes,
+    hasDetails: !!details,
+    hasColor: !!details?.color,
+    hasSize: !!details?.size
+  });
+  
   if (details?.color) {
     Object.entries(details.color).forEach(([hex, v]) => {
       if (!selectedColors.includes(hex)) return;
+      
+      // Safe access to variant data
+      const variantData = v || {};
+      const images = variantData.images || [];
+      
+      console.log(`Processing color variant ${hex}:`, {
+        variantData,
+        images,
+        price: variantData.price,
+        compare: variantData.compare
+      });
+      
       items.push({
         kind: "Color",
         key: `c-${hex}`,
         token: hex,
-        price: v.price || "—",
-        compare: v.compare || "—",
-        image: v.images?.[0] || null, // keep object; toSrc handles it
-        count: Math.max(0, (v.images?.length || 0) - 1),
+        price: variantData.price || "—",
+        compare: variantData.compare || "—",
+        image: images[0] || null, // keep object; toSrc handles it
+        count: Math.max(0, images.length - 1),
       });
     });
   }
+  
   if (details?.size) {
     Object.entries(details.size).forEach(([s, v]) => {
       if (!selectedSizes.includes(s)) return;
+      
+      // Safe access to variant data
+      const variantData = v || {};
+      const images = variantData.images || [];
+      
+      console.log(`Processing size variant ${s}:`, {
+        variantData,
+        images,
+        price: variantData.price,
+        compare: variantData.compare
+      });
+      
       items.push({
         kind: "Size",
         key: `s-${s}`,
         token: s,
-        price: v.price || "—",
-        compare: v.compare || "—",
-        image: v.images?.[0] || null,
-        count: Math.max(0, (v.images?.length || 0) - 1),
+        price: variantData.price || "—",
+        compare: variantData.compare || "—",
+        image: images[0] || null,
+        count: Math.max(0, images.length - 1),
       });
     });
   }
+  
+  console.log("buildVariantSummary returning items:", items);
   return items;
 };
 
@@ -172,25 +215,25 @@ export default function AddProductScreen({ navigation, route }) {
   const isEditMode = route?.params?.editMode || false;
   const productData = route?.params?.productData || {};
   const productId = route?.params?.productId || productData?.id;
-  
+
   // Ensure productId is properly converted to string for API calls
   const finalProductId = productId ? String(productId) : null;
-  
-  console.log('AddProductScreen received params:', {
+
+  console.log("AddProductScreen received params:", {
     isEditMode,
     productData,
     productId,
-    routeParams: route?.params
+    routeParams: route?.params,
   });
-  
-  console.log('Product ID validation:', {
+
+  console.log("Product ID validation:", {
     productId,
     productIdType: typeof productId,
     productIdTruthy: !!productId,
     productIdString: String(productId),
     finalProductId,
     finalProductIdType: typeof finalProductId,
-    finalProductIdTruthy: !!finalProductId
+    finalProductIdTruthy: !!finalProductId,
   });
 
   const C = useMemo(
@@ -228,18 +271,20 @@ export default function AddProductScreen({ navigation, route }) {
       setFullDesc(productData.description || "");
       setPrice(productData.price || "");
       setDiscountPrice(productData.discount_price || "");
-      
+
       // Handle images
       if (productData.images && productData.images.length > 0) {
-        const imageUris = productData.images.map(img => ({
-          uri: `https://colala.hmstech.xyz/storage/${img.path}`
+        const imageUris = productData.images.map((img) => ({
+          uri: `https://colala.hmstech.xyz/storage/${img.path}`,
         }));
         setImages(imageUris);
       }
-      
+
       // Handle video
       if (productData.video) {
-        setVideo({ uri: `https://colala.hmstech.xyz/storage/${productData.video}` });
+        setVideo({
+          uri: `https://colala.hmstech.xyz/storage/${productData.video}`,
+        });
       }
     }
   }, [isEditMode, productData]);
@@ -252,6 +297,8 @@ export default function AddProductScreen({ navigation, route }) {
   const [tiers, setTiers] = useState([]);
 
   const [coupon, setCoupon] = useState("");
+  const [selectedCoupon, setSelectedCoupon] = useState(null);
+  const [couponOpen, setCouponOpen] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
 
   const [catOpen, setCatOpen] = useState(false);
@@ -278,7 +325,14 @@ export default function AddProductScreen({ navigation, route }) {
 
   // summary for screen (under Add Variant)
   const screenVariantSummary = useMemo(
-    () => buildVariantSummary(variantDetailData, variantColors, variantSizes),
+    () => {
+      console.log("Building screen variant summary with:", {
+        variantDetailData,
+        variantColors,
+        variantSizes
+      });
+      return buildVariantSummary(variantDetailData, variantColors, variantSizes);
+    },
     [variantDetailData, variantColors, variantSizes]
   );
 
@@ -288,22 +342,16 @@ export default function AddProductScreen({ navigation, route }) {
     if (isEditMode) {
       return true;
     }
-    
-    const requiredStrings = [
-      name,
-      shortDesc,
-      fullDesc,
-      price,
-      discountPrice,
-    ];
+
+    const requiredStrings = [name, shortDesc, fullDesc, price, discountPrice];
     const allStringsFilled = requiredStrings.every(
       (v) => String(v ?? "").trim().length > 0
     );
-    
+
     // Check if category and brand are selected (they should be IDs)
     const categorySelected = !!category;
     const brandSelected = !!brand;
-    
+
     return (
       images.length >= 3 &&
       availability.length > 0 &&
@@ -328,7 +376,7 @@ export default function AddProductScreen({ navigation, route }) {
   ]);
 
   /* ───────────────────────── mutations ───────────────────────── */
-  
+
   // Create Product Mutation
   const createProductMutation = useMutation({
     mutationFn: (payload) => createProduct(payload, token),
@@ -337,30 +385,61 @@ export default function AddProductScreen({ navigation, route }) {
       if (data.status === true) {
         Alert.alert("Success", "Product created successfully!");
         // Invalidate and refetch products list
-        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ["products"] });
         // Navigate back or to products list
         navigation?.goBack?.();
       }
     },
     onError: (error) => {
       console.error("Create product error:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create product";
-      Alert.alert("Error", errorMessage);
+      console.error("Full error object:", error);
+      console.error("Error details:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      console.error("Error config:", error.config);
+
+      let errorMessage = "Failed to create product. Please try again.";
+      let errorDetails = "";
+      
+      if (error.response?.data) {
+        // Show backend error message
+        errorMessage = error.response.data.message || errorMessage;
+        
+        // Show validation errors if they exist
+        if (error.response.data.errors) {
+          const validationErrors = Object.entries(error.response.data.errors)
+            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+            .join('\n');
+          errorDetails = `Validation errors:\n${validationErrors}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Show detailed error in alert
+      const fullErrorMessage = errorDetails ? `${errorMessage}\n\n${errorDetails}` : errorMessage;
+      Alert.alert("Error", fullErrorMessage);
     },
   });
 
   // Update Product Mutation
   const updateProductMutation = useMutation({
     mutationFn: ({ id, payload }) => {
-      console.log("updateProductMutation called with:", { id, payload, token, finalProductId });
+      console.log("updateProductMutation called with:", {
+        id,
+        payload,
+        token,
+        finalProductId,
+      });
       return updateProduct(id, payload, token);
     },
     onSuccess: (data) => {
       console.log("Product updated successfully:", data);
       if (data.status === "success") {
         Alert.alert("Success", "Product updated successfully!");
-        queryClient.invalidateQueries(['products']);
-        queryClient.invalidateQueries(['productDetails']);
+        queryClient.invalidateQueries(["products"]);
+        queryClient.invalidateQueries(["productDetails"]);
         navigation.goBack();
       }
     },
@@ -369,7 +448,7 @@ export default function AddProductScreen({ navigation, route }) {
       console.error("Error details:", {
         message: error?.message,
         response: error?.response?.data,
-        status: error?.response?.status
+        status: error?.response?.status,
       });
       let errorMessage = "Failed to update product";
       if (error?.data?.message) {
@@ -381,70 +460,85 @@ export default function AddProductScreen({ navigation, route }) {
     },
   });
 
-  // Create Product Variant Mutation
-  const createVariantMutation = useMutation({
-    mutationFn: ({ productId, payload }) => createProductVariant(productId, payload, token),
-    onSuccess: (data) => {
-      console.log("Product variant created successfully:", data);
-    },
-    onError: (error) => {
-      console.error("Create variant error:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to create product variant";
-      Alert.alert("Error", errorMessage);
-    },
-  });
 
   // Set Bulk Prices Mutation
   const setBulkPricesMutation = useMutation({
-    mutationFn: ({ productId, payload }) => setBulkPrices(productId, payload, token),
+    mutationFn: ({ productId, payload }) =>
+      setBulkPrices(productId, payload, token),
     onSuccess: (data) => {
       console.log("Bulk prices set successfully:", data);
     },
     onError: (error) => {
       console.error("Set bulk prices error:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to set bulk prices";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to set bulk prices";
       Alert.alert("Error", errorMessage);
     },
   });
 
   // Attach Delivery Options Mutation
   const attachDeliveryMutation = useMutation({
-    mutationFn: ({ productId, payload }) => attachDeliveryOptions(productId, payload, token),
+    mutationFn: ({ productId, payload }) =>
+      attachDeliveryOptions(productId, payload, token),
     onSuccess: (data) => {
       console.log("Delivery options attached successfully:", data);
     },
     onError: (error) => {
       console.error("Attach delivery options error:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to attach delivery options";
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to attach delivery options";
       Alert.alert("Error", errorMessage);
     },
   });
 
   // Combined loading state
-  const isSubmitting = createProductMutation.isPending || 
-                      updateProductMutation.isPending ||
-                      createVariantMutation.isPending || 
-                      setBulkPricesMutation.isPending || 
-                      attachDeliveryMutation.isPending;
+  const isSubmitting =
+    createProductMutation.isPending ||
+    updateProductMutation.isPending ||
+    setBulkPricesMutation.isPending ||
+    attachDeliveryMutation.isPending;
 
   /* ───────────────────────── API queries ───────────────────────── */
-  
+
   // Fetch categories
-  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError } = useQuery({
-    queryKey: ['categories'],
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useQuery({
+    queryKey: ["categories"],
     queryFn: () => getCategories(token),
     enabled: !!token,
   });
 
   // Fetch brands
-  const { data: brandsData, isLoading: brandsLoading, error: brandsError } = useQuery({
-    queryKey: ['brands'],
+  const {
+    data: brandsData,
+    isLoading: brandsLoading,
+    error: brandsError,
+  } = useQuery({
+    queryKey: ["brands"],
     queryFn: () => getBrands(token),
     enabled: !!token,
   });
 
+  // Fetch coupons
+  const {
+    data: couponsData,
+    isLoading: couponsLoading,
+    error: couponsError,
+  } = useQuery({
+    queryKey: ["coupons", token],
+    queryFn: () => getCoupons(token),
+    enabled: !!token,
+  });
+
   /* ───────────────────────── submit functions ───────────────────────── */
-  
+
   // Create FormData for product creation
   const createProductFormData = () => {
     console.log("Creating FormData with values:", {
@@ -453,226 +547,382 @@ export default function AddProductScreen({ navigation, route }) {
       brand: brand,
       description: fullDesc,
       price: price,
-      discountPrice: discountPrice
+      discountPrice: discountPrice,
+      hasVariants: variantTypes.length > 0,
+      variantCount: variantTypes.length,
     });
-    
+
     const formData = new FormData();
-    
+
     // Basic product information
-    formData.append('name', name.trim());
-    formData.append('category_id', category); // Category ID
-    formData.append('brand_id', brand); // Brand ID
-    formData.append('description', fullDesc.trim());
-    formData.append('price', price.toString());
-    formData.append('discount_price', discountPrice.toString());
-    formData.append('has_variants', variantTypes.length > 0 ? '1' : '0');
-    formData.append('status', 'active'); // Default status
+    formData.append("name", name.trim());
+    formData.append("category_id", category); // Category ID
+    formData.append("brand", brand); // Brand name (not brand_id)
+    formData.append("description", fullDesc.trim());
+    formData.append("price", price.toString());
+    formData.append("discount_price", discountPrice.toString());
+    formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
+    formData.append("status", "active"); // Default status
     
+    // Add loyalty points if applicable
+    if (usePoints) {
+      formData.append("loyality_points_applicable", "1");
+    }
+    
+    // Add coupon code if selected
+    if (selectedCoupon?.code) {
+      formData.append("coupon_code", selectedCoupon.code);
+      console.log("Coupon code added to FormData:", selectedCoupon.code);
+    }
+
     // Add video if available (optional)
     if (video?.uri) {
-      formData.append('video', {
+      console.log("Adding video file:", video.uri);
+      console.log("Video file exists:", video.uri ? "Yes" : "No");
+      console.log("Video URI type:", typeof video.uri);
+      console.log("Video URI length:", video.uri?.length);
+      console.log("Raw video object:", video);
+      
+      const videoFile = {
         uri: video.uri,
-        type: 'video/mp4',
-        name: 'product_video.mp4'
-      });
-      console.log("Video added to FormData:", video.uri);
+        type: "video/mp4",
+        name: "product_video.mp4",
+      };
+      formData.append("video", videoFile);
+      console.log("✅ Video added to FormData:", video.uri);
     } else {
       console.log("No video provided - video is optional");
     }
-    
+
     // Add images
     images.forEach((image, index) => {
       if (image?.uri) {
-        formData.append('images[]', {
+        formData.append("images[]", {
           uri: image.uri,
-          type: 'image/jpeg',
-          name: `product_image_${index}.jpg`
+          type: "image/jpeg",
+          name: `product_image_${index}.jpg`,
         });
       }
     });
-    
+
+    // Add variants if they exist
+    if (variantTypes.length > 0 && variantDetailData) {
+      console.log("Adding variants to FormData:", variantDetailData);
+      
+      // Process color variants
+      if (variantDetailData.color) {
+        Object.entries(variantDetailData.color).forEach(([colorHex, colorData], index) => {
+          if (variantColors.includes(colorHex)) {
+            formData.append(`variants[${index}][sku]`, `${name.trim()}-${colorHex}`);
+            formData.append(`variants[${index}][color]`, colorHex);
+            formData.append(`variants[${index}][price]`, (colorData.price || price).toString());
+            formData.append(`variants[${index}][discount_price]`, (colorData.compare || discountPrice).toString());
+            formData.append(`variants[${index}][stock]`, "100"); // Default stock
+            
+            // Add variant images if they exist
+            if (colorData.images && colorData.images.length > 0) {
+              colorData.images.forEach((image, imgIndex) => {
+                if (image?.uri) {
+                  formData.append(`variants[${index}][images][]`, {
+                    uri: image.uri,
+                    type: "image/jpeg",
+                    name: `variant_${colorHex}_${imgIndex}.jpg`,
+                  });
+                }
+              });
+            }
+          }
+        });
+      }
+      
+      // Process size variants
+      if (variantDetailData.size) {
+        Object.entries(variantDetailData.size).forEach(([size, sizeData], index) => {
+          if (variantSizes.includes(size)) {
+            const variantIndex = Object.keys(variantDetailData.color || {}).length + index;
+            formData.append(`variants[${variantIndex}][sku]`, `${name.trim()}-${size}`);
+            formData.append(`variants[${variantIndex}][size]`, size);
+            formData.append(`variants[${variantIndex}][price]`, (sizeData.price || price).toString());
+            formData.append(`variants[${variantIndex}][discount_price]`, (sizeData.compare || discountPrice).toString());
+            formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
+            
+            // Add variant images if they exist
+            if (sizeData.images && sizeData.images.length > 0) {
+              sizeData.images.forEach((image, imgIndex) => {
+                if (image?.uri) {
+                  formData.append(`variants[${variantIndex}][images][]`, {
+                    uri: image.uri,
+                    type: "image/jpeg",
+                    name: `variant_${size}_${imgIndex}.jpg`,
+                  });
+                }
+              });
+            }
+          }
+        });
+      }
+    }
+
     return formData;
   };
 
-  // Create FormData for product variant
-  const createVariantFormData = (variantData) => {
+  // Create FormData for product update (same structure as create)
+  const updateProductFormData = () => {
+    console.log("Creating update FormData with values:", {
+      name: name,
+      category: category,
+      brand: brand,
+      description: fullDesc,
+      price: price,
+      discountPrice: discountPrice,
+      hasVariants: variantTypes.length > 0,
+      variantCount: variantTypes.length,
+    });
+
     const formData = new FormData();
+
+    // Basic product information
+    formData.append("name", name.trim());
+    formData.append("category_id", category); // Category ID
+    formData.append("brand", brand); // Brand name (not brand_id)
+    formData.append("description", fullDesc.trim());
+    formData.append("price", price.toString());
+    formData.append("discount_price", discountPrice.toString());
+    formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
+    formData.append("status", "active"); // Default status
     
-    formData.append('sku', variantData.sku || '');
-    formData.append('color', variantData.color || '');
-    formData.append('size', variantData.size || '');
-    formData.append('price', variantData.price.toString());
-    formData.append('discount_price', variantData.discount_price.toString());
-    formData.append('stock', variantData.stock.toString());
-    
-    // Add variant images
-    if (variantData.images && variantData.images.length > 0) {
-      variantData.images.forEach((image, index) => {
-        if (image?.uri) {
-          formData.append('images[]', {
-            uri: image.uri,
-            type: 'image/jpeg',
-            name: `variant_image_${index}.jpg`
-          });
-        }
-      });
+    // Add loyalty points if applicable
+    if (usePoints) {
+      formData.append("loyality_points_applicable", "1");
     }
     
+    // Add coupon code if selected
+    if (selectedCoupon?.code) {
+      formData.append("coupon_code", selectedCoupon.code);
+      console.log("Coupon code added to FormData:", selectedCoupon.code);
+    }
+
+    // Add video if available (optional)
+    if (video?.uri) {
+      console.log("Adding video file:", video.uri);
+      console.log("Video file exists:", video.uri ? "Yes" : "No");
+      console.log("Video URI type:", typeof video.uri);
+      console.log("Video URI length:", video.uri?.length);
+      console.log("Raw video object:", video);
+      
+      const videoFile = {
+        uri: video.uri,
+        type: "video/mp4",
+        name: "product_video.mp4",
+      };
+      formData.append("video", videoFile);
+      console.log("✅ Video added to FormData:", video.uri);
+    } else {
+      console.log("No video provided - video is optional");
+    }
+
+    // Add images
+    images.forEach((image, index) => {
+      if (image?.uri) {
+        formData.append("images[]", {
+          uri: image.uri,
+          type: "image/jpeg",
+          name: `product_image_${index}.jpg`,
+        });
+      }
+    });
+
+    // Add variants if they exist
+    if (variantTypes.length > 0 && variantDetailData) {
+      console.log("Adding variants to FormData:", variantDetailData);
+      
+      // Process color variants
+      if (variantDetailData.color) {
+        Object.entries(variantDetailData.color).forEach(([colorHex, colorData], index) => {
+          if (variantColors.includes(colorHex)) {
+            formData.append(`variants[${index}][sku]`, `${name.trim()}-${colorHex}`);
+            formData.append(`variants[${index}][color]`, colorHex);
+            formData.append(`variants[${index}][price]`, (colorData.price || price).toString());
+            formData.append(`variants[${index}][discount_price]`, (colorData.compare || discountPrice).toString());
+            formData.append(`variants[${index}][stock]`, "100"); // Default stock
+            
+            // Add variant images if they exist
+            if (colorData.images && colorData.images.length > 0) {
+              colorData.images.forEach((image, imgIndex) => {
+                if (image?.uri) {
+                  formData.append(`variants[${index}][images][]`, {
+                    uri: image.uri,
+                    type: "image/jpeg",
+                    name: `variant_${colorHex}_${imgIndex}.jpg`,
+                  });
+                }
+              });
+            }
+          }
+        });
+      }
+      
+      // Process size variants
+      if (variantDetailData.size) {
+        Object.entries(variantDetailData.size).forEach(([size, sizeData], index) => {
+          if (variantSizes.includes(size)) {
+            const variantIndex = Object.keys(variantDetailData.color || {}).length + index;
+            formData.append(`variants[${variantIndex}][sku]`, `${name.trim()}-${size}`);
+            formData.append(`variants[${variantIndex}][size]`, size);
+            formData.append(`variants[${variantIndex}][price]`, (sizeData.price || price).toString());
+            formData.append(`variants[${variantIndex}][discount_price]`, (sizeData.compare || discountPrice).toString());
+            formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
+            
+            // Add variant images if they exist
+            if (sizeData.images && sizeData.images.length > 0) {
+              sizeData.images.forEach((image, imgIndex) => {
+                if (image?.uri) {
+                  formData.append(`variants[${variantIndex}][images][]`, {
+                    uri: image.uri,
+                    type: "image/jpeg",
+                    name: `variant_${size}_${imgIndex}.jpg`,
+                  });
+                }
+              });
+            }
+          }
+        });
+      }
+    }
+
     return formData;
   };
 
   // Main submit function
   const handleSubmitProduct = async () => {
     if (!isComplete || isSubmitting) return;
-    
+
     // Skip frontend validation for edit mode - data is already validated
     if (!isEditMode) {
       // Validate required fields only for new products
-      if (!name || !category || !brand || !fullDesc || !price || !discountPrice) {
+      if (
+        !name ||
+        !category ||
+        !brand ||
+        !fullDesc ||
+        !price ||
+        !discountPrice
+      ) {
         Alert.alert("Error", "Please fill in all required fields");
         return;
       }
     }
-    
+
     try {
       console.log("Starting product creation...");
-      
-      // Step 1: Create the main product
-      const productFormData = createProductFormData();
-      console.log("Product FormData created");
-      
+
+      // Step 1: Create or update the product
+      let productFormData;
       let productResult;
+      
       if (isEditMode) {
         if (!finalProductId) {
-          console.error('Product ID is missing:', {
+          console.error("Product ID is missing:", {
             routeProductId: route?.params?.productId,
             productDataId: productData?.id,
             originalProductId: productId,
             finalProductId: finalProductId,
-            productData: productData
+            productData: productData,
           });
-          throw new Error(`Product ID is required for update. Received: ${finalProductId}`);
+          throw new Error(
+            `Product ID is required for update. Received: ${finalProductId}`
+          );
         }
-        console.log('Updating product with:', {
+        productFormData = updateProductFormData();
+        console.log("Update FormData created");
+        console.log("Updating product with:", {
           id: finalProductId,
-          payload: productFormData
+          payload: productFormData,
         });
         productResult = await updateProductMutation.mutateAsync({
           id: finalProductId,
-          payload: productFormData
+          payload: productFormData,
         });
       } else {
-        productResult = await createProductMutation.mutateAsync(productFormData);
+        productFormData = createProductFormData();
+        console.log("Create FormData created");
+        productResult = await createProductMutation.mutateAsync(
+          productFormData
+        );
       }
-      
+
       if (productResult?.status !== "success") {
-        throw new Error(productResult?.message || `Failed to ${isEditMode ? 'update' : 'create'} product`);
+        throw new Error(
+          productResult?.message ||
+            `Failed to ${isEditMode ? "update" : "create"} product`
+        );
       }
-      
+
       const productId = productResult?.data?.id;
       if (!productId) {
         throw new Error("Product ID not returned from server");
       }
-      
+
       console.log("Product created with ID:", productId);
-      
-      // Step 2: Create variants if they exist
-      if (variantTypes.length > 0 && variantDetailData) {
-        console.log("Creating product variants...");
-        
-        // Process color variants
-        if (variantDetailData.color) {
-          for (const [colorHex, colorData] of Object.entries(variantDetailData.color)) {
-            if (variantColors.includes(colorHex)) {
-              const variantPayload = createVariantFormData({
-                sku: `${productId}-${colorHex}`,
-                color: colorHex,
-                price: colorData.price || price,
-                discount_price: colorData.compare || discountPrice,
-                stock: 100, // Default stock
-                images: colorData.images || []
-              });
-              
-              await createVariantMutation.mutateAsync({
-                productId,
-                payload: variantPayload
-              });
-            }
-          }
-        }
-        
-        // Process size variants
-        if (variantDetailData.size) {
-          for (const [size, sizeData] of Object.entries(variantDetailData.size)) {
-            if (variantSizes.includes(size)) {
-              const variantPayload = createVariantFormData({
-                sku: `${productId}-${size}`,
-                size: size,
-                price: sizeData.price || price,
-                discount_price: sizeData.compare || discountPrice,
-                stock: 100, // Default stock
-                images: sizeData.images || []
-              });
-              
-              await createVariantMutation.mutateAsync({
-                productId,
-                payload: variantPayload
-              });
-            }
-          }
-        }
-      }
-      
+      console.log("Product creation completed successfully - all data sent in single request");
+
       // Step 3: Set bulk prices if tiers exist
       if (tiers.length > 0) {
         console.log("Setting bulk prices...");
         const bulkPricesPayload = {
-          prices: tiers.map(tier => ({
+          prices: tiers.map((tier) => ({
             min_quantity: parseInt(tier.minQuantity) || 10,
             amount: parseFloat(tier.amount) || 0,
-            discount_percent: parseFloat(tier.discount) || 0
-          }))
+            discount_percent: parseFloat(tier.discount) || 0,
+          })),
         };
-        
+
         await setBulkPricesMutation.mutateAsync({
           productId,
-          payload: bulkPricesPayload
+          payload: bulkPricesPayload,
         });
       }
-      
+
       // Step 4: Attach delivery options
       if (delivery.length > 0) {
         console.log("Attaching delivery options...");
-        const deliveryOptionIds = delivery.map(d => d.id).filter(id => id);
-        
+        const deliveryOptionIds = delivery.map((d) => d.id).filter((id) => id);
+
         if (deliveryOptionIds.length > 0) {
           await attachDeliveryMutation.mutateAsync({
             productId,
-            payload: { delivery_option_ids: deliveryOptionIds }
+            payload: { delivery_option_ids: deliveryOptionIds },
           });
         }
       }
-      
+
       console.log("Product operation completed successfully!");
-      
+
       // Show success message to user
       Alert.alert(
-        "Success", 
-        isEditMode ? "Product updated successfully!" : "Product created successfully!",
+        "Success",
+        isEditMode
+          ? "Product updated successfully!"
+          : "Product created successfully!",
         [
           {
             text: "OK",
             onPress: () => {
               // Navigate back or reset form
               navigation.goBack();
-            }
-          }
+            },
+          },
         ]
       );
-      
     } catch (error) {
       console.error("Product operation failed:", error);
-      Alert.alert("Error", error.message || `Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`);
+      Alert.alert(
+        "Error",
+        error.message ||
+          `Failed to ${
+            isEditMode ? "update" : "create"
+          } product. Please try again.`
+      );
     }
   };
 
@@ -831,7 +1081,12 @@ export default function AddProductScreen({ navigation, route }) {
 
         {/* Category (modal) */}
         <PickerField
-          label={category ? categoriesData?.data?.find(c => c.id === category)?.title || "Category" : "Category"}
+          label={
+            category
+              ? categoriesData?.data?.find((c) => c.id === category)?.title ||
+                "Category"
+              : "Category"
+          }
           empty={!category}
           onPress={() => setCatOpen(true)}
           C={C}
@@ -840,7 +1095,11 @@ export default function AddProductScreen({ navigation, route }) {
 
         {/* Brand (modal) */}
         <PickerField
-          label={brand ? brandsData?.data?.find(b => b.id === brand)?.name || "Brand" : "Brand"}
+          label={
+            brand
+              ? brandsData?.data?.find((b) => b.id === brand)?.name || "Brand"
+              : "Brand"
+          }
           empty={!brand}
           onPress={() => setBrandOpen(true)}
           C={C}
@@ -1006,9 +1265,9 @@ export default function AddProductScreen({ navigation, route }) {
           Promote your product via coupon codes.
         </ThemedText>
         <PickerField
-          label={coupon || "Coupon code to be used"}
-          empty={!coupon}
-          onPress={() => setCoupon((c) => (c ? "" : ""))}
+          label={selectedCoupon ? `${selectedCoupon.code} (${selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value + '%' : '₦' + selectedCoupon.discount_value})` : "Coupon code to be used"}
+          empty={!selectedCoupon}
+          onPress={() => setCouponOpen(true)}
           C={C}
         />
 
@@ -1092,15 +1351,18 @@ export default function AddProductScreen({ navigation, route }) {
           disabled={!isComplete || isSubmitting}
           style={[
             styles.postBtn,
-            { 
-              backgroundColor: (isComplete && !isSubmitting) ? C.primary : "#F3A3AA",
-              opacity: isSubmitting ? 0.7 : 1
+            {
+              backgroundColor:
+                isComplete && !isSubmitting ? C.primary : "#F3A3AA",
+              opacity: isSubmitting ? 0.7 : 1,
             },
           ]}
           onPress={handleSubmitProduct}
         >
           {isSubmitting ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
               <ActivityIndicator size="small" color="#fff" />
               <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
                 Creating Product...
@@ -1193,6 +1455,20 @@ export default function AddProductScreen({ navigation, route }) {
         brandsData={brandsData}
         isLoading={brandsLoading}
         error={brandsError}
+      />
+
+      {/* Coupon selection modal */}
+      <CouponSheet
+        visible={couponOpen}
+        onClose={() => setCouponOpen(false)}
+        onSelect={(coupon) => {
+          setSelectedCoupon(coupon);
+          setCouponOpen(false);
+        }}
+        C={C}
+        couponsData={couponsData}
+        isLoading={couponsLoading}
+        error={couponsError}
       />
 
       {/* Location sheets */}
@@ -1315,9 +1591,22 @@ const MiniField = ({ C, flex = 1, style, ...rest }) => (
 
 /* ───────────────────────── Brand/Category Sheets ───────────────────────── */
 
-function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoading, error }) {
-  console.log("CategoriesSheet visible:", visible, "categoriesData:", categoriesData);
-  
+function CategoriesSheet({
+  visible,
+  onClose,
+  onSelect,
+  C,
+  categoriesData,
+  isLoading,
+  error,
+}) {
+  console.log(
+    "CategoriesSheet visible:",
+    visible,
+    "categoriesData:",
+    categoriesData
+  );
+
   // Handle loading state
   if (isLoading) {
     return (
@@ -1384,7 +1673,9 @@ function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoad
             </View>
             <View style={{ padding: 20, alignItems: "center" }}>
               <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
-              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+              <ThemedText
+                style={{ color: C.sub, marginTop: 10, textAlign: "center" }}
+              >
                 Failed to load categories. Please try again.
               </ThemedText>
             </View>
@@ -1396,7 +1687,7 @@ function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoad
 
   // Get categories from API data
   const categories = categoriesData?.data || [];
-  
+
   return (
     <Modal
       visible={visible}
@@ -1437,7 +1728,9 @@ function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoad
           {categories.length === 0 ? (
             <View style={{ padding: 20, alignItems: "center" }}>
               <Ionicons name="folder-outline" size={48} color={C.sub} />
-              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+              <ThemedText
+                style={{ color: C.sub, marginTop: 10, textAlign: "center" }}
+              >
                 No categories available
               </ThemedText>
             </View>
@@ -1452,7 +1745,9 @@ function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoad
                 ]}
                 activeOpacity={0.9}
               >
-                <ThemedText style={{ color: C.text }}>{category.title}</ThemedText>
+                <ThemedText style={{ color: C.text }}>
+                  {category.title}
+                </ThemedText>
                 {category.products_count > 0 && (
                   <ThemedText style={{ color: C.sub, fontSize: 12 }}>
                     {category.products_count} products
@@ -1467,9 +1762,17 @@ function CategoriesSheet({ visible, onClose, onSelect, C, categoriesData, isLoad
   );
 }
 
-function BrandSheet({ visible, onClose, onSelect, C, brandsData, isLoading, error }) {
+function BrandSheet({
+  visible,
+  onClose,
+  onSelect,
+  C,
+  brandsData,
+  isLoading,
+  error,
+}) {
   console.log("BrandSheet visible:", visible, "brandsData:", brandsData);
-  
+
   // Handle loading state
   if (isLoading) {
     return (
@@ -1536,7 +1839,9 @@ function BrandSheet({ visible, onClose, onSelect, C, brandsData, isLoading, erro
             </View>
             <View style={{ padding: 20, alignItems: "center" }}>
               <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
-              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+              <ThemedText
+                style={{ color: C.sub, marginTop: 10, textAlign: "center" }}
+              >
                 Failed to load brands. Please try again.
               </ThemedText>
             </View>
@@ -1605,7 +1910,9 @@ function BrandSheet({ visible, onClose, onSelect, C, brandsData, isLoading, erro
           {brands.length === 0 ? (
             <View style={{ padding: 20, alignItems: "center" }}>
               <Ionicons name="business-outline" size={48} color={C.sub} />
-              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+              <ThemedText
+                style={{ color: C.sub, marginTop: 10, textAlign: "center" }}
+              >
                 No brands available
               </ThemedText>
             </View>
@@ -1657,8 +1964,13 @@ function AvailableLocationsSheet({
   setSelected,
   C,
 }) {
-  console.log("AvailableLocationsSheet visible:", visible, "selected:", selected);
-  
+  console.log(
+    "AvailableLocationsSheet visible:",
+    visible,
+    "selected:",
+    selected
+  );
+
   const popular = ["All Locations", "Oyo State", "Lagos State", "Rivers State"];
   const allStates = [
     "Abia State",
@@ -1704,7 +2016,9 @@ function AvailableLocationsSheet({
   const toggle = (opt) => {
     console.log("Location toggle clicked:", opt, "Current selected:", selected);
     setSelected((prev) => {
-      const newSelection = prev.includes(opt) ? prev.filter((x) => x !== opt) : [...prev, opt];
+      const newSelection = prev.includes(opt)
+        ? prev.filter((x) => x !== opt)
+        : [...prev, opt];
       console.log("New location selection:", newSelection);
       return newSelection;
     });
@@ -1770,8 +2084,8 @@ function AvailableLocationsSheet({
                 activeOpacity={0.9}
                 style={[
                   styles.locationRow,
-                  { 
-                    borderColor: checked ? C.primary : C.line, 
+                  {
+                    borderColor: checked ? C.primary : C.line,
                     backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
                     borderWidth: checked ? 2 : 1,
                   },
@@ -1798,8 +2112,8 @@ function AvailableLocationsSheet({
                   activeOpacity={0.9}
                   style={[
                     styles.locationRow,
-                    { 
-                      borderColor: checked ? C.primary : C.line, 
+                    {
+                      borderColor: checked ? C.primary : C.line,
                       backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
                       borderWidth: checked ? 2 : 1,
                     },
@@ -1840,7 +2154,7 @@ function DeliveryPriceSheet({
   C,
 }) {
   console.log("DeliveryPriceSheet visible:", visible, "selected:", selected);
-  
+
   const DATA = {
     "Lagos State": [
       { area: "Ikeja (light)", group: "Light", price: 5000, free: false },
@@ -1872,7 +2186,12 @@ function DeliveryPriceSheet({
   const [showGoodsMenu, setShowGoodsMenu] = useState(false);
 
   const toggle = (item) => {
-    console.log("Delivery toggle clicked:", item.area, "Current selected:", selected);
+    console.log(
+      "Delivery toggle clicked:",
+      item.area,
+      "Current selected:",
+      selected
+    );
     const key = `${active}::${item.area}`;
     setSelected((prev) => {
       const exists = prev.find((x) => x.key === key);
@@ -2028,10 +2347,12 @@ function DeliveryPriceSheet({
                 paddingHorizontal: 12,
                 backgroundColor: C.primary,
                 borderRadius: 8,
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
-              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              <ThemedText
+                style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+              >
                 Select All
               </ThemedText>
             </TouchableOpacity>
@@ -2043,10 +2364,12 @@ function DeliveryPriceSheet({
                 paddingHorizontal: 12,
                 backgroundColor: C.sub,
                 borderRadius: 8,
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
-              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              <ThemedText
+                style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+              >
                 Clear All
               </ThemedText>
             </TouchableOpacity>
@@ -2062,8 +2385,8 @@ function DeliveryPriceSheet({
                   onPress={() => toggle(r)}
                   style={[
                     styles.deliveryRow,
-                    { 
-                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6", 
+                    {
+                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
                       borderColor: checked ? C.primary : C.line,
                       borderWidth: checked ? 2 : 1,
                     },
@@ -2364,6 +2687,8 @@ function AddVariantModal({
           sizes={selectedTypes.includes("Size") ? selectedSizes : []}
           initial={details}
           onSave={(d) => {
+            console.log("AddVariantSheet received save data:", d);
+            console.log("Setting variant details:", d);
             setDetails(d);
             setDetailsOpen(false);
           }}
@@ -2377,7 +2702,7 @@ function AddVariantModal({
 
 function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
   console.log("ColorPickerSheet visible:", visible, "selected:", selected);
-  
+
   const base = [
     { name: "Black", hex: "#000000" },
     { name: "Blue", hex: "#0033FF" },
@@ -2390,10 +2715,17 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
   const [hex, setHex] = useState("");
 
   const toggle = (item) => {
-    console.log("Color toggle clicked:", item.hex, "Current selected:", selected);
+    console.log(
+      "Color toggle clicked:",
+      item.hex,
+      "Current selected:",
+      selected
+    );
     const exists = selected.includes(item.hex);
     setSelected((prev) => {
-      const newSelection = exists ? prev.filter((h) => h !== item.hex) : [...prev, item.hex];
+      const newSelection = exists
+        ? prev.filter((h) => h !== item.hex)
+        : [...prev, item.hex];
       console.log("New selection:", newSelection);
       return newSelection;
     });
@@ -2442,17 +2774,19 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
           {/* Select All / Clear All buttons */}
           <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
             <TouchableOpacity
-              onPress={() => setSelected(base.map(c => c.hex))}
+              onPress={() => setSelected(base.map((c) => c.hex))}
               style={{
                 flex: 1,
                 paddingVertical: 8,
                 paddingHorizontal: 12,
                 backgroundColor: C.primary,
                 borderRadius: 8,
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
-              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              <ThemedText
+                style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+              >
                 Select All
               </ThemedText>
             </TouchableOpacity>
@@ -2464,10 +2798,12 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
                 paddingHorizontal: 12,
                 backgroundColor: C.sub,
                 borderRadius: 8,
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
-              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              <ThemedText
+                style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+              >
                 Clear All
               </ThemedText>
             </TouchableOpacity>
@@ -2482,11 +2818,11 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
                   onPress={() => toggle(c)}
                   style={[
                     styles.sheetRow,
-                    { 
-                      borderColor: C.line, 
+                    {
+                      borderColor: C.line,
                       backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
                       borderWidth: checked ? 2 : 1,
-                      borderColor: checked ? C.primary : C.line
+                      borderColor: checked ? C.primary : C.line,
                     },
                   ]}
                   activeOpacity={0.7}
@@ -2551,13 +2887,15 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
 
 function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
   console.log("SizePickerSheet visible:", visible, "selected:", selected);
-  
+
   const sizes = ["S", "M", "L", "XL", "XXL"];
 
   const toggle = (s) => {
     console.log("Size toggle clicked:", s, "Current selected:", selected);
     setSelected((prev) => {
-      const newSelection = prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s];
+      const newSelection = prev.includes(s)
+        ? prev.filter((x) => x !== s)
+        : [...prev, s];
       console.log("New size selection:", newSelection);
       return newSelection;
     });
@@ -2603,10 +2941,12 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
                 paddingHorizontal: 12,
                 backgroundColor: C.primary,
                 borderRadius: 8,
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
-              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              <ThemedText
+                style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+              >
                 Select All
               </ThemedText>
             </TouchableOpacity>
@@ -2618,10 +2958,12 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
                 paddingHorizontal: 12,
                 backgroundColor: C.sub,
                 borderRadius: 8,
-                alignItems: "center"
+                alignItems: "center",
               }}
             >
-              <ThemedText style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+              <ThemedText
+                style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+              >
                 Clear All
               </ThemedText>
             </TouchableOpacity>
@@ -2636,11 +2978,11 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
                   onPress={() => toggle(s)}
                   style={[
                     styles.sheetRow,
-                    { 
-                      borderColor: C.line, 
+                    {
+                      borderColor: C.line,
                       backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
                       borderWidth: checked ? 2 : 1,
-                      borderColor: checked ? C.primary : C.line
+                      borderColor: checked ? C.primary : C.line,
                     },
                   ]}
                   activeOpacity={0.7}
@@ -3126,7 +3468,36 @@ function VariantDetailsModal({
 
         <View style={{ padding: 16 }}>
           <TouchableOpacity
-            onPress={() => onSave({ color: colorMap, size: sizeMap })}
+            onPress={() => {
+              console.log("Saving variant details:", {
+                colorMap,
+                sizeMap,
+                colorMapKeys: Object.keys(colorMap),
+                sizeMapKeys: Object.keys(sizeMap)
+              });
+              
+              // Debug each color variant
+              Object.entries(colorMap).forEach(([hex, data]) => {
+                console.log(`Color ${hex} data:`, {
+                  price: data.price,
+                  compare: data.compare,
+                  images: data.images,
+                  imagesLength: data.images?.length
+                });
+              });
+              
+              // Debug each size variant
+              Object.entries(sizeMap).forEach(([size, data]) => {
+                console.log(`Size ${size} data:`, {
+                  price: data.price,
+                  compare: data.compare,
+                  images: data.images,
+                  imagesLength: data.images?.length
+                });
+              });
+              
+              onSave({ color: colorMap, size: sizeMap });
+            }}
             activeOpacity={0.9}
             style={[styles.saveBtn, { backgroundColor: C.primary }]}
           >
@@ -3167,6 +3538,149 @@ function VariantDetailsModal({
           }
         />
       </SafeAreaView>
+    </Modal>
+  );
+}
+
+/* ───────────────────────── CouponSheet Component ───────────────────────── */
+
+function CouponSheet({
+  visible,
+  onClose,
+  onSelect,
+  C,
+  couponsData,
+  isLoading,
+  error,
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter coupons based on search query
+  const filteredCoupons = couponsData?.data?.filter((coupon) =>
+    coupon.code.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  const CouponRow = ({ coupon }) => (
+    <TouchableOpacity
+      onPress={() => onSelect(coupon)}
+      style={[
+        styles.sheetRow,
+        { borderColor: C.line, backgroundColor: "#EFEFF0" },
+      ]}
+      activeOpacity={0.9}
+    >
+      <View style={{ flex: 1 }}>
+        <ThemedText style={{ color: C.text, fontWeight: "600" }}>
+          {coupon.code}
+        </ThemedText>
+        <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+          {coupon.discount_type === 'percentage' 
+            ? `${coupon.discount_value}% off` 
+            : `₦${coupon.discount_value} off`
+          }
+        </ThemedText>
+        {coupon.expiry_date && (
+          <ThemedText style={{ color: C.sub, fontSize: 11, marginTop: 1 }}>
+            Expires: {new Date(coupon.expiry_date).toLocaleDateString()}
+          </ThemedText>
+        )}
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <ThemedText style={{ color: C.sub, fontSize: 11 }}>
+          Used: {coupon.times_used}/{coupon.max_usage}
+        </ThemedText>
+        <ThemedText style={{ 
+          color: coupon.status === 'active' ? '#10B981' : '#EF4444', 
+          fontSize: 11,
+          fontWeight: '600'
+        }}>
+          {coupon.status}
+        </ThemedText>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={styles.sheetOverlay}>
+        <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <ThemedText
+              font="oleo"
+              style={[styles.sheetTitle, { color: C.text }]}
+            >
+              Select Coupon
+            </ThemedText>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.sheetClose, { borderColor: C.line }]}
+            >
+              <Ionicons name="close" size={18} color={C.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.searchBar, { borderColor: C.line }]}>
+            <TextInput
+              placeholder="Search coupons..."
+              placeholderTextColor="#9BA0A6"
+              style={{ flex: 1, color: C.text }}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          {isLoading ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={{ color: C.sub, marginTop: 16 }}>
+                Loading coupons...
+              </ThemedText>
+            </View>
+          ) : error ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <ThemedText style={{ color: "#E53E3E", textAlign: "center" }}>
+                Error loading coupons. Please try again.
+              </ThemedText>
+            </View>
+          ) : (
+            <>
+              <ThemedText style={[styles.sheetSection, { color: C.text }]}>
+                Available Coupons
+              </ThemedText>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {filteredCoupons.map((coupon) => (
+                  <CouponRow key={coupon.id} coupon={coupon} />
+                ))}
+                {filteredCoupons.length === 0 && (
+                  <ThemedText
+                    style={{ color: C.sub, textAlign: "center", marginTop: 20 }}
+                  >
+                    No coupons found
+                  </ThemedText>
+                )}
+              </ScrollView>
+            </>
+          )}
+        </View>
+      </View>
     </Modal>
   );
 }

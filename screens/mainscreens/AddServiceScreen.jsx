@@ -23,10 +23,10 @@ import { useTheme } from "../../components/ThemeProvider";
 import { getStoreCategories } from "../../utils/queries/seller";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
-import { getOnboardingToken } from "../../utils/tokenStorage";
 import { createService } from "../../utils/mutations/services";
 import { useMutation } from "@tanstack/react-query";
 import { updateService } from "../../utils/mutations/services";
+import axios from "axios";
 
 const toSrc = (v) =>
   typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
@@ -138,9 +138,78 @@ export default function AddServiceScreen({ navigation, route }) {
 
   const categories = categoriesData?.selected || [];
 
-  // Create service mutation
+  // Create service mutation with direct axios call
   const createServiceMutation = useMutation({
-    mutationFn: (formData) => createService(formData, token),
+    mutationFn: async (formData) => {
+      console.log("🚀 Making direct axios call to create service");
+      console.log("🌐 API Endpoint: https://colala.hmstech.xyz/api/seller/service/create");
+      console.log("🔑 Token present:", !!token);
+      
+      // Log FormData entries for debugging
+      console.log("📋 FormData entries:");
+      for (let [key, value] of formData._parts) {
+        if (value instanceof File || (value && value.uri)) {
+          console.log(`  ${key}: [File] - ${value.name || 'unnamed'} (${value.type})`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
+      }
+      
+      // Debug FormData constructor
+      console.log("🔍 FormData constructor:", formData.constructor.name);
+      console.log("🔍 FormData entries method:", typeof formData.entries);
+      console.log("🔍 FormData _parts length:", formData._parts?.length);
+      
+      // Debug media entries specifically
+      const mediaEntries = formData._parts.filter(pair => pair[0].startsWith('media'));
+      console.log("🔍 Media entries count:", mediaEntries.length);
+      mediaEntries.forEach((entry, index) => {
+        console.log(`🔍 Media entry ${index}:`, {
+          fieldName: entry[0],
+          valueType: typeof entry[1],
+          hasUri: !!(entry[1] && entry[1].uri),
+          hasType: !!(entry[1] && entry[1].type),
+          hasName: !!(entry[1] && entry[1].name),
+          value: entry[1]
+        });
+      });
+      
+      // Try using fetch API instead of axios for better FormData handling
+      console.log("🌐 Using fetch API for FormData upload");
+      
+      const response = await fetch(
+        "https://colala.hmstech.xyz/api/seller/service/create",
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            // Don't set Content-Type - let fetch handle it automatically
+          },
+          body: formData,
+        }
+      );
+      
+      if (!response.ok) {
+        // Get the error details from the response
+        const errorData = await response.json();
+        console.error("❌ Backend error response:", errorData);
+        console.error("❌ Error status:", response.status);
+        console.error("❌ Error message:", errorData.message);
+        console.error("❌ Error errors:", errorData.errors);
+        
+        // Create a more detailed error
+        const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        error.response = {
+          status: response.status,
+          data: errorData
+        };
+        throw error;
+      }
+      
+      const data = await response.json();
+      console.log("✅ Service creation response:", data);
+      return data;
+    },
     onSuccess: (data) => {
       console.log("Service created successfully:", data);
       Alert.alert("Success", "Service created successfully!");
@@ -149,18 +218,36 @@ export default function AddServiceScreen({ navigation, route }) {
     },
     onError: (error) => {
       console.error("Create service error:", error);
+      console.error("Full error object:", error);
       console.error("Error details:", error.response?.data);
       console.error("Error status:", error.response?.status);
       console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      console.error("Error config:", error.config);
 
       let errorMessage = "Failed to create service. Please try again.";
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
+      let errorDetails = "";
+      
+      if (error.response?.data) {
+        // Show backend error message
+        errorMessage = error.response.data.message || errorMessage;
+        
+        // Show validation errors if they exist
+        if (error.response.data.errors) {
+          const validationErrors = Object.entries(error.response.data.errors)
+            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+            .join('\n');
+          errorDetails = `Validation errors:\n${validationErrors}`;
+        }
       } else if (error.message) {
         errorMessage = error.message;
+      } else if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNABORTED') {
+        errorMessage = "Network error. Please check your connection and try again.";
       }
 
-      Alert.alert("Error", errorMessage);
+      // Show detailed error in alert
+      const fullErrorMessage = errorDetails ? `${errorMessage}\n\n${errorDetails}` : errorMessage;
+      Alert.alert("Error", fullErrorMessage);
     },
   });
 
@@ -261,12 +348,14 @@ export default function AddServiceScreen({ navigation, route }) {
         formData.append("discount_price", parseFloat(discountPrice));
       }
 
-      // Add media files with dot notation (media.0, media.1, etc.)
+      // Add media files using indexed format (media.0, media.1, etc.)
       let mediaIndex = 0;
-
+      
       if (video) {
         console.log("Adding video file:", video.uri);
         console.log("Video file exists:", video.uri ? "Yes" : "No");
+        console.log("Video URI type:", typeof video.uri);
+        console.log("Video URI length:", video.uri?.length);
         console.log("Raw video object:", video);
         // Create proper file object with all required properties
         const videoFile = {
@@ -275,6 +364,7 @@ export default function AddServiceScreen({ navigation, route }) {
           name: "service_video.mp4",
         };
         formData.append(`media.${mediaIndex}`, videoFile);
+        console.log(`✅ Video added to FormData as media.${mediaIndex}`);
         mediaIndex++;
       }
 
@@ -299,10 +389,9 @@ export default function AddServiceScreen({ navigation, route }) {
           .split(".")
           .pop()}`;
         console.log(`Adding image file ${index + 1}:`, image.uri);
-        console.log(
-          `Image file ${index + 1} exists:`,
-          image.uri ? "Yes" : "No"
-        );
+        console.log(`Image file ${index + 1} exists:`, image.uri ? "Yes" : "No");
+        console.log(`Image URI type:`, typeof image.uri);
+        console.log(`Image URI length:`, image.uri?.length);
         console.log(`Image file ${index + 1} type:`, getFileType(image.uri));
         console.log(`Raw image object ${index + 1}:`, image);
         // Create proper file object with all required properties
@@ -312,6 +401,7 @@ export default function AddServiceScreen({ navigation, route }) {
           name: fileName,
         };
         formData.append(`media.${mediaIndex}`, imageFile);
+        console.log(`✅ Image ${index + 1} added to FormData as media.${mediaIndex}`);
         mediaIndex++;
       });
 
@@ -356,11 +446,19 @@ export default function AddServiceScreen({ navigation, route }) {
       const mediaEntries = formData._parts.filter((pair) =>
         pair[0].startsWith("media")
       );
-      console.log(`Total media entries in FormData: ${mediaEntries.length}`);
-      console.log(
-        "Media field names:",
-        mediaEntries.map((pair) => pair[0])
-      );
+      console.log(`📊 Total media entries: ${mediaEntries.length}`);
+      console.log("📊 Media field names:", mediaEntries.map((pair) => pair[0]));
+      console.log("📊 Expected format: media.0, media.1, media.2, etc.");
+      
+      // Log all FormData entries for debugging
+      console.log("📋 All FormData entries:");
+      for (let [key, value] of formData._parts) {
+        if (value instanceof File || (value && value.uri)) {
+          console.log(`  ${key}: [File] - ${value.name || 'unnamed'} (${value.type})`);
+        } else {
+          console.log(`  ${key}: ${value}`);
+        }
+      }
 
       // Debug: Check if files are being sent as proper file objects
       mediaEntries.forEach((entry, index) => {
