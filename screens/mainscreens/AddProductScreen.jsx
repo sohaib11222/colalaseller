@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getCategories, getBrands } from "../../utils/queries/general";
 import { updateProduct } from "../../utils/mutations/products";
 import { getCoupons } from "../../utils/queries/settings";
+import { getAddresses, getDeliveries } from "../../utils/queries/seller";
 
 // handles: require(number) | string uri | { uri }
 const toSrc = (v) => {
@@ -45,7 +46,7 @@ const toSrc = (v) => {
 // Build a flat list of rows to show in summaries
 const buildVariantSummary = (details, selectedColors, selectedSizes) => {
   const items = [];
-  
+
   // Add debugging
   console.log("buildVariantSummary called with:", {
     details,
@@ -53,24 +54,24 @@ const buildVariantSummary = (details, selectedColors, selectedSizes) => {
     selectedSizes,
     hasDetails: !!details,
     hasColor: !!details?.color,
-    hasSize: !!details?.size
+    hasSize: !!details?.size,
   });
-  
+
   if (details?.color) {
     Object.entries(details.color).forEach(([hex, v]) => {
       if (!selectedColors.includes(hex)) return;
-      
+
       // Safe access to variant data
       const variantData = v || {};
       const images = variantData.images || [];
-      
+
       console.log(`Processing color variant ${hex}:`, {
         variantData,
         images,
         price: variantData.price,
-        compare: variantData.compare
+        compare: variantData.compare,
       });
-      
+
       items.push({
         kind: "Color",
         key: `c-${hex}`,
@@ -82,22 +83,22 @@ const buildVariantSummary = (details, selectedColors, selectedSizes) => {
       });
     });
   }
-  
+
   if (details?.size) {
     Object.entries(details.size).forEach(([s, v]) => {
       if (!selectedSizes.includes(s)) return;
-      
+
       // Safe access to variant data
       const variantData = v || {};
       const images = variantData.images || [];
-      
+
       console.log(`Processing size variant ${s}:`, {
         variantData,
         images,
         price: variantData.price,
-        compare: variantData.compare
+        compare: variantData.compare,
       });
-      
+
       items.push({
         kind: "Size",
         key: `s-${s}`,
@@ -109,7 +110,7 @@ const buildVariantSummary = (details, selectedColors, selectedSizes) => {
       });
     });
   }
-  
+
   console.log("buildVariantSummary returning items:", items);
   return items;
 };
@@ -310,6 +311,8 @@ export default function AddProductScreen({ navigation, route }) {
   const [availOpen, setAvailOpen] = useState(false);
   const [delivOpen, setDelivOpen] = useState(false);
 
+  // API data for addresses and deliveries (using query data directly)
+
   // variants (lives in screen so it persists after closing modal)
   const [variantOpen, setVariantOpen] = useState(false);
   const [variantTypes, setVariantTypes] = useState([]); // ["Color","Size"]
@@ -324,17 +327,14 @@ export default function AddProductScreen({ navigation, route }) {
   const [variantDetailData, setVariantDetailData] = useState(null);
 
   // summary for screen (under Add Variant)
-  const screenVariantSummary = useMemo(
-    () => {
-      console.log("Building screen variant summary with:", {
-        variantDetailData,
-        variantColors,
-        variantSizes
-      });
-      return buildVariantSummary(variantDetailData, variantColors, variantSizes);
-    },
-    [variantDetailData, variantColors, variantSizes]
-  );
+  const screenVariantSummary = useMemo(() => {
+    console.log("Building screen variant summary with:", {
+      variantDetailData,
+      variantColors,
+      variantSizes,
+    });
+    return buildVariantSummary(variantDetailData, variantColors, variantSizes);
+  }, [variantDetailData, variantColors, variantSizes]);
 
   // overall completeness gate
   const isComplete = useMemo(() => {
@@ -401,16 +401,21 @@ export default function AddProductScreen({ navigation, route }) {
 
       let errorMessage = "Failed to create product. Please try again.";
       let errorDetails = "";
-      
+
       if (error.response?.data) {
         // Show backend error message
         errorMessage = error.response.data.message || errorMessage;
-        
+
         // Show validation errors if they exist
         if (error.response.data.errors) {
           const validationErrors = Object.entries(error.response.data.errors)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('\n');
+            .map(
+              ([field, messages]) =>
+                `${field}: ${
+                  Array.isArray(messages) ? messages.join(", ") : messages
+                }`
+            )
+            .join("\n");
           errorDetails = `Validation errors:\n${validationErrors}`;
         }
       } else if (error.message) {
@@ -418,7 +423,9 @@ export default function AddProductScreen({ navigation, route }) {
       }
 
       // Show detailed error in alert
-      const fullErrorMessage = errorDetails ? `${errorMessage}\n\n${errorDetails}` : errorMessage;
+      const fullErrorMessage = errorDetails
+        ? `${errorMessage}\n\n${errorDetails}`
+        : errorMessage;
       Alert.alert("Error", fullErrorMessage);
     },
   });
@@ -459,7 +466,6 @@ export default function AddProductScreen({ navigation, route }) {
       Alert.alert("Error", errorMessage);
     },
   });
-
 
   // Set Bulk Prices Mutation
   const setBulkPricesMutation = useMutation({
@@ -537,6 +543,28 @@ export default function AddProductScreen({ navigation, route }) {
     enabled: !!token,
   });
 
+  // Fetch addresses
+  const {
+    data: addressesData,
+    isLoading: addressesLoading,
+    error: addressesError,
+  } = useQuery({
+    queryKey: ["addresses", token],
+    queryFn: () => getAddresses(token),
+    enabled: !!token,
+  });
+
+  // Fetch deliveries
+  const {
+    data: deliveriesData,
+    isLoading: deliveriesLoading,
+    error: deliveriesError,
+  } = useQuery({
+    queryKey: ["deliveries", token],
+    queryFn: () => getDeliveries(token),
+    enabled: !!token,
+  });
+
   /* ───────────────────────── submit functions ───────────────────────── */
 
   // Create FormData for product creation
@@ -563,12 +591,12 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("discount_price", discountPrice.toString());
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
-    
+
     // Add loyalty points if applicable
     if (usePoints) {
       formData.append("loyality_points_applicable", "1");
     }
-    
+
     // Add coupon code if selected
     if (selectedCoupon?.code) {
       formData.append("coupon_code", selectedCoupon.code);
@@ -582,7 +610,7 @@ export default function AddProductScreen({ navigation, route }) {
       console.log("Video URI type:", typeof video.uri);
       console.log("Video URI length:", video.uri?.length);
       console.log("Raw video object:", video);
-      
+
       const videoFile = {
         uri: video.uri,
         type: "video/mp4",
@@ -608,58 +636,81 @@ export default function AddProductScreen({ navigation, route }) {
     // Add variants if they exist
     if (variantTypes.length > 0 && variantDetailData) {
       console.log("Adding variants to FormData:", variantDetailData);
-      
+
       // Process color variants
       if (variantDetailData.color) {
-        Object.entries(variantDetailData.color).forEach(([colorHex, colorData], index) => {
-          if (variantColors.includes(colorHex)) {
-            formData.append(`variants[${index}][sku]`, `${name.trim()}-${colorHex}`);
-            formData.append(`variants[${index}][color]`, colorHex);
-            formData.append(`variants[${index}][price]`, (colorData.price || price).toString());
-            formData.append(`variants[${index}][discount_price]`, (colorData.compare || discountPrice).toString());
-            formData.append(`variants[${index}][stock]`, "100"); // Default stock
-            
-            // Add variant images if they exist
-            if (colorData.images && colorData.images.length > 0) {
-              colorData.images.forEach((image, imgIndex) => {
-                if (image?.uri) {
-                  formData.append(`variants[${index}][images][]`, {
-                    uri: image.uri,
-                    type: "image/jpeg",
-                    name: `variant_${colorHex}_${imgIndex}.jpg`,
-                  });
-                }
-              });
+        Object.entries(variantDetailData.color).forEach(
+          ([colorHex, colorData], index) => {
+            if (variantColors.includes(colorHex)) {
+              formData.append(
+                `variants[${index}][sku]`,
+                `${name.trim()}-${colorHex}`
+              );
+              formData.append(`variants[${index}][color]`, colorHex);
+              formData.append(
+                `variants[${index}][price]`,
+                (colorData.price || price).toString()
+              );
+              formData.append(
+                `variants[${index}][discount_price]`,
+                (colorData.compare || discountPrice).toString()
+              );
+              formData.append(`variants[${index}][stock]`, "100"); // Default stock
+
+              // Add variant images if they exist
+              if (colorData.images && colorData.images.length > 0) {
+                colorData.images.forEach((image, imgIndex) => {
+                  if (image?.uri) {
+                    formData.append(`variants[${index}][images][]`, {
+                      uri: image.uri,
+                      type: "image/jpeg",
+                      name: `variant_${colorHex}_${imgIndex}.jpg`,
+                    });
+                  }
+                });
+              }
             }
           }
-        });
+        );
       }
-      
+
       // Process size variants
       if (variantDetailData.size) {
-        Object.entries(variantDetailData.size).forEach(([size, sizeData], index) => {
-          if (variantSizes.includes(size)) {
-            const variantIndex = Object.keys(variantDetailData.color || {}).length + index;
-            formData.append(`variants[${variantIndex}][sku]`, `${name.trim()}-${size}`);
-            formData.append(`variants[${variantIndex}][size]`, size);
-            formData.append(`variants[${variantIndex}][price]`, (sizeData.price || price).toString());
-            formData.append(`variants[${variantIndex}][discount_price]`, (sizeData.compare || discountPrice).toString());
-            formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
-            
-            // Add variant images if they exist
-            if (sizeData.images && sizeData.images.length > 0) {
-              sizeData.images.forEach((image, imgIndex) => {
-                if (image?.uri) {
-                  formData.append(`variants[${variantIndex}][images][]`, {
-                    uri: image.uri,
-                    type: "image/jpeg",
-                    name: `variant_${size}_${imgIndex}.jpg`,
-                  });
-                }
-              });
+        Object.entries(variantDetailData.size).forEach(
+          ([size, sizeData], index) => {
+            if (variantSizes.includes(size)) {
+              const variantIndex =
+                Object.keys(variantDetailData.color || {}).length + index;
+              formData.append(
+                `variants[${variantIndex}][sku]`,
+                `${name.trim()}-${size}`
+              );
+              formData.append(`variants[${variantIndex}][size]`, size);
+              formData.append(
+                `variants[${variantIndex}][price]`,
+                (sizeData.price || price).toString()
+              );
+              formData.append(
+                `variants[${variantIndex}][discount_price]`,
+                (sizeData.compare || discountPrice).toString()
+              );
+              formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
+
+              // Add variant images if they exist
+              if (sizeData.images && sizeData.images.length > 0) {
+                sizeData.images.forEach((image, imgIndex) => {
+                  if (image?.uri) {
+                    formData.append(`variants[${variantIndex}][images][]`, {
+                      uri: image.uri,
+                      type: "image/jpeg",
+                      name: `variant_${size}_${imgIndex}.jpg`,
+                    });
+                  }
+                });
+              }
             }
           }
-        });
+        );
       }
     }
 
@@ -690,12 +741,12 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("discount_price", discountPrice.toString());
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
-    
+
     // Add loyalty points if applicable
     if (usePoints) {
       formData.append("loyality_points_applicable", "1");
     }
-    
+
     // Add coupon code if selected
     if (selectedCoupon?.code) {
       formData.append("coupon_code", selectedCoupon.code);
@@ -709,7 +760,7 @@ export default function AddProductScreen({ navigation, route }) {
       console.log("Video URI type:", typeof video.uri);
       console.log("Video URI length:", video.uri?.length);
       console.log("Raw video object:", video);
-      
+
       const videoFile = {
         uri: video.uri,
         type: "video/mp4",
@@ -735,58 +786,81 @@ export default function AddProductScreen({ navigation, route }) {
     // Add variants if they exist
     if (variantTypes.length > 0 && variantDetailData) {
       console.log("Adding variants to FormData:", variantDetailData);
-      
+
       // Process color variants
       if (variantDetailData.color) {
-        Object.entries(variantDetailData.color).forEach(([colorHex, colorData], index) => {
-          if (variantColors.includes(colorHex)) {
-            formData.append(`variants[${index}][sku]`, `${name.trim()}-${colorHex}`);
-            formData.append(`variants[${index}][color]`, colorHex);
-            formData.append(`variants[${index}][price]`, (colorData.price || price).toString());
-            formData.append(`variants[${index}][discount_price]`, (colorData.compare || discountPrice).toString());
-            formData.append(`variants[${index}][stock]`, "100"); // Default stock
-            
-            // Add variant images if they exist
-            if (colorData.images && colorData.images.length > 0) {
-              colorData.images.forEach((image, imgIndex) => {
-                if (image?.uri) {
-                  formData.append(`variants[${index}][images][]`, {
-                    uri: image.uri,
-                    type: "image/jpeg",
-                    name: `variant_${colorHex}_${imgIndex}.jpg`,
-                  });
-                }
-              });
+        Object.entries(variantDetailData.color).forEach(
+          ([colorHex, colorData], index) => {
+            if (variantColors.includes(colorHex)) {
+              formData.append(
+                `variants[${index}][sku]`,
+                `${name.trim()}-${colorHex}`
+              );
+              formData.append(`variants[${index}][color]`, colorHex);
+              formData.append(
+                `variants[${index}][price]`,
+                (colorData.price || price).toString()
+              );
+              formData.append(
+                `variants[${index}][discount_price]`,
+                (colorData.compare || discountPrice).toString()
+              );
+              formData.append(`variants[${index}][stock]`, "100"); // Default stock
+
+              // Add variant images if they exist
+              if (colorData.images && colorData.images.length > 0) {
+                colorData.images.forEach((image, imgIndex) => {
+                  if (image?.uri) {
+                    formData.append(`variants[${index}][images][]`, {
+                      uri: image.uri,
+                      type: "image/jpeg",
+                      name: `variant_${colorHex}_${imgIndex}.jpg`,
+                    });
+                  }
+                });
+              }
             }
           }
-        });
+        );
       }
-      
+
       // Process size variants
       if (variantDetailData.size) {
-        Object.entries(variantDetailData.size).forEach(([size, sizeData], index) => {
-          if (variantSizes.includes(size)) {
-            const variantIndex = Object.keys(variantDetailData.color || {}).length + index;
-            formData.append(`variants[${variantIndex}][sku]`, `${name.trim()}-${size}`);
-            formData.append(`variants[${variantIndex}][size]`, size);
-            formData.append(`variants[${variantIndex}][price]`, (sizeData.price || price).toString());
-            formData.append(`variants[${variantIndex}][discount_price]`, (sizeData.compare || discountPrice).toString());
-            formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
-            
-            // Add variant images if they exist
-            if (sizeData.images && sizeData.images.length > 0) {
-              sizeData.images.forEach((image, imgIndex) => {
-                if (image?.uri) {
-                  formData.append(`variants[${variantIndex}][images][]`, {
-                    uri: image.uri,
-                    type: "image/jpeg",
-                    name: `variant_${size}_${imgIndex}.jpg`,
-                  });
-                }
-              });
+        Object.entries(variantDetailData.size).forEach(
+          ([size, sizeData], index) => {
+            if (variantSizes.includes(size)) {
+              const variantIndex =
+                Object.keys(variantDetailData.color || {}).length + index;
+              formData.append(
+                `variants[${variantIndex}][sku]`,
+                `${name.trim()}-${size}`
+              );
+              formData.append(`variants[${variantIndex}][size]`, size);
+              formData.append(
+                `variants[${variantIndex}][price]`,
+                (sizeData.price || price).toString()
+              );
+              formData.append(
+                `variants[${variantIndex}][discount_price]`,
+                (sizeData.compare || discountPrice).toString()
+              );
+              formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
+
+              // Add variant images if they exist
+              if (sizeData.images && sizeData.images.length > 0) {
+                sizeData.images.forEach((image, imgIndex) => {
+                  if (image?.uri) {
+                    formData.append(`variants[${variantIndex}][images][]`, {
+                      uri: image.uri,
+                      type: "image/jpeg",
+                      name: `variant_${size}_${imgIndex}.jpg`,
+                    });
+                  }
+                });
+              }
             }
           }
-        });
+        );
       }
     }
 
@@ -819,7 +893,7 @@ export default function AddProductScreen({ navigation, route }) {
       // Step 1: Create or update the product
       let productFormData;
       let productResult;
-      
+
       if (isEditMode) {
         if (!finalProductId) {
           console.error("Product ID is missing:", {
@@ -864,7 +938,9 @@ export default function AddProductScreen({ navigation, route }) {
       }
 
       console.log("Product created with ID:", productId);
-      console.log("Product creation completed successfully - all data sent in single request");
+      console.log(
+        "Product creation completed successfully - all data sent in single request"
+      );
 
       // Step 3: Set bulk prices if tiers exist
       if (tiers.length > 0) {
@@ -1265,7 +1341,15 @@ export default function AddProductScreen({ navigation, route }) {
           Promote your product via coupon codes.
         </ThemedText>
         <PickerField
-          label={selectedCoupon ? `${selectedCoupon.code} (${selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value + '%' : '₦' + selectedCoupon.discount_value})` : "Coupon code to be used"}
+          label={
+            selectedCoupon
+              ? `${selectedCoupon.code} (${
+                  selectedCoupon.discount_type === "percentage"
+                    ? selectedCoupon.discount_value + "%"
+                    : "₦" + selectedCoupon.discount_value
+                })`
+              : "Coupon code to be used"
+          }
           empty={!selectedCoupon}
           onPress={() => setCouponOpen(true)}
           C={C}
@@ -1481,6 +1565,9 @@ export default function AddProductScreen({ navigation, route }) {
         }}
         selected={availability}
         setSelected={setAvailability}
+        addressesData={addressesData}
+        isLoading={addressesLoading}
+        error={addressesError}
       />
       <DeliveryPriceSheet
         C={C}
@@ -1499,6 +1586,9 @@ export default function AddProductScreen({ navigation, route }) {
                 "Kano State",
               ]
         }
+        deliveriesData={deliveriesData}
+        isLoading={deliveriesLoading}
+        error={deliveriesError}
       />
 
       {/* Variant full-screen modal */}
@@ -1963,6 +2053,9 @@ function AvailableLocationsSheet({
   selected,
   setSelected,
   C,
+  addressesData,
+  isLoading,
+  error,
 }) {
   console.log(
     "AvailableLocationsSheet visible:",
@@ -1971,47 +2064,19 @@ function AvailableLocationsSheet({
     selected
   );
 
-  const popular = ["All Locations", "Oyo State", "Lagos State", "Rivers State"];
-  const allStates = [
-    "Abia State",
-    "Adamawa State",
-    "Akwa Ibom State",
-    "Anambra State",
-    "Bauchi State",
-    "Bayelsa State",
-    "Benue State",
-    "Borno State",
-    "Cross River State",
-    "Delta State",
-    "Ebonyi State",
-    "Edo State",
-    "Ekiti State",
-    "Enugu State",
-    "Gombe State",
-    "Imo State",
-    "Jigawa State",
-    "Kaduna State",
-    "Kano State",
-    "Katsina State",
-    "Kebbi State",
-    "Kogi State",
-    "Kwara State",
-    "Lagos State",
-    "Nasarawa State",
-    "Niger State",
-    "Ogun State",
-    "Ondo State",
-    "Osun State",
-    "Oyo State",
-    "Plateau State",
-    "Rivers State",
-    "Sokoto State",
-    "Taraba State",
-    "Yobe State",
-    "Zamfara State",
-    "FCT Abuja",
-  ];
   const [q, setQ] = useState("");
+
+  // Extract addresses from API data
+  const addresses = addressesData?.items || [];
+  
+  // Get unique states for popular (main addresses)
+  const popularStates = addresses
+    .filter(addr => addr.is_main)
+    .map(addr => addr.state);
+  const popular = [...new Set(popularStates)].sort(); // Remove duplicates and sort
+  
+  // Get unique states for all states
+  const allStates = [...new Set(addresses.map(addr => addr.state))].sort(); // Remove duplicates and sort
 
   const toggle = (opt) => {
     console.log("Location toggle clicked:", opt, "Current selected:", selected);
@@ -2026,6 +2091,85 @@ function AvailableLocationsSheet({
 
   const filter = (list) =>
     list.filter((s) => s.toLowerCase().includes(q.trim().toLowerCase()));
+
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <ThemedText
+                  font="oleo"
+                  style={[styles.sheetTitle, { color: C.text }]}
+                >
+                  Select Available Location
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={{ color: C.sub, marginTop: 10 }}>
+                Loading addresses...
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <ThemedText
+                  font="oleo"
+                  style={[styles.sheetTitle, { color: C.text }]}
+                >
+                  Select Available Location
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ThemedText style={{ color: C.error, textAlign: "center" }}>
+                Error loading addresses. Please try again.
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -2075,11 +2219,11 @@ function AvailableLocationsSheet({
           <ThemedText style={[styles.sheetSection, { color: C.text }]}>
             Popular
           </ThemedText>
-          {filter(popular).map((opt) => {
+          {filter(popular).map((opt, index) => {
             const checked = selected.includes(opt);
             return (
               <TouchableOpacity
-                key={opt}
+                key={`popular-${opt}-${index}`}
                 onPress={() => toggle(opt)}
                 activeOpacity={0.9}
                 style={[
@@ -2103,11 +2247,11 @@ function AvailableLocationsSheet({
             All States
           </ThemedText>
           <ScrollView showsVerticalScrollIndicator={false}>
-            {filter(allStates).map((opt) => {
+            {filter(allStates).map((opt, index) => {
               const checked = selected.includes(opt);
               return (
                 <TouchableOpacity
-                  key={opt}
+                  key={`all-${opt}-${index}`}
                   onPress={() => toggle(opt)}
                   activeOpacity={0.9}
                   style={[
@@ -2152,38 +2296,54 @@ function DeliveryPriceSheet({
   setSelected,
   statesSource,
   C,
+  deliveriesData,
+  isLoading,
+  error,
 }) {
   console.log("DeliveryPriceSheet visible:", visible, "selected:", selected);
 
-  const DATA = {
-    "Lagos State": [
-      { area: "Ikeja (light)", group: "Light", price: 5000, free: false },
-      { area: "Ikeja (Medium)", group: "Medium", price: 10000, free: true },
-      { area: "Ikeja (Heavy)", group: "Heavy", price: 20000, free: true },
-      { area: "Lekki (light)", group: "Light", price: 5000, free: false },
-      { area: "Mainland (light)", group: "Light", price: 5000, free: true },
-      { area: "Epe (light)", group: "Light", price: 5000, free: false },
-    ],
-    "Oyo State": [
-      { area: "Ibadan (light)", group: "Light", price: 4000, free: false },
-      { area: "Ibadan (Medium)", group: "Medium", price: 8000, free: true },
-    ],
-    "Abuja State": [
-      { area: "Central (light)", group: "Light", price: 7000, free: false },
-    ],
-    "Rivers State": [
-      { area: "PH City (light)", group: "Light", price: 6000, free: false },
-    ],
-    "Kano State": [
-      { area: "Kano City (light)", group: "Light", price: 5000, free: false },
-    ],
-  };
-
-  const tabs = statesSource.length ? statesSource : Object.keys(DATA);
-  const [active, setActive] = useState(tabs[0] || "Lagos State");
-
+  const [active, setActive] = useState(statesSource[0] || "Lagos State");
   const [goodsFilter, setGoodsFilter] = useState("All Goods");
   const [showGoodsMenu, setShowGoodsMenu] = useState(false);
+
+  // Transform deliveries data to match the expected format
+  const deliveries = deliveriesData?.items || [];
+  const DATA = {};
+  
+  console.log("Raw deliveries data:", deliveries);
+  
+  // Group deliveries by state and create unique combinations
+  deliveries.forEach(delivery => {
+    const state = delivery.state;
+    if (!DATA[state]) {
+      DATA[state] = [];
+    }
+    
+    // Create a unique key for this delivery option
+    const uniqueKey = `${delivery.local_government}-${delivery.variant}`;
+    
+    // Check if this combination already exists to avoid duplicates
+    const existingItem = DATA[state].find(item => 
+      item.area === `${delivery.local_government} (${delivery.variant})`
+    );
+    
+    if (!existingItem) {
+      DATA[state].push({
+        id: delivery.id,
+        area: `${delivery.local_government} (${delivery.variant})`,
+        group: delivery.variant,
+        price: parseFloat(delivery.price),
+        free: delivery.is_free === 1,
+        state: delivery.state,
+        local_government: delivery.local_government,
+        variant: delivery.variant,
+      });
+    }
+  });
+  
+  console.log("Transformed DATA:", DATA);
+
+  const tabs = statesSource.length ? statesSource : Object.keys(DATA);
 
   const toggle = (item) => {
     console.log(
@@ -2192,34 +2352,115 @@ function DeliveryPriceSheet({
       "Current selected:",
       selected
     );
-    const key = `${active}::${item.area}`;
     setSelected((prev) => {
-      const exists = prev.find((x) => x.key === key);
+      const exists = prev.some((s) => 
+        s.state === item.state && 
+        s.local_government === item.local_government && 
+        s.variant === item.variant
+      );
       const newSelection = exists
-        ? prev.filter((x) => x.key !== key)
-        : [
-            ...prev,
-            {
-              key,
-              state: active,
-              area: item.area,
-              price: item.price,
-              free: item.free,
-            },
-          ];
+        ? prev.filter((s) => 
+            !(s.state === item.state && 
+              s.local_government === item.local_government && 
+              s.variant === item.variant)
+          )
+        : [...prev, item];
       console.log("New delivery selection:", newSelection);
       return newSelection;
     });
   };
 
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <ThemedText
+                  font="oleo"
+                  style={[styles.sheetTitle, { color: C.text }]}
+                >
+                  Select Delivery Locations
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={{ color: C.sub, marginTop: 10 }}>
+                Loading delivery options...
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent
+        onRequestClose={onClose}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <ThemedText
+                  font="oleo"
+                  style={[styles.sheetTitle, { color: C.text }]}
+                >
+                  Select Delivery Locations
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.sheetClose, { borderColor: C.line }]}
+              >
+                <Ionicons name="close" size={18} color={C.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ThemedText style={{ color: C.error, textAlign: "center" }}>
+                Error loading delivery options. Please try again.
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   const isChecked = (item) =>
-    !!selected.find((x) => x.state === active && x.area === item.area);
+    !!selected.find((x) => 
+      x.state === item.state && 
+      x.local_government === item.local_government && 
+      x.variant === item.variant
+    );
 
   const rowsRaw = DATA[active] || [];
   const rows =
     goodsFilter === "All Goods"
-      ? rowsRaw
-      : rowsRaw.filter((r) => `${r.group} Goods` === goodsFilter);
+      ? rowsRaw.sort((a, b) => a.area.localeCompare(b.area)) // Sort alphabetically
+      : rowsRaw.filter((r) => `${r.group} Goods` === goodsFilter).sort((a, b) => a.area.localeCompare(b.area)); // Sort alphabetically
 
   return (
     <Modal
@@ -2377,11 +2618,11 @@ function DeliveryPriceSheet({
 
           {/* Rows */}
           <ScrollView showsVerticalScrollIndicator={false}>
-            {rows.map((r) => {
+            {rows.map((r, index) => {
               const checked = isChecked(r);
               return (
                 <TouchableOpacity
-                  key={r.area}
+                  key={`${r.id}-${r.area}-${index}`}
                   onPress={() => toggle(r)}
                   style={[
                     styles.deliveryRow,
@@ -3473,29 +3714,29 @@ function VariantDetailsModal({
                 colorMap,
                 sizeMap,
                 colorMapKeys: Object.keys(colorMap),
-                sizeMapKeys: Object.keys(sizeMap)
+                sizeMapKeys: Object.keys(sizeMap),
               });
-              
+
               // Debug each color variant
               Object.entries(colorMap).forEach(([hex, data]) => {
                 console.log(`Color ${hex} data:`, {
                   price: data.price,
                   compare: data.compare,
                   images: data.images,
-                  imagesLength: data.images?.length
+                  imagesLength: data.images?.length,
                 });
               });
-              
+
               // Debug each size variant
               Object.entries(sizeMap).forEach(([size, data]) => {
                 console.log(`Size ${size} data:`, {
                   price: data.price,
                   compare: data.compare,
                   images: data.images,
-                  imagesLength: data.images?.length
+                  imagesLength: data.images?.length,
                 });
               });
-              
+
               onSave({ color: colorMap, size: sizeMap });
             }}
             activeOpacity={0.9}
@@ -3556,9 +3797,10 @@ function CouponSheet({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter coupons based on search query
-  const filteredCoupons = couponsData?.data?.filter((coupon) =>
-    coupon.code.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredCoupons =
+    couponsData?.data?.filter((coupon) =>
+      coupon.code.toLowerCase().includes(searchQuery.toLowerCase())
+    ) || [];
 
   const CouponRow = ({ coupon }) => (
     <TouchableOpacity
@@ -3574,10 +3816,9 @@ function CouponSheet({
           {coupon.code}
         </ThemedText>
         <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
-          {coupon.discount_type === 'percentage' 
-            ? `${coupon.discount_value}% off` 
-            : `₦${coupon.discount_value} off`
-          }
+          {coupon.discount_type === "percentage"
+            ? `${coupon.discount_value}% off`
+            : `₦${coupon.discount_value} off`}
         </ThemedText>
         {coupon.expiry_date && (
           <ThemedText style={{ color: C.sub, fontSize: 11, marginTop: 1 }}>
@@ -3585,15 +3826,17 @@ function CouponSheet({
           </ThemedText>
         )}
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
+      <View style={{ alignItems: "flex-end" }}>
         <ThemedText style={{ color: C.sub, fontSize: 11 }}>
           Used: {coupon.times_used}/{coupon.max_usage}
         </ThemedText>
-        <ThemedText style={{ 
-          color: coupon.status === 'active' ? '#10B981' : '#EF4444', 
-          fontSize: 11,
-          fontWeight: '600'
-        }}>
+        <ThemedText
+          style={{
+            color: coupon.status === "active" ? "#10B981" : "#EF4444",
+            fontSize: 11,
+            fontWeight: "600",
+          }}
+        >
           {coupon.status}
         </ThemedText>
       </View>
