@@ -137,21 +137,27 @@ const API_ENDPOINTS = {
     Single_Boost: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // GET
     Boost_Status: (id) => `${API_DOMAIN}/seller/boosts/${id}/status`, // PATCH
   },
-  GENERAL:{
+  GENERAL: {
     Categories: `${API_DOMAIN}/categories`, // GET
     Brands: `${API_DOMAIN}/brands`, // GET
   },
-  ORDERS:{
+  ORDERS: {
     Get_All_Orders: `${API_DOMAIN}/seller/orders`, // GET
-    Order_Detail: (id)=>`${API_DOMAIN}/seller/orders/${id}`,
-    Mark_For_Delivery: (id)=>`${API_DOMAIN}/seller/orders/${id}/out-for-deliver`,
-    Verify_Code: (id)=>`${API_DOMAIN}/seller/orders/${id}/delivered`,
+    Order_Detail: (id) => `${API_DOMAIN}/seller/orders/${id}`,
+    Mark_For_Delivery: (id) => `${API_DOMAIN}/seller/orders/${id}/out-for-deliver`,
+    Verify_Code: (id) => `${API_DOMAIN}/seller/orders/${id}/delivered`,
   },
   CHATS: {
     List: `${API_DOMAIN}/seller/chat`,
     Details: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/messages`,
     Send: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/send`,
-  }
+  },
+
+  STORES: {
+    // GET -> fetch current store + all_categories
+    // POST -> create/update store builder payload
+    Builder: `${API_DOMAIN}/seller/store/builder`,
+  },
 };
 
 export { API_DOMAIN, API_ENDPOINTS };
