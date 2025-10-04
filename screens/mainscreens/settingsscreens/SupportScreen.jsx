@@ -31,7 +31,7 @@ export default function SupportScreen() {
   const { token } = useAuth();
   // Query client for refresh functionality
   const queryClient = useQueryClient();
-  
+
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
 
@@ -48,8 +48,12 @@ export default function SupportScreen() {
   );
 
   // Fetch support tickets
-  const { data: ticketsData, isLoading, error } = useQuery({
-    queryKey: ['supportTickets', token],
+  const {
+    data: ticketsData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["supportTickets", token],
     queryFn: () => getSupportList(token),
     enabled: !!token,
   });
@@ -77,9 +81,9 @@ export default function SupportScreen() {
     setRefreshing(true);
     try {
       // Invalidate and refetch support tickets query
-      await queryClient.invalidateQueries({ queryKey: ['supportTickets'] });
+      await queryClient.invalidateQueries({ queryKey: ["supportTickets"] });
     } catch (error) {
-      console.log('Refresh error:', error);
+      console.log("Refresh error:", error);
     } finally {
       setRefreshing(false);
     }
@@ -158,17 +162,35 @@ export default function SupportScreen() {
             Support
           </ThemedText>
 
-          <TouchableOpacity style={styles.circleBtn}>
-            <Ionicons
-              name="notifications-outline"
-              size={18}
-              color={C.text}
-            />
+          {/* ✅ Notification button now navigates to Notification screen */}
+          <TouchableOpacity
+            style={styles.circleBtn}
+            onPress={() => {
+              try {
+                console.log("Navigating to Notification screen");
+                // If Notification screen is nested (e.g., inside ChatNavigator)
+                navigation.navigate("ChatNavigator", {
+                  screen: "Notification",
+                });
+
+                // 👉 OR if it’s a direct route, just use:
+                // navigation.navigate("Notification");
+              } catch (error) {
+                console.error("Navigation error:", error);
+              }
+            }}
+          >
+            <Ionicons name="notifications-outline" size={18} color={C.text} />
           </TouchableOpacity>
         </View>
 
         {/* Search input */}
-        <View style={[styles.searchWrap, { backgroundColor: C.card, borderColor: C.line }]}>
+        <View
+          style={[
+            styles.searchWrap,
+            { backgroundColor: C.card, borderColor: C.line },
+          ]}
+        >
           <TextInput
             placeholder="Search chat"
             placeholderTextColor="#9CA3AF"
@@ -184,9 +206,16 @@ export default function SupportScreen() {
 
       {/* Header loading indicator */}
       {isLoading && (
-        <View style={[styles.headerLoadingContainer, { backgroundColor: C.card, borderBottomColor: C.line }]}>
+        <View
+          style={[
+            styles.headerLoadingContainer,
+            { backgroundColor: C.card, borderBottomColor: C.line },
+          ]}
+        >
           <ActivityIndicator size="small" color={C.primary} />
-          <ThemedText style={[styles.headerLoadingText, { color: C.sub }]}>Loading support tickets...</ThemedText>
+          <ThemedText style={[styles.headerLoadingText, { color: C.sub }]}>
+            Loading support tickets...
+          </ThemedText>
         </View>
       )}
 
@@ -249,18 +278,16 @@ export default function SupportScreen() {
             <View style={styles.emptyWrap}>
               <Ionicons name="chatbubbles-outline" size={64} color={C.sub} />
               <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
-                {query.trim()
-                  ? "No tickets found"
-                  : "No support tickets"}
+                {query.trim() ? "No tickets found" : "No support tickets"}
               </ThemedText>
               <ThemedText style={[styles.emptyText, { color: C.sub }]}>
                 {query.trim()
                   ? "No tickets found matching your search. Try a different search term."
-                  : tab === "pending" 
-                    ? "No pending tickets at the moment."
-                    : tab === "resolved"
-                    ? "No resolved tickets yet."
-                    : "You haven't created any support tickets yet. Tap the + button to create one."}
+                  : tab === "pending"
+                  ? "No pending tickets at the moment."
+                  : tab === "resolved"
+                  ? "No resolved tickets yet."
+                  : "You haven't created any support tickets yet. Tap the + button to create one."}
               </ThemedText>
             </View>
           }
@@ -268,7 +295,9 @@ export default function SupportScreen() {
             <TouchableOpacity
               style={[styles.ticketCard, { backgroundColor: C.card }]}
               onPress={() =>
-                navigation.navigate("SupportDetailsScreen", { ticketId: item.id })
+                navigation.navigate("SupportDetailsScreen", {
+                  ticketId: item.id,
+                })
               }
             >
               <View style={styles.ticketContent}>
@@ -278,7 +307,10 @@ export default function SupportScreen() {
                     style={styles.ticketAvatar}
                   />
                   <View style={styles.ticketInfo}>
-                    <ThemedText style={[styles.ticketSubject, { color: C.text }]} numberOfLines={1}>
+                    <ThemedText
+                      style={[styles.ticketSubject, { color: C.text }]}
+                      numberOfLines={1}
+                    >
                       {item.subject}
                     </ThemedText>
                     <ThemedText
@@ -298,7 +330,12 @@ export default function SupportScreen() {
                     {item.createdAt}
                   </ThemedText>
                   {item.unreadCount > 0 && (
-                    <View style={[styles.unreadBadge, { backgroundColor: C.primary }]}>
+                    <View
+                      style={[
+                        styles.unreadBadge,
+                        { backgroundColor: C.primary },
+                      ]}
+                    >
                       <ThemedText style={styles.unreadText}>
                         {item.unreadCount}
                       </ThemedText>
@@ -329,18 +366,21 @@ const TabPill = ({ label, active, onPress, C }) => (
   <TouchableOpacity
     onPress={onPress}
     style={[
-      styles.tabPill, 
-      active 
-        ? [styles.tabActive, { backgroundColor: C.primary }] 
-        : [styles.tabInactive, { backgroundColor: C.card, borderColor: C.line }]
+      styles.tabPill,
+      active
+        ? [styles.tabActive, { backgroundColor: C.primary }]
+        : [
+            styles.tabInactive,
+            { backgroundColor: C.card, borderColor: C.line },
+          ],
     ]}
     activeOpacity={0.9}
   >
     <ThemedText
       style={[
         styles.tabText,
-        active 
-          ? styles.tabTextActive 
+        active
+          ? styles.tabTextActive
           : [styles.tabTextInactive, { color: C.sub }],
       ]}
     >
@@ -440,12 +480,12 @@ const styles = StyleSheet.create({
   tabTextInactive: {},
 
   /* Empty state */
-  emptyWrap: { 
-    flex: 1, 
-    alignItems: "center", 
-    justifyContent: "center", 
+  emptyWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 60,
-    paddingHorizontal: 32 
+    paddingHorizontal: 32,
   },
   emptyTitle: {
     fontSize: 18,
@@ -453,8 +493,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
-  emptyText: { 
-    textAlign: "center", 
+  emptyText: {
+    textAlign: "center",
     lineHeight: 20,
     marginTop: 8,
     fontSize: 14,

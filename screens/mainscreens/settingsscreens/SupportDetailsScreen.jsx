@@ -438,9 +438,9 @@ export default function SupportDetailsScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.cartButton, { backgroundColor: C.lightGray }]}>
+          {/* <TouchableOpacity style={[styles.cartButton, { backgroundColor: C.lightGray }]}>
             <Ionicons name="cart-outline" size={20} color={C.text} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* Dispute Summary Card */}

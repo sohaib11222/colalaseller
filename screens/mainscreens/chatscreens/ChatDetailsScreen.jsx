@@ -380,14 +380,14 @@ export default function ChatDetailsScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.hIcon}
             onPress={() => {
               // navigate to cart screen if available
             }}
           >
             <Image source={require('../../../assets/cart-black.png')} style={styles.iconImg} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* Messages */}
