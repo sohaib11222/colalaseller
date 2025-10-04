@@ -26,7 +26,7 @@ import { createProduct, createProductVariant, setBulkPrices, attachDeliveryOptio
 import { Alert, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { getCategories, getBrands } from "../../utils/queries/general";
-
+import { updateProduct } from "../../utils/mutations/products";
 
 // handles: require(number) | string uri | { uri }
 const toSrc = (v) => {
@@ -163,10 +163,35 @@ const FREE_DELIVERY_ICON = require("../../assets/Frame 269.png");
 
 /* ───────────────────────── screen ───────────────────────── */
 
-export default function AddProductScreen({ navigation }) {
+export default function AddProductScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { token } = useAuth();
   const queryClient = useQueryClient();
+
+  // Check if we're in edit mode
+  const isEditMode = route?.params?.editMode || false;
+  const productData = route?.params?.productData || {};
+  const productId = route?.params?.productId || productData?.id;
+  
+  // Ensure productId is properly converted to string for API calls
+  const finalProductId = productId ? String(productId) : null;
+  
+  console.log('AddProductScreen received params:', {
+    isEditMode,
+    productData,
+    productId,
+    routeParams: route?.params
+  });
+  
+  console.log('Product ID validation:', {
+    productId,
+    productIdType: typeof productId,
+    productIdTruthy: !!productId,
+    productIdString: String(productId),
+    finalProductId,
+    finalProductIdType: typeof finalProductId,
+    finalProductIdTruthy: !!finalProductId
+  });
 
   const C = useMemo(
     () => ({
@@ -192,6 +217,32 @@ export default function AddProductScreen({ navigation }) {
   const [fullDesc, setFullDesc] = useState("");
   const [price, setPrice] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
+
+  // Pre-fill form when in edit mode
+  useEffect(() => {
+    if (isEditMode && productData) {
+      setName(productData.name || "");
+      setCategory(productData.category_id?.toString() || "");
+      setBrand(productData.brand || "");
+      setShortDesc(productData.description || "");
+      setFullDesc(productData.description || "");
+      setPrice(productData.price || "");
+      setDiscountPrice(productData.discount_price || "");
+      
+      // Handle images
+      if (productData.images && productData.images.length > 0) {
+        const imageUris = productData.images.map(img => ({
+          uri: `https://colala.hmstech.xyz/storage/${img.path}`
+        }));
+        setImages(imageUris);
+      }
+      
+      // Handle video
+      if (productData.video) {
+        setVideo({ uri: `https://colala.hmstech.xyz/storage/${productData.video}` });
+      }
+    }
+  }, [isEditMode, productData]);
 
   const [tag1, setTag1] = useState("");
   const [tag2, setTag2] = useState("");
@@ -233,6 +284,11 @@ export default function AddProductScreen({ navigation }) {
 
   // overall completeness gate
   const isComplete = useMemo(() => {
+    // Skip validation for edit mode - data is already validated
+    if (isEditMode) {
+      return true;
+    }
+    
     const requiredStrings = [
       name,
       shortDesc,
@@ -257,6 +313,7 @@ export default function AddProductScreen({ navigation }) {
       brandSelected
     );
   }, [
+    isEditMode,
     video,
     images,
     availability,
@@ -288,6 +345,38 @@ export default function AddProductScreen({ navigation }) {
     onError: (error) => {
       console.error("Create product error:", error);
       const errorMessage = error?.response?.data?.message || error?.message || "Failed to create product";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Update Product Mutation
+  const updateProductMutation = useMutation({
+    mutationFn: ({ id, payload }) => {
+      console.log("updateProductMutation called with:", { id, payload, token, finalProductId });
+      return updateProduct(id, payload, token);
+    },
+    onSuccess: (data) => {
+      console.log("Product updated successfully:", data);
+      if (data.status === "success") {
+        Alert.alert("Success", "Product updated successfully!");
+        queryClient.invalidateQueries(['products']);
+        queryClient.invalidateQueries(['productDetails']);
+        navigation.goBack();
+      }
+    },
+    onError: (error) => {
+      console.error("Error updating product:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
+      let errorMessage = "Failed to update product";
+      if (error?.data?.message) {
+        errorMessage = error.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
       Alert.alert("Error", errorMessage);
     },
   });
@@ -333,6 +422,7 @@ export default function AddProductScreen({ navigation }) {
 
   // Combined loading state
   const isSubmitting = createProductMutation.isPending || 
+                      updateProductMutation.isPending ||
                       createVariantMutation.isPending || 
                       setBulkPricesMutation.isPending || 
                       attachDeliveryMutation.isPending;
@@ -435,10 +525,13 @@ export default function AddProductScreen({ navigation }) {
   const handleSubmitProduct = async () => {
     if (!isComplete || isSubmitting) return;
     
-    // Validate required fields
-    if (!name || !category || !brand || !fullDesc || !price || !discountPrice) {
-      Alert.alert("Error", "Please fill in all required fields");
-      return;
+    // Skip frontend validation for edit mode - data is already validated
+    if (!isEditMode) {
+      // Validate required fields only for new products
+      if (!name || !category || !brand || !fullDesc || !price || !discountPrice) {
+        Alert.alert("Error", "Please fill in all required fields");
+        return;
+      }
     }
     
     try {
@@ -448,10 +541,32 @@ export default function AddProductScreen({ navigation }) {
       const productFormData = createProductFormData();
       console.log("Product FormData created");
       
-      const productResult = await createProductMutation.mutateAsync(productFormData);
+      let productResult;
+      if (isEditMode) {
+        if (!finalProductId) {
+          console.error('Product ID is missing:', {
+            routeProductId: route?.params?.productId,
+            productDataId: productData?.id,
+            originalProductId: productId,
+            finalProductId: finalProductId,
+            productData: productData
+          });
+          throw new Error(`Product ID is required for update. Received: ${finalProductId}`);
+        }
+        console.log('Updating product with:', {
+          id: finalProductId,
+          payload: productFormData
+        });
+        productResult = await updateProductMutation.mutateAsync({
+          id: finalProductId,
+          payload: productFormData
+        });
+      } else {
+        productResult = await createProductMutation.mutateAsync(productFormData);
+      }
       
       if (productResult?.status !== "success") {
-        throw new Error(productResult?.message || "Failed to create product");
+        throw new Error(productResult?.message || `Failed to ${isEditMode ? 'update' : 'create'} product`);
       }
       
       const productId = productResult?.data?.id;
@@ -538,12 +653,12 @@ export default function AddProductScreen({ navigation }) {
         }
       }
       
-      console.log("Product creation completed successfully!");
+      console.log("Product operation completed successfully!");
       
       // Show success message to user
       Alert.alert(
         "Success", 
-        "Product created successfully!",
+        isEditMode ? "Product updated successfully!" : "Product created successfully!",
         [
           {
             text: "OK",
@@ -556,8 +671,8 @@ export default function AddProductScreen({ navigation }) {
       );
       
     } catch (error) {
-      console.error("Product creation failed:", error);
-      Alert.alert("Error", error.message || "Failed to create product. Please try again.");
+      console.error("Product operation failed:", error);
+      Alert.alert("Error", error.message || `Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`);
     }
   };
 
@@ -993,7 +1108,7 @@ export default function AddProductScreen({ navigation }) {
             </View>
           ) : (
             <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-              Post Product
+              {isEditMode ? "Update Product" : "Post Product"}
             </ThemedText>
           )}
         </TouchableOpacity>

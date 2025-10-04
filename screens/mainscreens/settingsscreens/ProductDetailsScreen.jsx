@@ -11,6 +11,7 @@ import {
   Animated,
   Dimensions,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -21,7 +22,8 @@ import { PanResponder } from "react-native";
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 
-const toSrc = (v) => (typeof v === "number" ? v : v ? { uri: String(v) } : undefined);
+const toSrc = (v) =>
+  typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
 
 // 🔴 replace if your filename differs
 const IMG_TRASH = require("../../../assets/Vector (9).png");
@@ -30,9 +32,85 @@ const IMG_BOOST = require("../../../assets/Rectangle 162 (1).png");
 
 /* ──────────────────────────────────────────────────────────────────────────── */
 
+//Code Related to Integration
+import {
+  getProductDetails,
+  getProductChartData,
+  getProductStatistics,
+} from "../../../utils/queries/products";
+import { deleteProduct } from "../../../utils/mutations/products";
+import { useAuth } from "../../../contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { previewBoost, createBoost } from "../../../utils/mutations/settings";
 export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
+  const productId = route?.params?.id || item?.id;
+  console.log("The Product Id is", productId);
   const { theme } = useTheme();
+  const { user, token } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Debug logging for auth
+  console.log("User from AuthContext:", user);
+  console.log("Token from AuthContext:", token);
+
+  // API Queries
+  const {
+    data: productData,
+    isLoading: productLoading,
+    error: productError,
+  } = useQuery({
+    queryKey: ["productDetails", productId],
+    queryFn: () => getProductDetails(productId, token),
+    enabled: !!productId && !!token,
+  });
+
+  const { data: chartData, isLoading: chartLoading } = useQuery({
+    queryKey: ["productChartData", productId],
+    queryFn: () => getProductChartData(productId, token),
+    enabled: !!productId && !!token,
+  });
+
+  const { data: statisticsData, isLoading: statsLoading } = useQuery({
+    queryKey: ["productStatistics", productId],
+    queryFn: () => getProductStatistics(productId, token),
+    enabled: !!productId && !!token,
+  });
+
+  // Delete mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: () => deleteProduct(productId, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["products"]);
+      navigation.goBack();
+    },
+  });
+
+  // Extract data from API responses
+  const product = productData?.data || {};
+  const chart = chartData?.data || [];
+  const stats = statisticsData?.data || {};
+  const productImages = product?.images || [];
+
+  // Debug logging
+  console.log("Product Data:", product);
+  console.log("Product ID from product object:", product?.id);
+  console.log("Product ID from route params:", productId);
+  console.log("Chart Data:", chart);
+  console.log("Stats Data:", stats);
+  console.log("Product Images:", productImages);
+  console.log("Final Stats:", finalStats);
+
+  // Loading states
+  const isLoading = productLoading || chartLoading || statsLoading;
+
+  // Error states
+  const hasAuthError =
+    productError?.statusCode === 401 ||
+    chartLoading?.statusCode === 401 ||
+    statsLoading?.statusCode === 401;
+  const hasError = productError || chartLoading || statsLoading;
 
   const C = useMemo(
     () => ({
@@ -46,34 +124,56 @@ export default function ProductDetailsScreen({ route, navigation }) {
     [theme]
   );
 
-  const stats = {
-    orderId: "ORD-1234DFEKFK",
-    createdAt: "July 19, 2025 - 07:22AM",
-    views: item.views ?? 200,
-    inCart: 200,
-    completed: 200,
-    uncompleted: 100,
-    profileClicks: 10,
-    chats: 5,
+  // Use real API data with N/A fallbacks
+  const finalStats = {
+    orderId: product?.id ? `ORD-${product.id}` : "N/A",
+    createdAt: product?.created_at
+      ? new Date(product.created_at).toLocaleDateString()
+      : "N/A",
+    views: stats?.view || 0,
+    inCart: stats?.add_to_cart || 0,
+    completed: stats?.order || 0,
+    uncompleted: 0,
+    profileClicks: stats?.click || 0,
+    chats: stats?.chat || 0,
+    impressions: stats?.impression || 0,
   };
 
-  const series = {
-    labels: ["1", "2", "3", "4", "5", "6", "7"],
-    impressions: [65, 40, 75, 30, 90, 65, 55],
-    visitors: [35, 60, 20, 18, 70, 55, 45],
-    orders: [20, 25, 5, 12, 40, 35, 22],
-  };
+  // Use real chart data or show empty state
+  const finalSeries =
+    chart.length > 0
+      ? {
+          labels: chart.map((_, i) => String(i + 1)),
+          impressions: chart.map((item) => item.impressions || 0),
+          visitors: chart.map((item) => item.visitors || 0),
+          orders: chart.map((item) => item.orders || 0),
+        }
+      : {
+          labels: ["N/A"],
+          impressions: [0],
+          visitors: [0],
+          orders: [0],
+        };
 
   const [viewOpen, setViewOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar style="dark" />
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.line, backgroundColor: C.card }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: C.line, backgroundColor: C.card },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={[styles.hIcon, { borderColor: C.line, backgroundColor: C.card }]}
+          style={[
+            styles.hIcon,
+            { borderColor: C.line, backgroundColor: C.card },
+          ]}
         >
           <Ionicons name="chevron-back" size={20} color={C.text} />
         </TouchableOpacity>
@@ -83,104 +183,370 @@ export default function ProductDetailsScreen({ route, navigation }) {
         </ThemedText>
 
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity style={[styles.hIcon, { borderColor: C.line, backgroundColor: C.card }]}>
+          <TouchableOpacity
+            style={[
+              styles.hIcon,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
+          >
             <Ionicons name="filter" size={18} color={C.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.hIcon, { borderColor: C.line, backgroundColor: C.card }]}>
+          <TouchableOpacity
+            style={[
+              styles.hIcon,
+              { borderColor: C.line, backgroundColor: C.card },
+            ]}
+          >
             <Ionicons name="ellipsis-vertical" size={18} color={C.text} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 14, paddingBottom: 26 }}>
-        {/* Summary block */}
-        <View
-          style={[
-            styles.summaryWrap,
-            { backgroundColor: C.card, borderColor: C.line, shadowColor: "#000" },
-          ]}
-        >
-          <Image source={toSrc(item.image)} style={styles.summaryImg} />
-          <View style={{ flex: 1 }}>
-            <ThemedText numberOfLines={1} style={{ color: C.text, fontWeight: "700", marginTop: 14 }}>
-              {item.title || "Product name"} - Black
+      {/* Loading State */}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={C.primary} />
+            <ThemedText style={{ color: C.text, marginTop: 16, fontSize: 16 }}>
+              Loading product details...
             </ThemedText>
-            <ThemedText style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}>
-              ₦{Number(item.price || 0).toLocaleString()}
-            </ThemedText>
-            <ThemedText style={{ color: C.sub, marginTop: 6 }}>Qty left: 200</ThemedText>
           </View>
         </View>
-
-        {/* Action buttons */}
-        <View style={{ flexDirection: "row", gap: 14, marginTop: 14 }}>
-          <TouchableOpacity style={[styles.bigBtn, { backgroundColor: C.primary }]}>
-            <ThemedText style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>Edit Product</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bigBtn, { backgroundColor: "#111" }]}
-            onPress={() => setViewOpen(true)}
+      ) : hasAuthError ? (
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <Ionicons name="lock-closed" size={48} color={C.primary} />
+            <ThemedText
+              style={{
+                color: C.text,
+                marginTop: 16,
+                fontSize: 16,
+                textAlign: "center",
+              }}
+            >
+              Authentication Required
+            </ThemedText>
+            <ThemedText
+              style={{
+                color: C.sub,
+                marginTop: 8,
+                fontSize: 14,
+                textAlign: "center",
+              }}
+            >
+              Please log in again to view product details
+            </ThemedText>
+            <TouchableOpacity
+              style={[
+                styles.bigBtn,
+                { backgroundColor: C.primary, marginTop: 16 },
+              ]}
+              onPress={() => navigation.goBack()}
+            >
+              <ThemedText
+                style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
+              >
+                Go Back
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 14, paddingBottom: 26 }}
+        >
+          {/* Summary block */}
+          <View
+            style={[
+              styles.summaryWrap,
+              {
+                backgroundColor: C.card,
+                borderColor: C.line,
+                shadowColor: "#000",
+              },
+            ]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>View Product</ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        {/* Chart card */}
-        <View
-          style={[
-            styles.chartCard,
-            { backgroundColor: C.card, borderColor: C.line, shadowColor: "#000" },
-          ]}
-        >
-          <Legend C={C} />
-          <MiniGroupedBars C={C} series={series} />
-          <View style={[styles.pagerBar, { backgroundColor: "#E5E7EB" }]} />
-        </View>
-
-        {/* Product statistics */}
-        <View style={[styles.statsCard, { backgroundColor: C.card, borderColor: C.line }]}>
-          <View style={[styles.statsHeader, { backgroundColor: C.primary }]}>
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Product Statistics</ThemedText>
+            <Image
+              source={toSrc(
+                productImages[0]?.path
+                  ? `https://colala.hmstech.xyz/storage/${productImages[0].path}`
+                  : item.image ||
+                      "https://via.placeholder.com/118x93?text=No+Image"
+              )}
+              style={styles.summaryImg}
+            />
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                numberOfLines={1}
+                style={{ color: C.text, fontWeight: "700", marginTop: 14 }}
+              >
+                {product.name || item.title || "N/A"}
+              </ThemedText>
+              <ThemedText
+                style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}
+              >
+                ₦{Number(product.price || item.price || 0).toLocaleString()}
+              </ThemedText>
+              {product.discount_price && (
+                <ThemedText
+                  style={{
+                    color: C.sub,
+                    textDecorationLine: "line-through",
+                    fontSize: 12,
+                    marginTop: 2,
+                  }}
+                >
+                  ₦{Number(product.discount_price).toLocaleString()}
+                </ThemedText>
+              )}
+              <ThemedText style={{ color: C.sub, marginTop: 6 }}>
+                Qty left: {product.stock || "N/A"}
+              </ThemedText>
+            </View>
           </View>
 
-          {[
-            ["Order ID", stats.orderId],
-            ["Date Created", stats.createdAt],
-            ["Views", stats.views?.toLocaleString?.() ?? String(stats.views)],
-            ["In cart", String(stats.inCart)],
-            ["Completed Orders", String(stats.completed)],
-            ["Uncompleted", String(stats.uncompleted)],
-            ["Profile Clicks", String(stats.profileClicks)],
-            ["Chats", String(stats.chats)],
-          ].map(([k, v]) => (
-            <Row key={k} C={C} k={k} v={v} />
-          ))}
-        </View>
+          {/* Action buttons */}
+          <View style={{ flexDirection: "row", gap: 14, marginTop: 14 }}>
+            <TouchableOpacity
+              style={[styles.bigBtn, { backgroundColor: C.primary }]}
+              onPress={() => {
+                console.log("Navigating to AddProduct with:", {
+                  editMode: true,
+                  productData: product,
+                  productId: productId,
+                });
+                console.log("Product ID details:", {
+                  productId,
+                  productIdType: typeof productId,
+                  productIdTruthy: !!productId,
+                  productIdString: String(productId),
+                });
+                navigation.navigate("AddProduct", {
+                  editMode: true,
+                  productData: product,
+                  productId: productId,
+                });
+              }}
+            >
+              <ThemedText
+                style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
+              >
+                Edit Product
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bigBtn, { backgroundColor: "#111" }]}
+              onPress={() => setViewOpen(true)}
+            >
+              <ThemedText
+                style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
+              >
+                View Product
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
 
-        {/* bottom action */}
-        <TouchableOpacity style={[styles.bottomBtn, { borderColor: "#000", backgroundColor: C.card }]}>
-          <ThemedText style={{ color: C.text, fontWeight: "700" }}>Mark as Unavailable</ThemedText>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Chart card */}
+          <View
+            style={[
+              styles.chartCard,
+              {
+                backgroundColor: C.card,
+                borderColor: C.line,
+                shadowColor: "#000",
+              },
+            ]}
+          >
+            <Legend C={C} />
+            <MiniGroupedBars C={C} series={finalSeries} />
+            <View style={[styles.pagerBar, { backgroundColor: "#E5E7EB" }]} />
+          </View>
+
+          {/* Product statistics */}
+          <View
+            style={[
+              styles.statsCard,
+              { backgroundColor: C.card, borderColor: C.line },
+            ]}
+          >
+            <View style={[styles.statsHeader, { backgroundColor: C.primary }]}>
+              <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                Product Statistics
+              </ThemedText>
+            </View>
+
+            {[
+              ["Product ID", finalStats.orderId],
+              ["Date Created", finalStats.createdAt],
+              [
+                "Impressions",
+                finalStats.impressions !== undefined
+                  ? finalStats.impressions.toLocaleString()
+                  : "N/A",
+              ],
+              [
+                "Views",
+                finalStats.views !== undefined
+                  ? finalStats.views.toLocaleString()
+                  : "N/A",
+              ],
+              [
+                "Clicks",
+                finalStats.profileClicks !== undefined
+                  ? String(finalStats.profileClicks)
+                  : "N/A",
+              ],
+              [
+                "Add to Cart",
+                finalStats.inCart !== undefined
+                  ? String(finalStats.inCart)
+                  : "N/A",
+              ],
+              [
+                "Orders",
+                finalStats.completed !== undefined
+                  ? String(finalStats.completed)
+                  : "N/A",
+              ],
+              [
+                "Chats",
+                finalStats.chats !== undefined
+                  ? String(finalStats.chats)
+                  : "N/A",
+              ],
+            ].map(([k, v]) => (
+              <Row key={k} C={C} k={k} v={v} />
+            ))}
+          </View>
+
+          {/* bottom action */}
+          <TouchableOpacity
+            style={[
+              styles.bottomBtn,
+              { borderColor: "#EF4444", backgroundColor: C.card },
+            ]}
+            onPress={() => setDeleteModalOpen(true)}
+          >
+            <ThemedText style={{ color: "#EF4444", fontWeight: "700" }}>
+              Delete Product
+            </ThemedText>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
       {/* FULL-SCREEN PRODUCT MODAL */}
-      <ViewProductModal visible={viewOpen} onClose={() => setViewOpen(false)} item={item} C={C} />
+      <ViewProductModal
+        visible={viewOpen}
+        onClose={() => setViewOpen(false)}
+        item={product}
+        images={productImages}
+        onDelete={() => deleteProductMutation.mutate()}
+        navigation={navigation}
+        productId={productId}
+        C={C}
+      />
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <DeleteConfirmationModal
+        visible={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={() => {
+          deleteProductMutation.mutate();
+          setDeleteModalOpen(false);
+        }}
+        productName={product.name || item.title || "this product"}
+        C={C}
+      />
     </SafeAreaView>
   );
 }
 
 /* ───────── Full-screen modal ───────── */
 
-function ViewProductModal({ visible, onClose, item, C }) {
-  const gallery = [
-    item.image,
-    "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
-    "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
-  ];
+function ViewProductModal({
+  visible,
+  onClose,
+  item,
+  images = [],
+  C,
+  onDelete,
+  navigation,
+  productId,
+}) {
+  // Create gallery from API images or fallback to dummy images
+  const gallery =
+    images.length > 0
+      ? images.map((img) => `https://colala.hmstech.xyz/storage/${img.path}`)
+      : [
+          item.image,
+          "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
+          "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
+        ];
+
   const [active, setActive] = useState(0);
   const [tab, setTab] = useState("overview");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const priceNow = `₦${Number(item.price || 0).toLocaleString()}`;
-  const oldPrice = item.compareAt ? `₦${Number(item.compareAt).toLocaleString()}` : "₦3,000,000";
+  const oldPrice = item.discount_price
+    ? `₦${Number(item.discount_price).toLocaleString()}`
+    : "₦3,000,000";
+
+  // Debug gallery info
+  console.log("Gallery images:", gallery);
+  console.log("Current active index:", active);
+
+  // Check if there's a video
+  const hasVideo = item.video && item.video.trim() !== "";
+
+  // Swipe functionality for image gallery
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to horizontal swipes
+        return (
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
+          Math.abs(gestureState.dx) > 5
+        );
+      },
+      onPanResponderGrant: () => {
+        // Reset any ongoing gestures
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Track the gesture but don't act on it yet
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const { dx, vx } = gestureState;
+        const threshold = 30; // Reduced threshold for easier swiping
+        const velocityThreshold = 0.2; // Reduced velocity threshold
+
+        console.log("Swipe gesture:", {
+          dx,
+          vx,
+          active,
+          galleryLength: gallery.length,
+        });
+
+        // Check if it's a valid swipe
+        if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
+          if (dx > 0) {
+            // Swipe right - go to previous image
+            if (active > 0) {
+              console.log("Swipe right - going to previous image");
+              setActive(active - 1);
+            }
+          } else if (dx < 0) {
+            // Swipe left - go to next image
+            if (active < gallery.length - 1) {
+              console.log("Swipe left - going to next image");
+              setActive(active + 1);
+            }
+          }
+        }
+      },
+    })
+  ).current;
 
   // Flow state
   const [boostOpen, setBoostOpen] = useState(false);
@@ -196,31 +562,85 @@ function ViewProductModal({ visible, onClose, item, C }) {
     setBoostOpen(false);
     setTimeout(() => setSetupOpen(true), 220);
   };
-  const openReview = () => {
+
+  const [previewData, setPreviewData] = useState(null);
+
+  const openReview = (data) => {
     setSetupOpen(false);
+    setPreviewData(data);
     setTimeout(() => setReviewOpen(true), 220);
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         {/* Modal Header */}
         <View style={[styles.mHeader, { backgroundColor: C.card }]}>
           <TouchableOpacity style={styles.mHeaderBtn} onPress={onClose}>
             <Ionicons name="chevron-back" size={20} color={C.text} />
           </TouchableOpacity>
-          <ThemedText style={{ color: C.text, fontWeight: "700", fontSize: 18 }}>Product Details</ThemedText>
+          <ThemedText
+            style={{ color: C.text, fontWeight: "700", fontSize: 18 }}
+          >
+            Product Details
+          </ThemedText>
           <TouchableOpacity style={styles.mHeaderBtn}>
             <Ionicons name="ellipsis-vertical" size={18} color={C.text} />
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+        >
           {/* Hero image */}
-          <View style={styles.heroWrap}>
+          <View style={styles.heroWrap} {...panResponder.panHandlers}>
             <Image source={toSrc(gallery[active])} style={styles.heroImg} />
-            <View style={styles.playOverlay}>
-              <Ionicons name="play" size={26} color="#fff" />
+
+            {/* Left swipe area */}
+            {active > 0 && (
+              <TouchableOpacity
+                style={styles.swipeAreaLeft}
+                onPress={() => setActive(active - 1)}
+                activeOpacity={0.7}
+              />
+            )}
+
+            {/* Right swipe area */}
+            {active < gallery.length - 1 && (
+              <TouchableOpacity
+                style={styles.swipeAreaRight}
+                onPress={() => setActive(active + 1)}
+                activeOpacity={0.7}
+              />
+            )}
+
+            {hasVideo && (
+              <TouchableOpacity style={styles.playOverlay}>
+                <Ionicons name="play" size={26} color="#fff" />
+              </TouchableOpacity>
+            )}
+
+            {/* Image indicators */}
+            <View style={styles.imageIndicators}>
+              {gallery.map((_, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => setActive(index)}
+                  style={[
+                    styles.indicator,
+                    {
+                      backgroundColor:
+                        index === active ? "#fff" : "rgba(255,255,255,0.3)",
+                    },
+                  ]}
+                />
+              ))}
             </View>
           </View>
 
@@ -228,7 +648,11 @@ function ViewProductModal({ visible, onClose, item, C }) {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 14, gap: 10, marginTop: 10 }}
+            contentContainerStyle={{
+              paddingHorizontal: 14,
+              gap: 10,
+              marginTop: 10,
+            }}
           >
             {gallery.map((g, i) => (
               <TouchableOpacity
@@ -236,16 +660,29 @@ function ViewProductModal({ visible, onClose, item, C }) {
                 onPress={() => setActive(i)}
                 style={[
                   styles.thumb,
-                  { borderColor: i === active ? C.primary : "#E5E7EB", backgroundColor: "#fff" },
+                  {
+                    borderColor: i === active ? C.primary : "#E5E7EB",
+                    backgroundColor: "#fff",
+                  },
                 ]}
               >
-                <Image source={toSrc(g)} style={{ width: "100%", height: "100%", borderRadius: 10 }} />
+                <Image
+                  source={toSrc(g)}
+                  style={{ width: "100%", height: "100%", borderRadius: 10 }}
+                />
               </TouchableOpacity>
             ))}
           </ScrollView>
 
           {/* Tabs */}
-          <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 20, marginTop: 10 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 10,
+              paddingHorizontal: 20,
+              marginTop: 10,
+            }}
+          >
             {[
               { key: "overview", label: "Overview" },
               { key: "description", label: "Description" },
@@ -258,10 +695,19 @@ function ViewProductModal({ visible, onClose, item, C }) {
                   onPress={() => setTab(t.key)}
                   style={[
                     styles.segBtn,
-                    { backgroundColor: active ? C.primary : "#fff", borderColor: active ? C.primary : "#E5E7EB" },
+                    {
+                      backgroundColor: active ? C.primary : "#fff",
+                      borderColor: active ? C.primary : "#E5E7EB",
+                    },
                   ]}
                 >
-                  <ThemedText style={{ color: active ? "#fff" : C.text, fontWeight: "700", fontSize: 13 }}>
+                  <ThemedText
+                    style={{
+                      color: active ? "#fff" : C.text,
+                      fontWeight: "700",
+                      fontSize: 13,
+                    }}
+                  >
                     {t.label}
                   </ThemedText>
                 </TouchableOpacity>
@@ -270,80 +716,272 @@ function ViewProductModal({ visible, onClose, item, C }) {
           </View>
 
           {/* Main card */}
-          <View style={[styles.cardBlock, { backgroundColor: C.card, borderColor: C.line }]}>
+          <View
+            style={[
+              styles.cardBlock,
+              { backgroundColor: C.card, borderColor: C.line },
+            ]}
+          >
             {tab === "overview" && (
               <>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
                   <View>
-                    <ThemedText style={{ color: C.text, fontWeight: "700", fontSize: 15 }}>
-                      {item.title || "Iphone 12 Pro Max"}
+                    <ThemedText
+                      style={{ color: C.text, fontWeight: "700", fontSize: 15 }}
+                    >
+                      {item.name || item.title || "Product Name"}
                     </ThemedText>
-                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 10, marginTop: 6 }}>
-                      <ThemedText style={{ color: C.primary, fontWeight: "700", fontSize: 17 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "baseline",
+                        gap: 10,
+                        marginTop: 6,
+                      }}
+                    >
+                      <ThemedText
+                        style={{
+                          color: C.primary,
+                          fontWeight: "700",
+                          fontSize: 17,
+                        }}
+                      >
                         {priceNow}
                       </ThemedText>
-                      <ThemedText style={{ color: C.sub, textDecorationLine: "line-through", fontSize: 12 }}>
-                        {oldPrice}
-                      </ThemedText>
+                      {item.discount_price && (
+                        <ThemedText
+                          style={{
+                            color: C.sub,
+                            textDecorationLine: "line-through",
+                            fontSize: 12,
+                          }}
+                        >
+                          {oldPrice}
+                        </ThemedText>
+                      )}
                     </View>
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
                     <Ionicons name="star" size={18} color={C.primary} />
-                    <ThemedText style={{ color: C.text, fontWeight: "700" }}>4.5</ThemedText>
+                    <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                      4.5
+                    </ThemedText>
                   </View>
                 </View>
 
                 <View style={[styles.hr, { backgroundColor: "#CDCDCD" }]} />
 
                 <View style={{ marginTop: 12 }}>
-                  <ThemedText style={{ color: C.sub, fontWeight: "700", marginBottom: 6, fontSize: 13 }}>
+                  <ThemedText
+                    style={{
+                      color: C.sub,
+                      fontWeight: "700",
+                      marginBottom: 6,
+                      fontSize: 13,
+                    }}
+                  >
                     Description
                   </ThemedText>
                   <ThemedText style={{ color: C.text }}>
-                    Very clean iphone 12 pro max , out of the box , factory unlocked
+                    {item.description || "No description available"}
                   </ThemedText>
                 </View>
 
-                <View style={[styles.hr, { backgroundColor: "#CDCDCD", marginTop: 12 }]} />
+                <View
+                  style={[
+                    styles.hr,
+                    { backgroundColor: "#CDCDCD", marginTop: 12 },
+                  ]}
+                />
 
                 <View style={{ marginTop: 18 }}>
-                  <ThemedText style={{ color: C.sub, fontWeight: "700", marginBottom: -9, fontSize: 12, marginTop: 12 }}>
+                  <ThemedText
+                    style={{
+                      color: C.sub,
+                      fontWeight: "700",
+                      marginBottom: -9,
+                      fontSize: 12,
+                      marginTop: 12,
+                    }}
+                  >
                     Quantity Left
                   </ThemedText>
 
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <ThemedText style={{ color: C.primary, fontWeight: "700", fontSize: 14 }}>200</ThemedText>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <ThemedText
+                      style={{
+                        color: C.primary,
+                        fontWeight: "700",
+                        fontSize: 14,
+                      }}
+                    >
+                      {item.stock || "N/A"}
+                    </ThemedText>
 
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <TouchableOpacity onPress={() => {}} style={[styles.qtySquare, { backgroundColor: C.primary }]}>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {}}
+                        style={[
+                          styles.qtySquare,
+                          { backgroundColor: C.primary },
+                        ]}
+                      >
                         <Ionicons name="remove" size={18} color="#fff" />
                       </TouchableOpacity>
 
                       <View style={[styles.qtyPill]}>
-                        <ThemedText style={{ color: C.primary, fontWeight: "800", fontSize: 18 }}>200</ThemedText>
+                        <ThemedText
+                          style={{
+                            color: C.primary,
+                            fontWeight: "800",
+                            fontSize: 18,
+                          }}
+                        >
+                          {item.stock || "N/A"}
+                        </ThemedText>
                       </View>
 
-                      <TouchableOpacity onPress={() => {}} style={[styles.qtySquare, { backgroundColor: C.primary }]}>
+                      <TouchableOpacity
+                        onPress={() => {}}
+                        style={[
+                          styles.qtySquare,
+                          { backgroundColor: C.primary },
+                        ]}
+                      >
                         <Ionicons name="add" size={18} color="#fff" />
                       </TouchableOpacity>
                     </View>
                   </View>
                 </View>
 
-                <View style={[styles.hr, { backgroundColor: "#CDCDCD", marginTop: 14 }]} />
+                <View
+                  style={[
+                    styles.hr,
+                    { backgroundColor: "#CDCDCD", marginTop: 14 },
+                  ]}
+                />
 
-                <View style={{ flexDirection: "row", gap: 12, marginTop: 14, alignItems: "center" }}>
-                  <TouchableOpacity style={[styles.circleIconBtn]}>
-                    <Image source={IMG_TRASH} style={{ width: 18, height: 20 }} />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 12,
+                    marginTop: 14,
+                    alignItems: "center",
+                  }}
+                >
+                  <TouchableOpacity
+                    style={[styles.circleIconBtn]}
+                    onPress={() => setDeleteModalOpen(true)}
+                  >
+                    <Image
+                      source={IMG_TRASH}
+                      style={{ width: 18, height: 20 }}
+                    />
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.circleIconBtn]}>
-                    <Image source={IMG_STATS} style={{ width: 18, height: 18 }} />
+                    <Image
+                      source={IMG_STATS}
+                      style={{ width: 18, height: 18 }}
+                    />
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.editWide, { backgroundColor: C.primary }]}>
-                    <ThemedText style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>Edit Product</ThemedText>
+                  <TouchableOpacity
+                    style={[styles.editWide, { backgroundColor: C.primary }]}
+                    onPress={() => {
+                      console.log(
+                        "ViewProductModal navigating to AddProduct with:",
+                        {
+                          editMode: true,
+                          productData: item,
+                          productId: productId,
+                        }
+                      );
+                      console.log("ViewProductModal Product ID details:", {
+                        productId,
+                        productIdType: typeof productId,
+                        productIdTruthy: !!productId,
+                        productIdString: String(productId),
+                      });
+                      onClose();
+                      navigation.navigate("AddProduct", {
+                        editMode: true,
+                        productData: item,
+                        productId: productId,
+                      });
+                    }}
+                  >
+                    <ThemedText
+                      style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}
+                    >
+                      Edit Product
+                    </ThemedText>
                   </TouchableOpacity>
                 </View>
               </>
+            )}
+
+            {tab === "description" && (
+              <View style={{ padding: 16 }}>
+                <ThemedText
+                  style={{
+                    color: C.sub,
+                    fontWeight: "700",
+                    marginBottom: 12,
+                    fontSize: 16,
+                  }}
+                >
+                  Product Description
+                </ThemedText>
+                <ThemedText style={{ color: C.text, lineHeight: 24 }}>
+                  {item.description ||
+                    "No description available for this product."}
+                </ThemedText>
+              </View>
+            )}
+
+            {tab === "reviews" && (
+              <View style={{ padding: 16, alignItems: "center" }}>
+                <Ionicons name="star-outline" size={48} color={C.sub} />
+                <ThemedText
+                  style={{
+                    color: C.text,
+                    fontWeight: "700",
+                    marginTop: 16,
+                    fontSize: 18,
+                  }}
+                >
+                  No Reviews Yet
+                </ThemedText>
+                <ThemedText
+                  style={{
+                    color: C.sub,
+                    marginTop: 8,
+                    fontSize: 14,
+                    textAlign: "center",
+                  }}
+                >
+                  Be the first to review this product
+                </ThemedText>
+              </View>
             )}
           </View>
 
@@ -357,7 +995,11 @@ function ViewProductModal({ visible, onClose, item, C }) {
               style={[styles.boostBtn]}
               onPress={() => setBoostOpen(true)}
             >
-              <ThemedText style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}>Boost Product</ThemedText>
+              <ThemedText
+                style={{ color: "#fff", fontWeight: "800", fontSize: 13 }}
+              >
+                Boost Product
+              </ThemedText>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -383,6 +1025,8 @@ function ViewProductModal({ visible, onClose, item, C }) {
           setDaily={setDailyBudget}
           days={boostDays}
           setDays={setBoostDays}
+          item={item}
+          productId={productId}
         />
 
         {/* Review Ad */}
@@ -394,6 +1038,21 @@ function ViewProductModal({ visible, onClose, item, C }) {
           location={boostLocation}
           daily={dailyBudget}
           days={boostDays}
+          previewData={previewData}
+          productId={productId}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmationModal
+          visible={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          onConfirm={() => {
+            onDelete();
+            setDeleteModalOpen(false);
+            onClose();
+          }}
+          productName={item.name || item.title || "this product"}
+          C={C}
         />
       </SafeAreaView>
     </Modal>
@@ -415,18 +1074,27 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.sheetBackdrop} />
       </TouchableWithoutFeedback>
 
-      <Animated.View style={[styles.sheetWrap, { height: SHEET_H, transform: [{ translateY }] }]}>
+      <Animated.View
+        style={[
+          styles.sheetWrap,
+          { height: SHEET_H, transform: [{ translateY }] },
+        ]}
+      >
         <View style={styles.sheetContainer}>
           <Image
             source={
               imgLocal || {
-                uri:
-                  "https://images.unsplash.com/photo-1585386959984-a41552231658?q=80&w=1600&auto=format&fit=crop",
+                uri: "https://images.unsplash.com/photo-1585386959984-a41552231658?q=80&w=1600&auto=format&fit=crop",
               }
             }
             style={styles.sheetHeroFull}
@@ -435,7 +1103,9 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
 
           <View style={styles.sheetTopOverlay}>
             <View style={styles.sheetHandle} />
-            <ThemedText font="oleo" style={styles.boostTitle}>Boost Ad</ThemedText>
+            <ThemedText font="oleo" style={styles.boostTitle}>
+              Boost Ad
+            </ThemedText>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
               <Ionicons name="close" size={18} color="#fff" />
             </TouchableOpacity>
@@ -449,7 +1119,10 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
           >
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 18 }}
+              contentContainerStyle={{
+                paddingHorizontal: 14,
+                paddingBottom: 18,
+              }}
             >
               <ThemedText style={styles.sheetHeading}>
                 Get Amazing Benefits from Boosting your product
@@ -457,15 +1130,38 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
 
               <View style={{ gap: 12, marginTop: 10 }}>
                 {[
-                  ["Increased Visibility", "Boosting your product helps it reach a larger audience beyond your existing followers, increasing the chances of being seen by potential customers."],
-                  ["Targeted Reach", "Choose specific demographics and locations so your ad is seen by people most likely to engage."],
-                  ["More Engagement", "Boosted products tend to get more likes, comments, shares and clicks, helping you build credibility."],
-                  ["Wider Reach", "Shown on and outside Gym Paddy for more visibility."],
-                  ["Budget Control", "Set your own budget and duration with measurable results."],
+                  [
+                    "Increased Visibility",
+                    "Boosting your product helps it reach a larger audience beyond your existing followers, increasing the chances of being seen by potential customers.",
+                  ],
+                  [
+                    "Targeted Reach",
+                    "Choose specific demographics and locations so your ad is seen by people most likely to engage.",
+                  ],
+                  [
+                    "More Engagement",
+                    "Boosted products tend to get more likes, comments, shares and clicks, helping you build credibility.",
+                  ],
+                  [
+                    "Wider Reach",
+                    "Shown on and outside Gym Paddy for more visibility.",
+                  ],
+                  [
+                    "Budget Control",
+                    "Set your own budget and duration with measurable results.",
+                  ],
                 ].map(([title, body], i) => (
                   <View key={i} style={styles.benefitBox}>
-                    <ThemedText style={{ color: C.text, fontWeight: "800", fontSize: 14 }}>{title}</ThemedText>
-                    <ThemedText style={{ color: C.sub, marginTop: 6, fontSize: 12 }}>{body}</ThemedText>
+                    <ThemedText
+                      style={{ color: C.text, fontWeight: "800", fontSize: 14 }}
+                    >
+                      {title}
+                    </ThemedText>
+                    <ThemedText
+                      style={{ color: C.sub, marginTop: 6, fontSize: 12 }}
+                    >
+                      {body}
+                    </ThemedText>
                   </View>
                 ))}
               </View>
@@ -475,7 +1171,9 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
                 style={[styles.proceedBtn, { backgroundColor: C.primary }]}
                 onPress={onProceed}
               >
-                <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Proceed</ThemedText>
+                <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                  Proceed
+                </ThemedText>
               </TouchableOpacity>
             </ScrollView>
           </LinearGradient>
@@ -487,25 +1185,98 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
 
 /* ───────── Step 5a: Boost Setup ───────── */
 
-function BoostSetupModal({ visible, onClose, onProceed, C, location, setLocation, daily, setDaily, days, setDays }) {
+function BoostSetupModal({
+  visible,
+  onClose,
+  onProceed,
+  C,
+  location,
+  setLocation,
+  daily,
+  setDaily,
+  days,
+  setDays,
+  item,
+  productId,
+}) {
   const [showStateModal, setShowStateModal] = useState(false);
   const [editBudgetOpen, setEditBudgetOpen] = useState(false);
+  const { token } = useAuth();
+
+  const previewMutation = useMutation({
+    mutationFn: (payload) => previewBoost(payload, token),
+    onSuccess: (res) => {
+      console.log("Preview Boost Success:", res);
+      onProceed(res.data || res); // pass data forward to ReviewAdModal
+    },
+    onError: (err) => {
+      console.error("Preview Boost Failed:", err);
+      alert("Unable to preview boost. Please try again.");
+    },
+  });
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F9F9F9" }}>
         {/* Header */}
-        <View style={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 10, backgroundColor: "#fff" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <TouchableOpacity onPress={onClose} style={[styles.hIcon, { width: 34, height: 34, borderColor: "#E5E7EB", backgroundColor: "#fff" }]}>
+        <View
+          style={{
+            paddingHorizontal: 14,
+            paddingTop: 4,
+            paddingBottom: 10,
+            backgroundColor: "#fff",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.hIcon,
+                {
+                  width: 34,
+                  height: 34,
+                  borderColor: "#E5E7EB",
+                  backgroundColor: "#fff",
+                },
+              ]}
+            >
               <Ionicons name="chevron-back" size={18} color="#111" />
             </TouchableOpacity>
-            <ThemedText style={{ fontWeight: "700", color: "#111", fontSize: 16 }}>Boost Product</ThemedText>
+            <ThemedText
+              style={{ fontWeight: "700", color: "#111", fontSize: 16 }}
+            >
+              Boost Product
+            </ThemedText>
             <View style={{ width: 34, height: 34 }} />
           </View>
           {/* progress bar */}
-          <View style={{ height: 6, backgroundColor: "#eee", borderRadius: 999, marginTop: 10 }}>
-            <View style={{ width: "60%", height: "100%", backgroundColor: C.primary, borderRadius: 999 }} />
+          <View
+            style={{
+              height: 6,
+              backgroundColor: "#eee",
+              borderRadius: 999,
+              marginTop: 10,
+            }}
+          >
+            <View
+              style={{
+                width: "60%",
+                height: "100%",
+                backgroundColor: C.primary,
+                borderRadius: 999,
+              }}
+            />
           </View>
         </View>
 
@@ -519,21 +1290,44 @@ function BoostSetupModal({ visible, onClose, onProceed, C, location, setLocation
             onPress={() => setShowStateModal(true)}
             activeOpacity={0.9}
           >
-            <ThemedText style={[styles.selectText, { color: location ? "#000" : "#999" }]}>
+            <ThemedText
+              style={[styles.selectText, { color: location ? "#000" : "#999" }]}
+            >
               {location || "Location"}
             </ThemedText>
             <Ionicons name="chevron-down" size={18} color="#666" />
           </TouchableOpacity>
 
           {/* Spending limit */}
-          <View style={{ marginTop: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <ThemedText style={{ color: "#111", fontWeight: "600" }}>Set your daily spending limit</ThemedText>
-            <TouchableOpacity onPress={() => setEditBudgetOpen(true)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <View
+            style={{
+              marginTop: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <ThemedText style={{ color: "#111", fontWeight: "600" }}>
+              Set your daily spending limit
+            </ThemedText>
+            <TouchableOpacity
+              onPress={() => setEditBudgetOpen(true)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <Ionicons name="create-outline" size={20} color="#111" />
             </TouchableOpacity>
           </View>
 
-          <ThemedText style={{ color: "#666", marginTop: 10, marginBottom: 6, fontSize: 12 }}>Daily Budget</ThemedText>
+          <ThemedText
+            style={{
+              color: "#666",
+              marginTop: 10,
+              marginBottom: 6,
+              fontSize: 12,
+            }}
+          >
+            Daily Budget
+          </ThemedText>
           <SliderRow
             value={daily}
             setValue={setDaily}
@@ -544,7 +1338,16 @@ function BoostSetupModal({ visible, onClose, onProceed, C, location, setLocation
             format={(v) => `₦ ${Number(Math.round(v)).toLocaleString()}`}
           />
 
-          <ThemedText style={{ color: "#666", marginTop: 14, marginBottom: 6, fontSize: 12 }}>Duration</ThemedText>
+          <ThemedText
+            style={{
+              color: "#666",
+              marginTop: 14,
+              marginBottom: 6,
+              fontSize: 12,
+            }}
+          >
+            Duration
+          </ThemedText>
           <SliderRow
             value={days}
             setValue={setDays}
@@ -557,8 +1360,27 @@ function BoostSetupModal({ visible, onClose, onProceed, C, location, setLocation
 
           <View style={{ height: 18 }} />
 
-          <TouchableOpacity activeOpacity={0.9} style={[styles.proceedBtn, { backgroundColor: C.primary }]} onPress={onProceed}>
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Proceed</ThemedText>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={[styles.proceedBtn, { backgroundColor: C.primary }]}
+             onPress={() => {
+               if (!location || !daily || !days) {
+                 alert("Please select location, daily budget and duration");
+                 return;
+               }
+               const payload = {
+                 product_id: item?.id || productId, // item or productId available
+                 location,
+                 budget: daily, // Changed from daily_budget to budget
+                 duration: days,
+               };
+               console.log("Preview Boost Payload:", payload);
+               previewMutation.mutate(payload);
+             }}
+          >
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Proceed
+            </ThemedText>
           </TouchableOpacity>
         </ScrollView>
 
@@ -590,52 +1412,167 @@ function BoostSetupModal({ visible, onClose, onProceed, C, location, setLocation
 
 /* ───────── Review Ad ───────── */
 
-function ReviewAdModal({ visible, onClose, C, item, location, daily, days }) {
+function ReviewAdModal({
+  visible,
+  onClose,
+  C,
+  item,
+  location,
+  daily,
+  days,
+  previewData,
+  productId,
+}) {
   const totalApprox = Math.round((daily / 1000) * days * 35); // arbitrary demo math
+  const { token } = useAuth();
+
+  const data = previewData || {};
+  const product = data.product || item || {};
+  const stats = data.estimated || {};
+  const totalAmount = data.total || 0;
+
+  const createBoostMutation = useMutation({
+    mutationFn: (payload) => createBoost({ payload, token }),
+    onSuccess: (res) => {
+      console.log("Boost Created:", res);
+      alert("Boost created successfully!");
+      onClose();
+    },
+    onError: (err) => {
+      console.error("Create Boost Failed:", err);
+      alert("Unable to create boost. Please try again.");
+    },
+  });
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F9F9F9" }}>
         {/* Header */}
-        <View style={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 10, backgroundColor: "#fff" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <TouchableOpacity onPress={onClose} style={[styles.hIcon, { width: 34, height: 34, borderColor: "#E5E7EB", backgroundColor: "#fff" }]}>
+        <View
+          style={{
+            paddingHorizontal: 14,
+            paddingTop: 4,
+            paddingBottom: 10,
+            backgroundColor: "#fff",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <TouchableOpacity
+              onPress={onClose}
+              style={[
+                styles.hIcon,
+                {
+                  width: 34,
+                  height: 34,
+                  borderColor: "#E5E7EB",
+                  backgroundColor: "#fff",
+                },
+              ]}
+            >
               <Ionicons name="chevron-back" size={18} color="#111" />
             </TouchableOpacity>
-            <ThemedText style={{ fontWeight: "700", color: "#111", fontSize: 16 }}>Review AD</ThemedText>
+            <ThemedText
+              style={{ fontWeight: "700", color: "#111", fontSize: 16 }}
+            >
+              Review AD
+            </ThemedText>
             <View style={{ width: 34, height: 34 }} />
           </View>
           {/* progress bar full-ish */}
-          <View style={{ height: 6, backgroundColor: "#eee", borderRadius: 999, marginTop: 10 }}>
-            <View style={{ width: "90%", height: "100%", backgroundColor: C.primary, borderRadius: 999 }} />
+          <View
+            style={{
+              height: 6,
+              backgroundColor: "#eee",
+              borderRadius: 999,
+              marginTop: 10,
+            }}
+          >
+            <View
+              style={{
+                width: "90%",
+                height: "100%",
+                backgroundColor: C.primary,
+                borderRadius: 999,
+              }}
+            />
           </View>
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 26 }}>
-          <ThemedText style={{ color: "#111", marginVertical: 10, fontWeight: "600" }}>
+          <ThemedText
+            style={{ color: "#111", marginVertical: 10, fontWeight: "600" }}
+          >
             Your ad is almost ready
           </ThemedText>
 
           {/* Preview card */}
-          <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#EEE" }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 14,
+              padding: 12,
+              borderWidth: 1,
+              borderColor: "#EEE",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
+            >
               <View>
-                <ThemedText style={{ color: "#111", fontWeight: "700" }}>Ad Preview</ThemedText>
-                <ThemedText style={{ color: "#888", fontSize: 12 }}>This is how your ad will appear to your customers</ThemedText>
+                <ThemedText style={{ color: "#111", fontWeight: "700" }}>
+                  Ad Preview
+                </ThemedText>
+                <ThemedText style={{ color: "#888", fontSize: 12 }}>
+                  This is how your ad will appear to your customers
+                </ThemedText>
               </View>
               <Ionicons name="create-outline" size={18} color="#111" />
             </View>
 
-            <View style={{ overflow: "hidden", borderRadius: 12, borderWidth: 1, borderColor: "#EEE" }}>
+            <View
+              style={{
+                overflow: "hidden",
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: "#EEE",
+              }}
+            >
               <Image
-                source={toSrc(item.image) || { uri: "https://images.unsplash.com/photo-1518773553398-650c184e0bb3?w=1200&q=60" }}
+                source={toSrc(
+                  product?.images?.[0]?.url || product?.images?.[0]?.path
+                    ? `https://colala.hmstech.xyz/storage/${product.images[0].path}`
+                    : item.image ||
+                        "https://via.placeholder.com/300x300?text=No+Image"
+                )}
                 style={{ width: "100%", height: 150 }}
                 resizeMode="cover"
               />
               <View style={{ padding: 10, gap: 4 }}>
-                <ThemedText style={{ fontWeight: "700", color: "#111" }}>{item.title || "Dell Inspiron Laptop"}</ThemedText>
-                <ThemedText style={{ color: C.primary, fontWeight: "800" }}>₦{Number(item.price || 2000000).toLocaleString()}</ThemedText>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <ThemedText style={{ fontWeight: "700", color: "#111" }}>
+                  {item.title || "Dell Inspiron Laptop"}
+                </ThemedText>
+                <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
+                  ₦{Number(item.price || 2000000).toLocaleString()}
+                </ThemedText>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
                   <Ionicons name="star" size={14} color={C.primary} />
                   <ThemedText style={{ color: "#555" }}>4.5</ThemedText>
                 </View>
@@ -653,15 +1590,29 @@ function ReviewAdModal({ visible, onClose, C, item, location, daily, days }) {
           {/* Budget row */}
           <RowTile
             icon="cash-outline"
-            text={`₦${Number(daily).toLocaleString()} for ${days} day${days > 1 ? "s" : ""}`}
+            text={`₦${Number(daily).toLocaleString()} for ${days} day${
+              days > 1 ? "s" : ""
+            }`}
             trailingIcon="create-outline"
           />
 
           {/* Total approximate */}
-          <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#EEE" }}>
-            <ThemedText style={{ color: "#999", marginBottom: 6 }}>Total Approximate Spend</ThemedText>
-            <ThemedText style={{ color: C.primary, fontWeight: "900", fontSize: 18 }}>
-              ₦{Number(totalApprox).toLocaleString()}
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 14,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: "#EEE",
+            }}
+          >
+            <ThemedText style={{ color: "#999", marginBottom: 6 }}>
+              Total Approximate Spend
+            </ThemedText>
+            <ThemedText
+              style={{ color: C.primary, fontWeight: "900", fontSize: 18 }}
+            >
+              ₦{Number(totalAmount).toLocaleString()}
             </ThemedText>
           </View>
 
@@ -672,22 +1623,67 @@ function ReviewAdModal({ visible, onClose, C, item, location, daily, days }) {
             end={{ x: 1, y: 0 }}
             style={{ borderRadius: 16, padding: 16, marginTop: 12 }}
           >
-            <ThemedText style={{ color: "#fff", opacity: 0.9, marginBottom: 4 }}>Spending Wallet Balance</ThemedText>
-            <ThemedText style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>₦3,000,000</ThemedText>
-            <TouchableOpacity style={{ position: "absolute", right: 12, top: 12, backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 }}>
-              <ThemedText style={{ color: "#111", fontWeight: "700" }}>Top Up</ThemedText>
+            <ThemedText
+              style={{ color: "#fff", opacity: 0.9, marginBottom: 4 }}
+            >
+              Spending Wallet Balance
+            </ThemedText>
+            <ThemedText
+              style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}
+            >
+              ₦3,000,000
+            </ThemedText>
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                right: 12,
+                top: 12,
+                backgroundColor: "#fff",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+              }}
+            >
+              <ThemedText style={{ color: "#111", fontWeight: "700" }}>
+                Top Up
+              </ThemedText>
             </TouchableOpacity>
           </LinearGradient>
 
           {/* Estimated reach / clicks */}
-          <PillStat label="Estimated Reach" value="1k - 2k Accounts" color={C.primary} />
-          <PillStat label="Estimated Product Clicks" value="500" color={C.primary} />
+          <PillStat
+            label="Estimated Reach"
+            value={`${stats?.reach?.toLocaleString?.() || 0} Accounts`}
+            color={C.primary}
+          />
+          <PillStat
+            label="Estimated Product Clicks"
+            value={`${stats?.clicks?.toLocaleString?.() || 0}`}
+            color={C.primary}
+          />
 
           <TouchableOpacity
             activeOpacity={0.9}
-            style={[styles.proceedBtn, { backgroundColor: C.primary, marginTop: 16 }]}
+            style={[
+              styles.proceedBtn,
+              { backgroundColor: C.primary, marginTop: 16 },
+            ]}
+             onPress={() => {
+               const payload = {
+                 product_id: product?.id || productId,
+                 location: location,
+                 duration: days,
+                 budget: daily,
+                 start_date: new Date().toISOString().split('T')[0],
+                 payment_method: "wallet",
+               };
+               console.log("Create Boost Payload:", payload);
+               createBoostMutation.mutate(payload);
+             }}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Boost Product</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Boost Product
+            </ThemedText>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -697,23 +1693,63 @@ function ReviewAdModal({ visible, onClose, C, item, location, daily, days }) {
 
 function RowTile({ icon, text, trailingIcon }) {
   return (
-    <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#EEE", marginTop: 12, flexDirection: "row", alignItems: "center" }}>
-      <Ionicons name={icon} size={18} color="#111" style={{ marginRight: 10 }} />
+    <View
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: "#EEE",
+        marginTop: 12,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <Ionicons
+        name={icon}
+        size={18}
+        color="#111"
+        style={{ marginRight: 10 }}
+      />
       <ThemedText style={{ flex: 1, color: "#111" }}>{text}</ThemedText>
-      {trailingIcon ? <Ionicons name={trailingIcon} size={18} color="#111" /> : null}
+      {trailingIcon ? (
+        <Ionicons name={trailingIcon} size={18} color="#111" />
+      ) : null}
     </View>
   );
 }
 
 function PillStat({ label, value, color }) {
   return (
-    <View style={{ marginTop: 10, borderRadius: 12, overflow: "hidden", backgroundColor: "#fff", borderWidth: 1, borderColor: "#EEE" }}>
+    <View
+      style={{
+        marginTop: 10,
+        borderRadius: 12,
+        overflow: "hidden",
+        backgroundColor: "#fff",
+        borderWidth: 1,
+        borderColor: "#EEE",
+      }}
+    >
       <View style={{ padding: 10 }}>
-        <ThemedText style={{ color: "#999", marginBottom: 6 }}>{label}</ThemedText>
-        <View style={{ height: 26, borderRadius: 8, backgroundColor: "#F0F0F0", overflow: "hidden" }}>
-          <View style={{ width: "65%", height: "100%", backgroundColor: color }} />
+        <ThemedText style={{ color: "#999", marginBottom: 6 }}>
+          {label}
+        </ThemedText>
+        <View
+          style={{
+            height: 26,
+            borderRadius: 8,
+            backgroundColor: "#F0F0F0",
+            overflow: "hidden",
+          }}
+        >
+          <View
+            style={{ width: "65%", height: "100%", backgroundColor: color }}
+          />
         </View>
-        <ThemedText style={{ marginTop: 6, color: "#111", fontWeight: "700" }}>{value}</ThemedText>
+        <ThemedText style={{ marginTop: 6, color: "#111", fontWeight: "700" }}>
+          {value}
+        </ThemedText>
       </View>
     </View>
   );
@@ -721,28 +1757,71 @@ function PillStat({ label, value, color }) {
 
 /* ───────── Location Picker (styled like your mock) ───────── */
 
-const popularStates = ["All Locations", "Lagos State", "Oyo State", "FCT , Abuja", "Rivers State"];
+const popularStates = [
+  "All Locations",
+  "Lagos State",
+  "Oyo State",
+  "FCT , Abuja",
+  "Rivers State",
+];
 const allStates = [
-  "Abia State", "Adamawa State", "Akwa Ibom State", "Anambra State", "Bauchi State",
-  "Bayelsa State", "Benue State", "Borno State", "Cross River State", "Delta State",
-  "Edo State", "Ekiti State", "Enugu State", "Gombe State", "Imo State", "Jigawa State",
-  "Kaduna State", "Kano State", "Katsina State", "Kebbi State", "Kogi State", "Kwara State",
-  "Nasarawa State", "Niger State", "Ogun State", "Ondo State", "Osun State", "Oyo State",
-  "Plateau State", "Rivers State", "Sokoto State", "Taraba State", "Yobe State", "Zamfara State",
+  "Abia State",
+  "Adamawa State",
+  "Akwa Ibom State",
+  "Anambra State",
+  "Bauchi State",
+  "Bayelsa State",
+  "Benue State",
+  "Borno State",
+  "Cross River State",
+  "Delta State",
+  "Edo State",
+  "Ekiti State",
+  "Enugu State",
+  "Gombe State",
+  "Imo State",
+  "Jigawa State",
+  "Kaduna State",
+  "Kano State",
+  "Katsina State",
+  "Kebbi State",
+  "Kogi State",
+  "Kwara State",
+  "Nasarawa State",
+  "Niger State",
+  "Ogun State",
+  "Ondo State",
+  "Osun State",
+  "Oyo State",
+  "Plateau State",
+  "Rivers State",
+  "Sokoto State",
+  "Taraba State",
+  "Yobe State",
+  "Zamfara State",
   "FCT , Abuja",
 ];
 
 function LocationPickerModal({ visible, onClose, onSelect }) {
   const [query, setQuery] = useState("");
-  const filtered = allStates.filter((s) => s.toLowerCase().includes(query.toLowerCase()));
+  const filtered = allStates.filter((s) =>
+    s.toLowerCase().includes(query.toLowerCase())
+  );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.locationContainer}>
         <View style={styles.locationSheet}>
           <View style={styles.locationHandle} />
           <View style={styles.locationHeader}>
-            <ThemedText font="oleo" style={{ fontSize: 18, fontWeight: "600" }}>Location</ThemedText>
+            <ThemedText font="oleo" style={{ fontSize: 18, fontWeight: "600" }}>
+              Location
+            </ThemedText>
             <TouchableOpacity style={styles.locationClose} onPress={onClose}>
               <Ionicons name="close" size={16} />
             </TouchableOpacity>
@@ -755,10 +1834,17 @@ function LocationPickerModal({ visible, onClose, onSelect }) {
             onChangeText={setQuery}
           />
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
             <ThemedText style={styles.locationSection}>Popular</ThemedText>
             {popularStates.map((st) => (
-              <TouchableOpacity key={st} style={styles.locationRow} onPress={() => onSelect(st)}>
+              <TouchableOpacity
+                key={st}
+                style={styles.locationRow}
+                onPress={() => onSelect(st)}
+              >
                 <ThemedText style={{ color: "#111" }}>{st}</ThemedText>
                 <Ionicons name="chevron-forward" size={16} color="#666" />
               </TouchableOpacity>
@@ -766,7 +1852,11 @@ function LocationPickerModal({ visible, onClose, onSelect }) {
 
             <ThemedText style={styles.locationSection}>All States</ThemedText>
             {filtered.map((st) => (
-              <TouchableOpacity key={st} style={styles.locationRow} onPress={() => onSelect(st)}>
+              <TouchableOpacity
+                key={st}
+                style={styles.locationRow}
+                onPress={() => onSelect(st)}
+              >
                 <ThemedText style={{ color: "#111" }}>{st}</ThemedText>
                 <Ionicons name="chevron-forward" size={16} color="#666" />
               </TouchableOpacity>
@@ -795,16 +1885,35 @@ function BudgetEditSheet({ visible, onClose, onSave, color = "#EF4444" }) {
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.sheetBackdrop} />
       </TouchableWithoutFeedback>
 
-      <Animated.View style={[styles.editSheet, { height: SHEET_H, transform: [{ translateY }] }]}>
+      <Animated.View
+        style={[
+          styles.editSheet,
+          { height: SHEET_H, transform: [{ translateY }] },
+        ]}
+      >
         <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
           <View style={styles.locationHandle} />
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <ThemedText font="oleo" style={{ fontSize: 18, fontWeight: "600" }}>Edit Budget</ThemedText>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <ThemedText font="oleo" style={{ fontSize: 18, fontWeight: "600" }}>
+              Edit Budget
+            </ThemedText>
             <TouchableOpacity style={styles.locationClose} onPress={onClose}>
               <Ionicons name="close" size={16} />
             </TouchableOpacity>
@@ -830,14 +1939,23 @@ function BudgetEditSheet({ visible, onClose, onSave, color = "#EF4444" }) {
             />
           </View>
 
-          <ThemedText style={{ color: color, marginTop: 6 }}>Minimum budget is ₦900 for 1 day</ThemedText>
+          <ThemedText style={{ color: color, marginTop: 6 }}>
+            Minimum budget is ₦900 for 1 day
+          </ThemedText>
 
           <TouchableOpacity
-            onPress={() => onSave(Number(budget) || undefined, Number(days) || undefined)}
-            style={[styles.proceedBtn, { backgroundColor: color, marginTop: 16 }]}
+            onPress={() =>
+              onSave(Number(budget) || undefined, Number(days) || undefined)
+            }
+            style={[
+              styles.proceedBtn,
+              { backgroundColor: color, marginTop: 16 },
+            ]}
             activeOpacity={0.9}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>Save</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+              Save
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -847,12 +1965,21 @@ function BudgetEditSheet({ visible, onClose, onSave, color = "#EF4444" }) {
 
 /* ───────── Tiny slider ───────── */
 
-function SliderRow({ value, setValue, min, max, step = 1, color = "#EF4444", format = (v) => String(v) }) {
+function SliderRow({
+  value,
+  setValue,
+  min,
+  max,
+  step = 1,
+  color = "#EF4444",
+  format = (v) => String(v),
+}) {
   const [width, setWidth] = useState(0);
-  const pct = (Math.min(Math.max(value, min), max) - min) / (max - min);
-  const x = width * pct;
+  const [isDragging, setIsDragging] = useState(false);
 
-  const pan = useRef(new Animated.ValueXY()).current;
+  // Calculate position as percentage
+  const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const thumbPosition = width * pct;
 
   const clamp = (num, minN, maxN) => Math.min(Math.max(num, minN), maxN);
   const roundToStep = (num, stepN) => Math.round(num / stepN) * stepN;
@@ -860,43 +1987,136 @@ function SliderRow({ value, setValue, min, max, step = 1, color = "#EF4444", for
   const responder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: 0, y: 0 });
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt, gestureState) => {
+        console.log("Slider: Pan started", { value, min, max, width });
+        setIsDragging(true);
       },
-      onPanResponderMove: (_, g) => {
-        const nx = clamp(x + g.dx, 0, width);
-        const raw = min + (nx / width) * (max - min);
-        setValue(roundToStep(raw, step));
+      onPanResponderMove: (evt, gestureState) => {
+        if (width === 0) {
+          console.log("Slider: Width is 0, skipping");
+          return;
+        }
+
+        // Calculate new position based on gesture
+        const newPosition = clamp(
+          gestureState.moveX - gestureState.x0,
+          0,
+          width
+        );
+        const newPct = newPosition / width;
+        const rawValue = min + newPct * (max - min);
+        const steppedValue = roundToStep(rawValue, step);
+
+        console.log("Slider: Moving", {
+          moveX: gestureState.moveX,
+          x0: gestureState.x0,
+          newPosition,
+          newPct,
+          rawValue,
+          steppedValue,
+          currentValue: value,
+        });
+
+        setValue(steppedValue);
       },
-      onPanResponderRelease: () => {},
+      onPanResponderRelease: (evt, gestureState) => {
+        console.log("Slider: Pan released", { finalValue: value });
+        setIsDragging(false);
+      },
     })
   ).current;
 
   return (
     <View>
       <View
-        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        onLayout={(e) => {
+          const newWidth = e.nativeEvent.layout.width;
+          setWidth(newWidth);
+          console.log("Slider: Width set to", newWidth);
+        }}
         style={{ height: 24, justifyContent: "center" }}
       >
-        <View style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }} />
-        <View style={{ position: "absolute", left: 0, right: 0, height: 6, borderRadius: 999 }}>
-          <View style={{ width: Math.max(10, x), height: 6, backgroundColor: color, borderRadius: 999 }} />
+        {/* Background track */}
+        <View
+          style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }}
+        />
+
+        {/* Progress track */}
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            height: 6,
+            borderRadius: 999,
+          }}
+        >
+          <View
+            style={{
+              width: Math.max(10, thumbPosition),
+              height: 6,
+              backgroundColor: color,
+              borderRadius: 999,
+            }}
+          />
         </View>
-        <Animated.View
+
+        {/* Thumb */}
+        <View
           {...responder.panHandlers}
           style={{
             position: "absolute",
-            left: Math.max(0, x - 12),
+            left: Math.max(0, thumbPosition - 12),
             top: -8,
-            width: 28,
-            height: 28,
-            borderRadius: 14,
+            width: 24,
+            height: 24,
+            borderRadius: 12,
             backgroundColor: color,
-            elevation: 2,
+            elevation: 3,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            borderWidth: 2,
+            borderColor: "#fff",
+          }}
+        />
+
+        {/* Invisible touch area for easier interaction */}
+        <TouchableOpacity
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: -8,
+            height: 40,
+            backgroundColor: "transparent",
+          }}
+          activeOpacity={1}
+          onPress={(evt) => {
+            if (width === 0) return;
+
+            const touchX = evt.nativeEvent.locationX;
+            const newPct = Math.max(0, Math.min(1, touchX / width));
+            const rawValue = min + newPct * (max - min);
+            const steppedValue = roundToStep(rawValue, step);
+
+            console.log("Slider: Touch pressed", {
+              touchX,
+              newPct,
+              rawValue,
+              steppedValue,
+              currentValue: value,
+            });
+
+            setValue(steppedValue);
           }}
         />
       </View>
-      <ThemedText style={{ color: "#111", marginTop: 6, textAlign: "center" }}>{format(value)}</ThemedText>
+      <ThemedText style={{ color: "#111", marginTop: 6, textAlign: "center" }}>
+        {format(value)}
+      </ThemedText>
     </View>
   );
 }
@@ -914,17 +2134,29 @@ function Row({ C, k, v }) {
 
 function Legend({ C }) {
   const Dot = ({ color }) => (
-    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: color, marginRight: 8 }} />
+    <View
+      style={{
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: color,
+        marginRight: 8,
+      }}
+    />
   );
   return (
     <View style={[styles.legendWrap, { borderColor: "#F1F5F9" }]}>
       <View style={styles.legendRow}>
         <Dot color="#F59E0B" />
-        <ThemedText style={{ color: C.text, fontSize: 12 }}>Impressions</ThemedText>
+        <ThemedText style={{ color: C.text, fontSize: 12 }}>
+          Impressions
+        </ThemedText>
       </View>
       <View style={styles.legendRow}>
         <Dot color="#10B981" />
-        <ThemedText style={{ color: C.text, fontSize: 12 }}>Visitors</ThemedText>
+        <ThemedText style={{ color: C.text, fontSize: 12 }}>
+          Visitors
+        </ThemedText>
       </View>
       <View style={styles.legendRow}>
         <Dot color="#EF4444" />
@@ -946,11 +2178,24 @@ function MiniGroupedBars({ C, series }) {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 12, paddingBottom: 6 }}
+      contentContainerStyle={{
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 6,
+      }}
     >
-      <View style={{ height: maxH + 34, flexDirection: "row", alignItems: "flex-end" }}>
+      <View
+        style={{
+          height: maxH + 34,
+          flexDirection: "row",
+          alignItems: "flex-end",
+        }}
+      >
         {groups.map((g, idx) => (
-          <View key={idx} style={{ width: 58, alignItems: "center", marginRight: 12 }}>
+          <View
+            key={idx}
+            style={{ width: 58, alignItems: "center", marginRight: 12 }}
+          >
             <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
               {g.values.map((v, j) => (
                 <View
@@ -965,11 +2210,64 @@ function MiniGroupedBars({ C, series }) {
                 />
               ))}
             </View>
-            <ThemedText style={{ color: "#6B7280", fontSize: 11, marginTop: 8 }}>{g.label}</ThemedText>
+            <ThemedText
+              style={{ color: "#6B7280", fontSize: 11, marginTop: 8 }}
+            >
+              {g.label}
+            </ThemedText>
           </View>
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+/* ───────── Delete Confirmation Modal ───────── */
+
+function DeleteConfirmationModal({
+  visible,
+  onClose,
+  onConfirm,
+  productName,
+  C,
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.deleteModalContainer}>
+        <View style={styles.deleteModalContent}>
+          <ThemedText style={styles.deleteModalTitle}>
+            Delete Product
+          </ThemedText>
+          <ThemedText style={styles.deleteModalText}>
+            Are you sure you want to delete "{productName}"? This action cannot
+            be undone.
+          </ThemedText>
+          <View style={styles.deleteModalButtons}>
+            <TouchableOpacity
+              style={[styles.deleteModalButton, styles.deleteModalCancel]}
+              onPress={onClose}
+            >
+              <ThemedText style={{ color: "#374151", fontWeight: "600" }}>
+                Cancel
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deleteModalButton, styles.deleteModalConfirm]}
+              onPress={onConfirm}
+            >
+              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                Delete
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1281,14 +2579,64 @@ const styles = StyleSheet.create({
   },
 
   /* Location modal styles (closely match your mock) */
-  locationContainer: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
-  locationSheet: { backgroundColor: "#F9F9F9", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: SCREEN_H * 0.9 },
-  locationHandle: { width: 100, height: 6, backgroundColor: "#DADADA", borderRadius: 999, alignSelf: "center", marginBottom: 8 },
-  locationHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  locationClose: { borderWidth: 1.2, borderColor: "#222", borderRadius: 20, padding: 4 },
-  locationSearch: { backgroundColor: "#EDEDED", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, marginTop: 6 },
-  locationSection: { marginTop: 16, marginBottom: 8, fontSize: 14, fontWeight: "600", color: "#111" },
-  locationRow: { backgroundColor: "#fff", padding: 14, borderRadius: 12, borderWidth: 1, borderColor: "#EEE", marginBottom: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  locationContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  locationSheet: {
+    backgroundColor: "#F9F9F9",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    maxHeight: SCREEN_H * 0.9,
+  },
+  locationHandle: {
+    width: 100,
+    height: 6,
+    backgroundColor: "#DADADA",
+    borderRadius: 999,
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  locationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  locationClose: {
+    borderWidth: 1.2,
+    borderColor: "#222",
+    borderRadius: 20,
+    padding: 4,
+  },
+  locationSearch: {
+    backgroundColor: "#EDEDED",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    marginTop: 6,
+  },
+  locationSection: {
+    marginTop: 16,
+    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111",
+  },
+  locationRow: {
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#EEE",
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
   /* Budget Edit sheet */
   editSheet: {
@@ -1313,6 +2661,117 @@ const styles = StyleSheet.create({
   },
 
   // Boost Setup (select)
-  selectWrapper: { backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 16, height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  selectWrapper: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   selectText: { fontSize: 16, color: "#999" },
+
+  // Image indicators
+  imageIndicators: {
+    position: "absolute",
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  indicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  // Swipe areas
+  swipeAreaLeft: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "50%",
+    backgroundColor: "transparent",
+  },
+  swipeAreaRight: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: "50%",
+    backgroundColor: "transparent",
+  },
+
+  // Delete modal
+  deleteModalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  deleteModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    margin: 20,
+    alignItems: "center",
+    minWidth: 300,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  deleteModalText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  deleteModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  deleteModalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteModalCancel: {
+    backgroundColor: "#F3F4F6",
+  },
+  deleteModalConfirm: {
+    backgroundColor: "#EF4444",
+  },
+
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingContent: {
+    alignItems: "center",
+  },
+  loadingSpinner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderTopColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "transparent",
+    // Animation will be handled by React Native's built-in spinner
+  },
 });
