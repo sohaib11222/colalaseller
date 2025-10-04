@@ -10,6 +10,8 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -78,12 +80,13 @@ export default function ChatListScreen({ navigation }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("Products");
   const [ddOpen, setDdOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Track which chats we've opened (for fallback mode as well)
   const [clearedIds, setClearedIds] = useState(new Set());
 
   // Fetch chat list
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, refetch } = useQuery({
     queryKey: ["chats", "list"],
     queryFn: async () => {
       const token = await getToken();
@@ -136,6 +139,17 @@ export default function ChatListScreen({ navigation }) {
         chat_id: item.id,
       },
     });
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (error) {
+      console.error("Error refreshing chats:", error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const renderItem = ({ item }) => {
@@ -242,7 +256,26 @@ export default function ChatListScreen({ navigation }) {
         renderItem={renderItem}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 24, flexGrow: 1 }}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        ListEmptyComponent={ListEmpty}
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={[styles.loadingText, { color: C.sub }]}>Loading chats...</ThemedText>
+            </View>
+          ) : (
+            <ListEmpty />
+          )
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[C.primary]}
+            tintColor={C.primary}
+            title="Pull to refresh"
+            titleColor={C.sub}
+          />
+        }
         showsVerticalScrollIndicator={false}
       />
 
@@ -323,4 +356,17 @@ const styles = StyleSheet.create({
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
+  
+  // Loading states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "500",
+  },
 });

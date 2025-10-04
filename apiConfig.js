@@ -141,6 +141,12 @@ const API_ENDPOINTS = {
     Categories: `${API_DOMAIN}/categories`, // GET
     Brands: `${API_DOMAIN}/brands`, // GET
   },
+  ORDERS:{
+    Get_All_Orders: `${API_DOMAIN}/seller/orders`, // GET
+    Order_Detail: (id)=>`${API_DOMAIN}/seller/orders/${id}`,
+    Mark_For_Delivery: (id)=>`${API_DOMAIN}/seller/orders/${id}/out-for-deliver`,
+    Verify_Code: (id)=>`${API_DOMAIN}/seller/orders/${id}/delivered`,
+  },
   CHATS: {
     List: `${API_DOMAIN}/seller/chat`,
     Details: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/messages`,
