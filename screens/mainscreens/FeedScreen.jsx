@@ -440,11 +440,11 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, C }) {
         </View>
 
         <View style={styles.actionsRight}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[styles.visitBtn, { backgroundColor: C.primary }]}
           >
             <ThemedText style={styles.visitBtnText}>Visit Store</ThemedText>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity style={{ marginLeft: 10 }}>
             <Image
               source={require("../../assets/DownloadSimple.png")}

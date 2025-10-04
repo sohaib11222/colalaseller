@@ -183,7 +183,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
         </ThemedText>
 
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[
               styles.hIcon,
               { borderColor: C.line, backgroundColor: C.card },
@@ -198,7 +198,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
             ]}
           >
             <Ionicons name="ellipsis-vertical" size={18} color={C.text} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
 
