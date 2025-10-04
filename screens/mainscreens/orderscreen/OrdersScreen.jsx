@@ -1,245 +1,3 @@
-// // screens/orders/OrdersScreen.jsx
-// import React, { useMemo, useState } from "react";
-// import {
-//   View,
-//   StyleSheet,
-//   TextInput,
-//   TouchableOpacity,
-//   FlatList,
-//   SafeAreaView,
-//   StatusBar,
-//   Platform,
-//   Image,
-// } from "react-native";
-// import { Ionicons } from "@expo/vector-icons";
-// import ThemedText from "../../../components/ThemedText";
-// import { useTheme } from "../../../components/ThemeProvider";
-
-// const SAMPLE_ORDERS = [
-//   { id: "o1", customer: "Adewale Faizah", items: 2, total: 9999990, status: "new" },
-//   { id: "o2", customer: "Adam Shawn", items: 2, total: 9999990, status: "new" },
-//   { id: "o3", customer: "Chris Ade", items: 2, total: 9999990, status: "new" },
-//   { id: "o4", customer: "Sasha Sloan", items: 2, total: 9999990, status: "new" },
-//   { id: "o5", customer: "Ben Dibs", items: 2, total: 9999990, status: "new" },
-//   { id: "o6", customer: "Ben Dibs", items: 2, total: 9999990, status: "completed" },
-//   { id: "o7", customer: "Ben Dibs", items: 2, total: 9999990, status: "completed" },
-// ];
-
-// const OrdersScreen = ({ navigation }) => {
-//   const { theme } = useTheme();
-//   const C = useMemo(
-//     () => ({
-//       primary: theme?.colors?.primary || "#E53E3E",
-//       primaryDark: "#E2443F",
-//       bg: theme?.colors?.background || "#F5F6F8",
-//       card: theme?.colors?.card || "#FFFFFF",
-//       text: theme?.colors?.text || "#101318",
-//       sub: "#6C727A",
-//       line: "#ECEDEF",
-//       pill: "#F1F2F5",
-//     }),
-//     [theme]
-//   );
-
-//   const [tab, setTab] = useState("new"); // 'new' | 'completed'
-//   const [q, setQ] = useState("");
-
-//   const orders = useMemo(() => {
-//     const term = q.trim().toLowerCase();
-//     return SAMPLE_ORDERS.filter(
-//       (o) =>
-//         o.status === tab &&
-//         (term ? o.customer.toLowerCase().includes(term) || o.id.toLowerCase().includes(term) : true)
-//     );
-//   }, [q, tab]);
-
-//   const formatNaira = (n) => `₦${Number(n).toLocaleString()}`;
-
-//   const renderItem = ({ item }) => (
-//     <TouchableOpacity
-//       activeOpacity={0.85}
-//       style={[styles.row, { backgroundColor: C.card, borderColor: C.line }]}
-//       onPress={() =>
-//         navigation?.navigate?.("ChatNavigator", { screen: "SingleOrderDetails", params: { orderId: item.id } })
-//       }
-//     >
-//       <View style={[styles.leftIcon, { backgroundColor: "#B9191933" }]}>
-//         <Ionicons name="cart-outline" size={25} color={C.primary} />
-//       </View>
-
-//       <View style={{ flex: 1 }}>
-//         <ThemedText style={[styles.cust, { color: C.text }]} numberOfLines={1}>
-//           {item.customer}
-//         </ThemedText>
-//         <ThemedText style={[styles.items, { color: C.sub }]}>{item.items} items</ThemedText>
-//       </View>
-
-//       <ThemedText style={[styles.amount, { color: C.primary }]}>{formatNaira(item.total)}</ThemedText>
-//     </TouchableOpacity>
-//   );
-
-//   return (
-//     <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
-//       <StatusBar barStyle="light-content" />
-//       {/* Header */}
-//       <View style={[styles.header, { backgroundColor: C.primary }]}>
-//         <View style={styles.headerTop}>
-//           <ThemedText font="oleo" style={styles.headerTitle}>
-//             Orders
-//           </ThemedText>
-//           <View style={styles.iconRow}>
-
-//             <TouchableOpacity
-//               onPress={() =>
-//                 navigation.navigate("ChatNavigator", {
-//                   screen: "Notification",
-//                 })
-//               }
-//               style={[styles.iconButton, styles.iconPill]}
-//               accessibilityRole="button"
-//               accessibilityLabel="Open notifications"
-//             >
-//               <Image
-//                 source={require("../../../assets/bell-icon.png")}
-//                 style={styles.iconImg}
-//               />
-//             </TouchableOpacity>
-//           </View>
-//         </View>
-
-//         <View style={[styles.searchBox, { backgroundColor: C.card }]}>
-//           <TextInput
-//             placeholder="Search Order"
-//             placeholderTextColor="#9BA0A6"
-//             value={q}
-//             onChangeText={setQ}
-//             style={styles.searchInput}
-//             returnKeyType="search"
-//           />
-//           {/* <Ionicons name="search" size={18} color="#9BA0A6" /> */}
-//         </View>
-//       </View>
-
-//       {/* Tabs */}
-//       <View style={styles.tabsWrap}>
-//         <TouchableOpacity
-//           onPress={() => setTab("new")}
-//           style={[
-//             styles.tabBtn,
-//             tab === "new" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
-//           ]}
-//         >
-//           <ThemedText style={[styles.tabTxt, { color: tab === "new" ? "#fff" : "#6B7280" }]}>
-//             New
-//           </ThemedText>
-//         </TouchableOpacity>
-
-//         <TouchableOpacity
-//           onPress={() => setTab("completed")}
-//           style={[
-//             styles.tabBtn,
-//             tab === "completed" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
-//           ]}
-//         >
-//           <ThemedText style={[styles.tabTxt, { color: tab === "completed" ? "#fff" : "#6B7280" }]}>
-//             Completed
-//           </ThemedText>
-//         </TouchableOpacity>
-//       </View>
-
-//       {/* List */}
-//       <FlatList
-//         data={orders}
-//         keyExtractor={(i) => i.id}
-//         renderItem={renderItem}
-//         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-//         contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
-//         showsVerticalScrollIndicator={false}
-//       />
-//     </SafeAreaView>
-//   );
-// };
-
-// export default OrdersScreen;
-
-// /* ---------------- styles ---------------- */
-// const styles = StyleSheet.create({
-//   header: {
-//     paddingHorizontal: 16,
-//     paddingTop: Platform.OS === "android" ? 60 : 8,
-//     paddingBottom: 18,
-//     borderBottomLeftRadius: 24,
-//     borderBottomRightRadius: 24,
-//   },
-//   headerTop: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     justifyContent: "space-between",
-//     marginBottom: 12,
-//   },
-//   headerTitle: { color: "#fff", fontSize: 24, fontWeight: "400" },
-//   bellBtn: {
-//     width: 34,
-//     height: 34,
-//     borderRadius: 17,
-//     backgroundColor: "#fff",
-//     alignItems: "center",
-//     justifyContent: "center",
-//   },
-
-//   searchBox: {
-//     height: 60,
-//     borderRadius: 14,
-//     paddingHorizontal: 12,
-//     flexDirection: "row",
-//     alignItems: "center",
-//   },
-//   searchInput: { flex: 1, fontSize: 14, color: "#101318", marginRight: 8 },
-
-//   tabsWrap: {
-//     flexDirection: "row",
-//     gap: 12,
-//     paddingHorizontal: 13,
-//     paddingTop: 14,
-//     paddingBottom: 20,
-//   },
-//   tabBtn: {
-//     flex: 1,
-//     height: 40,
-//     borderRadius: 7,
-//     alignItems: "center",
-//     justifyContent: "center",
-//   },
-//   tabTxt: { fontWeight: "700", fontSize: 10 },
-
-//   row: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     borderRadius: 16,
-//     borderWidth: 1,
-//     paddingHorizontal: 12,
-//     paddingVertical: 12,
-//   },
-//   leftIcon: {
-//     width: 50,
-//     height: 50,
-//     borderRadius: 30,
-//     alignItems: "center",
-//     justifyContent: "center",
-//     marginRight: 12,
-//   },
-//   cust: { fontSize: 14, fontWeight: "700" },
-//   items: { fontSize: 10, marginTop: 2 },
-//    iconRow: { flexDirection: "row" },
-//   iconButton: { marginLeft: 9 },
-//   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
-
-//   // If your PNGs are already colored, remove tintColor.
-//   iconImg: { width: 22, height: 22, resizeMode: "contain" },
-//   amount: { fontSize: 13, fontWeight: "900", marginLeft: 10 },
-// });
-
-// screens/orders/OrdersScreen.jsx
 import React, { useMemo, useState } from "react";
 import {
   View,
@@ -251,6 +9,8 @@ import {
   StatusBar,
   Platform,
   Image,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -278,9 +38,15 @@ const OrdersScreen = ({ navigation }) => {
 
   const [tab, setTab] = useState("new"); // 'new' | 'completed'
   const [q, setQ] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   // ---- API: fetch all orders (new + completed) ----
-  const { data: apiData } = useQuery({
+  const { 
+    data: apiData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
     queryKey: ["orders", "list"],
     queryFn: async () => {
       const token = await getToken();
@@ -325,6 +91,22 @@ const OrdersScreen = ({ navigation }) => {
     staleTime: 30_000,
   });
 
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    console.log("🔄 Starting pull-to-refresh...");
+    setRefreshing(true);
+    try {
+      console.log("🔄 Refreshing orders data...");
+      await refetch();
+      console.log("✅ Orders data refreshed successfully");
+    } catch (error) {
+      console.error("❌ Error refreshing orders data:", error);
+    } finally {
+      setRefreshing(false);
+      console.log("🔄 Pull-to-refresh completed");
+    }
+  };
+
   const listNew = apiData?.newRows ?? [];
   const listCompleted = apiData?.completedRows ?? [];
 
@@ -341,6 +123,50 @@ const OrdersScreen = ({ navigation }) => {
   }, [q, tab, source]);
 
   const formatNaira = (n) => `₦${Number(n || 0).toLocaleString()}`;
+
+  // Empty state component
+  const EmptyState = ({ message }) => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="cart-outline" size={64} color={C.sub} />
+      <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+        No Orders Found
+      </ThemedText>
+      <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+        {message}
+      </ThemedText>
+    </View>
+  );
+
+  // Loading state component
+  const LoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color={C.primary} />
+      <ThemedText style={[styles.loadingText, { color: C.text }]}>
+        Loading orders...
+      </ThemedText>
+    </View>
+  );
+
+  // Error state component
+  const ErrorState = () => (
+    <View style={styles.errorContainer}>
+      <Ionicons name="alert-circle-outline" size={64} color={C.primary} />
+      <ThemedText style={[styles.errorTitle, { color: C.text }]}>
+        Failed to load orders
+      </ThemedText>
+      <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
+        {error?.message || "Something went wrong. Please try again."}
+      </ThemedText>
+      <TouchableOpacity
+        onPress={() => refetch()}
+        style={[styles.retryButton, { backgroundColor: C.primary }]}
+      >
+        <ThemedText style={[styles.retryButtonText, { color: "#fff" }]}>
+          Try Again
+        </ThemedText>
+      </TouchableOpacity>
+    </View>
+  );
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
@@ -440,14 +266,43 @@ const OrdersScreen = ({ navigation }) => {
       </View>
 
       {/* List */}
-      <FlatList
-        data={orders}
-        keyExtractor={(i) => i.id}
-        renderItem={renderItem}
-        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-      />
+      {isLoading && !apiData ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState />
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={(i) => i.id}
+          renderItem={renderItem}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          contentContainerStyle={{ 
+            paddingHorizontal: 12, 
+            paddingBottom: 24,
+            flexGrow: 1 
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[C.primary]}
+              tintColor={C.primary}
+              title="Pull to refresh"
+              titleColor={C.primary}
+            />
+          }
+          ListEmptyComponent={() => (
+            <EmptyState 
+              message={
+                tab === "new" 
+                  ? "No new orders at the moment. Check back later!" 
+                  : "No completed orders yet. Complete some orders to see them here!"
+              }
+            />
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -529,4 +384,67 @@ const styles = StyleSheet.create({
   // If your PNGs are already colored, remove tintColor.
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
   amount: { fontSize: 13, fontWeight: "900", marginLeft: 10 },
+
+  // Loading, Error, and Empty states
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  errorMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptyMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+  },
 });

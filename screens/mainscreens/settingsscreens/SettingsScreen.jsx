@@ -19,13 +19,12 @@ import { useTheme } from '../../../components/ThemeProvider';
 //Code Related to the integration
 import { getBalance } from '../../../utils/queries/settings';
 import { useQuery } from '@tanstack/react-query';
-import { getOnboardingToken } from '../../../utils/tokenStorage';
 import { useAuth } from '../../../contexts/AuthContext';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const [onboardingToken, setOnboardingToken] = useState(null);
+  const { user, token } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
@@ -46,22 +45,11 @@ const SettingsScreen = () => {
   const cartCount = 2;
   const notifCount = 3;
 
-  // Get onboarding token
-  useEffect(() => {
-    const getToken = async () => {
-      try {
-        console.log("🔍 Fetching onboarding token for balance...");
-        const token = await getOnboardingToken();
-        console.log("🔑 Balance token retrieved:", token ? "Token present" : "No token");
-        console.log("🔑 Balance token value:", token);
-        setOnboardingToken(token);
-      } catch (error) {
-        console.error("❌ Error getting onboarding token for balance:", error);
-        setOnboardingToken(null);
-      }
-    };
-    getToken();
-  }, []);
+  // Debug logging for user data
+  console.log("👤 User data from auth:", user);
+  console.log("🏪 Store data:", user?.store);
+  console.log("🔑 Token:", token ? "Present" : "Missing");
+
 
   // Fetch balance data using React Query
   const {
@@ -70,12 +58,12 @@ const SettingsScreen = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["balance", onboardingToken],
+    queryKey: ["balance", token],
     queryFn: () => {
-      console.log("🚀 Executing getBalance API call with token:", onboardingToken);
-      return getBalance(onboardingToken);
+      console.log("🚀 Executing getBalance API call with token:", token);
+      return getBalance(token);
     },
-    enabled: !!onboardingToken,
+    enabled: !!token,
     onSuccess: (data) => {
       console.log("✅ Balance API call successful:", data);
     },
@@ -134,7 +122,7 @@ const SettingsScreen = () => {
     { key: 'coupons', label: 'Manage Coupons/ Points', img: require('../../../assets/Vector (4).png'), leftColor: '#E5683E' },
     { key: 'announcements', label: 'Announcements', img: require('../../../assets/Vector (14).png'), leftColor: '#3E86E5' },
     { key: 'reviews', label: 'Reviews', img: require('../../../assets/Star copy 2.png'), leftColor: '#E53E41' },
-    { key: 'referrals', label: 'Referrals', img: require('../../../assets/Users.png'), leftColor: '#4C3EE5' },
+    // { key: 'referrals', label: 'Referrals', img: require('../../../assets/Users.png'), leftColor: '#4C3EE5' },
     { key: 'support', label: 'Support', img: require('../../../assets/Headset.png'), leftColor: '#E5863E' },
     { key: 'faqs', label: 'FAQs', img: require('../../../assets/Question.png'), leftColor: '#3EC9E5' },
   ];
@@ -206,16 +194,27 @@ const SettingsScreen = () => {
 
         {/* Profile row */}
         <View style={styles.profileRow}>
-          <Image source={{ uri: 'https://i.pravatar.cc/100?img=8' }} style={[styles.profileImg, { borderColor: '#ffffff66' }]} />
+          <Image 
+            source={
+              user?.store?.profile_image 
+                ? { uri: `https://colala.hmstech.xyz/storage/${user.store.profile_image}` }
+                : { uri: 'https://i.pravatar.cc/100?img=8' }
+            } 
+            style={[styles.profileImg, { borderColor: '#ffffff66' }]} 
+          />
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
-              <ThemedText style={[styles.name, { color: C.white }]}>Sasha Stores</ThemedText>
+              <ThemedText style={[styles.name, { color: C.white }]}>
+                {user?.store?.store_name || user?.full_name || 'Store Name'}
+              </ThemedText>
               <View style={styles.verifyPill}>
                 <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
               </View>
             </View>
             <View style={styles.locationRow}>
-              <ThemedText style={[styles.locationText, { color: C.white }]}>Lagos, Nigeria</ThemedText>
+              <ThemedText style={[styles.locationText, { color: C.white }]}>
+                {user?.store?.store_location || user?.state || 'Location'}
+              </ThemedText>
               <Ionicons name="caret-down" size={12} color={C.white} />
             </View>
           </View>

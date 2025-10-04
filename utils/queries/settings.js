@@ -48,3 +48,11 @@ export const getBoostsList = async (token) =>
 
 export const getSingleBoost = async (token, id) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Single_Boost(id), "GET", undefined, token);
+
+
+//Supports
+export const getSupportList = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Support_List, "GET", undefined, token);
+
+export const getSupportDetail = async (token, id) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Support_Detail(id), "GET", undefined, token);

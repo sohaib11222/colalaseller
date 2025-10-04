@@ -136,6 +136,14 @@ const API_ENDPOINTS = {
     Boost_Create: `${API_DOMAIN}/seller/boosts`, // POST
     Single_Boost: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // GET
     Boost_Status: (id) => `${API_DOMAIN}/seller/boosts/${id}/status`, // PATCH
+
+
+    //Support 
+    Support_List: `${API_DOMAIN}/buyer/support/tickets`, // GET
+    Support_Create: `${API_DOMAIN}/buyer/support/tickets`, // POST
+    Support_Detail: (id) => `${API_DOMAIN}/buyer/support/tickets/${id}`, // GET
+    Send_Message: (id) => `${API_DOMAIN}/buyer/support/messages`, // POST
+
   },
   GENERAL: {
     Categories: `${API_DOMAIN}/categories`, // GET

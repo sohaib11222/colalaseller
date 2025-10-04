@@ -121,7 +121,7 @@ export const autodebitCard = async ({ id, token }) => {
 
 // Boost Preview
 // payload = FormData with product_id, location, duration, budget, start_date, payment_method
-export const previewBoost = async (payload, token) => 
+export const previewBoost = async (payload, token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Boost_Preview, "POST", payload, token);
 
 
@@ -134,3 +134,11 @@ export const updateBoostStatus = async ({ id, payload, token }) => {
   await apiCall(API_ENDPOINTS.SETTINGS.Boost_Status(id), "PATCH", payload, token);
 };
 
+
+
+//Supports
+export const createSupport = async ({ payload, token }) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Support_Create, "POST", payload, token);
+
+export const sendMessage = async ({ id, payload, token }) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Send_Message(id), "POST", payload, token);

@@ -13,6 +13,8 @@ import MyReviewsScreen from "../screens/mainscreens/settingsscreens/MyReviewsScr
 import ShoppingWalletScreen from "../screens/mainscreens/settingsscreens/ShoppingWalletScreen";
 import EscrowWalletScreen from "../screens/mainscreens/settingsscreens/EscrowWalletScreen";
 import SupportScreen from "../screens/mainscreens/settingsscreens/SupportScreen";
+import SupportFormScreen from "../screens/mainscreens/settingsscreens/SupportFormScreen";
+import SupportDetailsScreen from "../screens/mainscreens/settingsscreens/SupportDetailsScreen";
 import FAQsScreen from "../screens/mainscreens/settingsscreens/FAQsScreen";
 import AccessControlScreen from "../screens/mainscreens/settingsscreens/AccessControlScreen";
 import SavedCardsScreen from "../screens/mainscreens/settingsscreens/SavedCardsScreen";
@@ -46,6 +48,8 @@ export default function ChatNavigator() {
       <Stack.Screen name="ShoppingWallet" component={ShoppingWalletScreen} />
       <Stack.Screen name="EscrowWallet" component={EscrowWalletScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
+      <Stack.Screen name="SupportForm" component={SupportFormScreen} />
+      <Stack.Screen name="SupportDetailsScreen" component={SupportDetailsScreen} />
       <Stack.Screen name="FAQs" component={FAQsScreen} />
       <Stack.Screen name="AccessControl" component={AccessControlScreen} />
       <Stack.Screen name="SavedCards" component={SavedCardsScreen} />
