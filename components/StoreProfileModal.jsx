@@ -53,6 +53,16 @@ const toFileUrl = (p) => {
   return `${API_BASE}/storage/${p}`;
 };
 
+// put below toFileUrl()
+const getPromoUrl = (b) => {
+  if (!b) return "";
+  if (typeof b === "string") return toFileUrl(b);
+  // backend uses image_path in your sample
+  return toFileUrl(
+    b.image_path || b.image_url || b.path || b.url || b.banner_image || ""
+  );
+};
+
 
 /* icons-as-images for stats row */
 const STATS_ICONS = {
@@ -133,8 +143,18 @@ export default function StoreProfileModal({
   const statsFollowers = Number(storeApi.followers_count ?? 0);   // API
   const statsRating = Number(storeApi.average_rating ?? 0);       // API
 
-  const promoSource =
-    PROMO_BY_COLOR[(theme?.colors?.primary || "").toUpperCase()] || PROMO_FALLBACK;
+  const promoUrl = React.useMemo(() => {
+    const arr = Array.isArray(storeApi?.permotaional_banners)
+      ? storeApi.permotaional_banners
+      : [];
+    const first = arr.map(getPromoUrl).find(Boolean);
+    return first || "";
+  }, [storeApi?.permotaional_banners]);
+
+  const promoSource = promoUrl
+    ? { uri: promoUrl }
+    : (PROMO_BY_COLOR[(theme?.colors?.primary || "").toUpperCase()] || PROMO_FALLBACK);
+
 
   /* tabs */
   const [tab, setTab] = useState("Products");
@@ -246,6 +266,8 @@ export default function StoreProfileModal({
     location: "Location",
   });
 
+
+
   const [picker, setPicker] = useState({ open: false, key: null });
   const openPicker = (key) => setPicker({ open: true, key });
   const closePicker = () => setPicker({ open: false, key: null });
@@ -317,12 +339,12 @@ export default function StoreProfileModal({
             <Ionicons name="location-outline" size={13} color="#444" />
             <ThemedText style={styles.location}>{item.location}</ThemedText>
           </View>
-          <TouchableOpacity>
+          {/* <TouchableOpacity>
             <Image
               source={require("../assets/Frame 265.png")}
               style={{ width: 28, height: 28, resizeMode: "contain" }}
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
     </View>
