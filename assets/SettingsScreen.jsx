@@ -61,7 +61,7 @@ const SettingsScreen = () => {
     getToken();
   }, []);
 
-  // Fetch balance data using React Query
+  // Fetch balance data using React Queryrod
   const {
     data: balanceData,
     isLoading,

@@ -43,6 +43,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { previewBoost, createBoost } from "../../../utils/mutations/settings";
+import { getBalance } from "../../../utils/queries/settings";
 export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
   const productId = route?.params?.id || item?.id;
@@ -78,6 +79,27 @@ export default function ProductDetailsScreen({ route, navigation }) {
     enabled: !!productId && !!token,
   });
 
+  // Fetch balance data using React Query
+  const {
+    data: balanceData,
+    isLoading: balanceLoading,
+    error: balanceError,
+    refetch: refetchBalance,
+  } = useQuery({
+    queryKey: ["balance", token],
+    queryFn: () => {
+      console.log("🚀 Executing getBalance API call with token:", token);
+      return getBalance(token);
+    },
+    enabled: !!token,
+    onSuccess: (data) => {
+      console.log("✅ Balance API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Balance API call failed:", error);
+    },
+  });
+
   // Delete mutation
   const deleteProductMutation = useMutation({
     mutationFn: () => deleteProduct(productId, token),
@@ -92,8 +114,12 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const chart = chartData?.data || [];
   const stats = statisticsData?.data || {};
   const productImages = product?.images || [];
+  
+  // Extract balance data from API response
+  const shoppingBalance = balanceData?.data?.shopping_balance || 0;
 
   // Debug logging
+  console.log("product qty", product.qty);
   console.log("Product Data:", product);
   console.log("Product ID from product object:", product?.id);
   console.log("Product ID from route params:", productId);
@@ -103,7 +129,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
   console.log("Final Stats:", finalStats);
 
   // Loading states
-  const isLoading = productLoading || chartLoading || statsLoading;
+  const isLoading = productLoading || chartLoading || statsLoading || balanceLoading;
 
   // Error states
   const hasAuthError =
@@ -301,7 +327,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 </ThemedText>
               )}
               <ThemedText style={{ color: C.sub, marginTop: 6 }}>
-                Qty left: {product.stock || "N/A"}
+                Qty left: {product.qty }
               </ThemedText>
             </View>
           </View>
@@ -445,6 +471,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
         navigation={navigation}
         productId={productId}
         C={C}
+        shoppingBalance={shoppingBalance}
       />
 
       {/* DELETE CONFIRMATION MODAL */}
@@ -473,6 +500,7 @@ function ViewProductModal({
   onDelete,
   navigation,
   productId,
+  shoppingBalance,
 }) {
   // Create gallery from API images or fallback to dummy images
   const gallery =
@@ -833,7 +861,7 @@ function ViewProductModal({
                         fontSize: 14,
                       }}
                     >
-                      {item.stock || "N/A"}
+                      {item.qty }
                     </ThemedText>
 
                     <View
@@ -857,7 +885,7 @@ function ViewProductModal({
                             fontSize: 18,
                           }}
                         >
-                          {item.stock || "N/A"}
+                          {item.qty }
                         </ThemedText>
                       </View>
 
@@ -1040,6 +1068,7 @@ function ViewProductModal({
           days={boostDays}
           previewData={previewData}
           productId={productId}
+          shoppingBalance={shoppingBalance}
         />
 
         {/* Delete Confirmation Modal */}
@@ -1422,6 +1451,7 @@ function ReviewAdModal({
   days,
   previewData,
   productId,
+  shoppingBalance,
 }) {
   const totalApprox = Math.round((daily / 1000) * days * 35); // arbitrary demo math
   const { token } = useAuth();
@@ -1631,7 +1661,7 @@ function ReviewAdModal({
             <ThemedText
               style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}
             >
-              ₦3,000,000
+              ₦{Number(shoppingBalance).toLocaleString()}
             </ThemedText>
             <TouchableOpacity
               style={{
@@ -1668,18 +1698,29 @@ function ReviewAdModal({
               styles.proceedBtn,
               { backgroundColor: C.primary, marginTop: 16 },
             ]}
-             onPress={() => {
-               const payload = {
-                 product_id: product?.id || productId,
-                 location: location,
-                 duration: days,
-                 budget: daily,
-                 start_date: new Date().toISOString().split('T')[0],
-                 payment_method: "wallet",
-               };
-               console.log("Create Boost Payload:", payload);
-               createBoostMutation.mutate(payload);
-             }}
+            onPress={() => {
+              // Guard: ensure wallet has enough balance for total amount.
+              // Use preview total if available; otherwise fallback to daily * days.
+              const walletBalance = Number(shoppingBalance) || 0;
+              const previewTotal = Number(totalAmount) || 0;
+              const fallbackTotal = Math.round((Number(daily) || 0) * (Number(days) || 0));
+              const requiredAmount = previewTotal > 0 ? previewTotal : fallbackTotal;
+              if (walletBalance < requiredAmount) {
+                alert("Insufficient balance. Please top up your wallet.");
+                return;
+              }
+
+              const payload = {
+                product_id: product?.id || productId,
+                location: location,
+                duration: days,
+                budget: daily,
+                start_date: new Date().toISOString().split('T')[0],
+                payment_method: "wallet",
+              };
+              console.log("Create Boost Payload:", payload);
+              createBoostMutation.mutate(payload);
+            }}
           >
             <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
               Boost Product

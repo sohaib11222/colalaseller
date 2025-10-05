@@ -136,6 +136,7 @@ export default function ChatDetailsScreen() {
     };
   }, []);
 
+  console.log("chatId", chatId);
   /* ---------------- Fetch details (robust unwrap + logs) ---------------- */
   const { data: detail, error: detailErr, isLoading: detailLoading } = useQuery({
     queryKey: ['chat', 'detail', chatId],
