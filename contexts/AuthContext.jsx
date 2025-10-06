@@ -23,18 +23,39 @@ export const AuthProvider = ({ children }) => {
 
   const initializeAuth = async () => {
     try {
-      const [storedToken, storedUser] = await Promise.all([
+      console.log('Initializing auth...');
+      
+      // Add timeout to prevent hanging
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+      );
+      
+      const authPromise = Promise.all([
         getToken(),
         getUserData()
       ]);
+      
+      const [storedToken, storedUser] = await Promise.race([authPromise, timeout]);
+
+      console.log('Auth data retrieved:', { hasToken: !!storedToken, hasUser: !!storedUser });
 
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(storedUser);
+        console.log('User authenticated successfully');
+      } else {
+        console.log('No stored auth data found');
       }
     } catch (error) {
       console.error('Error initializing auth:', error);
+      // Clear any potentially corrupted data
+      try {
+        await clearAuthData();
+      } catch (clearError) {
+        console.error('Error clearing auth data:', clearError);
+      }
     } finally {
+      console.log('Auth initialization complete');
       setIsLoading(false);
     }
   };

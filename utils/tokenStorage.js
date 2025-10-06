@@ -19,6 +19,7 @@ export const storeToken = async (token) => {
 export const getToken = async () => {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
+    console.log('Token retrieved:', token ? 'exists' : 'null');
     return token;
   } catch (error) {
     console.error('Error getting token:', error);
@@ -50,6 +51,7 @@ export const storeUserData = async (userData) => {
 export const getUserData = async () => {
   try {
     const userData = await AsyncStorage.getItem(USER_KEY);
+    console.log('User data retrieved:', userData ? 'exists' : 'null');
     return userData ? JSON.parse(userData) : null;
   } catch (error) {
     console.error('Error getting user data:', error);
