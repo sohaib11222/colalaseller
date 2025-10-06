@@ -805,6 +805,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    zIndex:5,
   },
   headerTitle: {
     position: "absolute",

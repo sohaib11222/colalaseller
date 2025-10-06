@@ -121,7 +121,7 @@ const API_ENDPOINTS = {
     //Cards
     List_Of_Cards: `${API_DOMAIN}/seller/cards`, // GET
     Create_Card: `${API_DOMAIN}/seller/cards`, // POST
-    Update_Card: (id) => `${API_DOMAIN}/seller/cards/${id}`, // POST
+    Update_Card: (id) => `${API_DOMAIN}/seller/cards/update/${id}`, // POST
     Delete_Card: (id) => `${API_DOMAIN}/seller/cards/${id}`, // DELETE
     Active_Card: (id) => `${API_DOMAIN}/seller/cards/${id}/active`, // PATCH
     Autodebit_Card: (id) => `${API_DOMAIN}/seller/cards/${id}/autodebit`, // PATCH
@@ -134,6 +134,7 @@ const API_ENDPOINTS = {
     Boosts_List: `${API_DOMAIN}/seller/boosts`, // GET
     Boost_Preview: `${API_DOMAIN}/seller/boosts/preview`, // POST
     Boost_Create: `${API_DOMAIN}/seller/boosts`, // POST
+    Boost_Update: (id) => `${API_DOMAIN}/seller/boosts/update/${id}`, 
     Single_Boost: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // GET
     Boost_Status: (id) => `${API_DOMAIN}/seller/boosts/${id}/status`, // PATCH
 

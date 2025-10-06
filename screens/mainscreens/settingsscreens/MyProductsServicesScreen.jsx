@@ -38,6 +38,46 @@ export default function MyProductsServicesScreen({ navigation }) {
   const { theme } = useTheme();
   const { token } = useAuth();
 
+
+  // inside MyProductsServicesScreen component
+  const openDetails = React.useCallback((item) => {
+    if (item?.type === 'product') {
+      navigation.navigate('ChatNavigator', {
+        screen: 'ProductDetails',
+        params: { id: item.id, item },
+      });
+    } else {
+      navigation.navigate('ChatNavigator', {
+        screen: 'ServiceDetails',
+        params: { id: item.id, item },
+      });
+    }
+  }, [navigation]);
+
+  const editItem = React.useCallback((item) => {
+    if (item?.type === 'product') {
+      // Same route & params style you used from ProductDetailsScreen
+      navigation.navigate('ChatNavigator', {
+        screen: "AddProduct",
+        params: {
+          editMode: true,
+          productId: item.id,
+        },
+      });
+    } else {
+      // Same route & params style you used from ServiceDetailsScreen
+      navigation.navigate('ChatNavigator', {
+        screen: 'AddService',
+        params: {
+          mode: 'edit',
+          serviceId: item.id,
+          isEdit: true,
+        },
+      });
+    }
+  }, [navigation]);
+
+
   const C = useMemo(
     () => ({
       primary: theme.colors?.primary || "#EF4444",
@@ -52,22 +92,22 @@ export default function MyProductsServicesScreen({ navigation }) {
   );
 
   // Fetch products and services using React Query
-  const { 
-    data: productsData, 
-    isLoading: productsLoading, 
-    error: productsError, 
-    refetch: refetchProducts 
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    error: productsError,
+    refetch: refetchProducts
   } = useQuery({
     queryKey: ['products', token],
     queryFn: () => getProducts(token),
     enabled: !!token,
   });
 
-  const { 
-    data: servicesData, 
-    isLoading: servicesLoading, 
-    error: servicesError, 
-    refetch: refetchServices 
+  const {
+    data: servicesData,
+    isLoading: servicesLoading,
+    error: servicesError,
+    refetch: refetchServices
   } = useQuery({
     queryKey: ['services', token],
     queryFn: () => getServices(token),
@@ -92,10 +132,14 @@ export default function MyProductsServicesScreen({ navigation }) {
     }
   };
 
+  // helpers/navigation.ts (or inline in your component)
+
+
+
   // Transform API data to match component expectations
   const transformProductData = (products) => {
     if (!products || !Array.isArray(products)) return [];
-    
+
     return products.map(product => ({
       id: product?.id?.toString() || Math.random().toString(),
       type: "product",
@@ -115,7 +159,7 @@ export default function MyProductsServicesScreen({ navigation }) {
 
   const transformServiceData = (services) => {
     if (!services || !Array.isArray(services)) return [];
-    
+
     return services.map(service => ({
       id: service?.id?.toString() || Math.random().toString(),
       type: "service",
@@ -134,9 +178,9 @@ export default function MyProductsServicesScreen({ navigation }) {
   };
 
   // Use API data if available, otherwise fallback to dummy data
-  const products = productsData?.data ? 
+  const products = productsData?.data ?
     transformProductData(productsData.data) : [];
-  const services = servicesData?.data ? 
+  const services = servicesData?.data ?
     transformServiceData(servicesData.data) : [];
 
   // Check if we have real API data but it's empty
@@ -201,10 +245,12 @@ export default function MyProductsServicesScreen({ navigation }) {
     return Array.from(set);
   }, [DATA]);
 
+
+
   /* ───────── filters ───────── */
   const filtered = useMemo(() => {
     if (!DATA || !Array.isArray(DATA)) return [];
-    
+
     return DATA.filter((x) => {
       if (!x) return false;
       if (tab === "products" && x.type !== "product") return false;
@@ -226,6 +272,8 @@ export default function MyProductsServicesScreen({ navigation }) {
   // Check if filters result in no data
   const hasFilters = category || statusFilter !== "all" || query.trim().length > 0;
   const isFilteredEmpty = hasFilters && filtered.length === 0 && DATA && DATA.length > 0;
+
+
 
   /* ───────── render ───────── */
   return (
@@ -282,7 +330,7 @@ export default function MyProductsServicesScreen({ navigation }) {
             activeOpacity={0.85}
             style={[styles.searchBox, { backgroundColor: "#fff", minWidth: 10 }]}
           >
-            <ThemedText style={{ color: category ? C.text : "#9CA3AF", flex: 1 , fontSize: 12}}>
+            <ThemedText style={{ color: category ? C.text : "#9CA3AF", flex: 1, fontSize: 12 }}>
               {category || "Categories"}
             </ThemedText>
             <Ionicons name="chevron-down" size={18} color={C.text} />
@@ -376,7 +424,7 @@ export default function MyProductsServicesScreen({ navigation }) {
         {(() => {
           const isLoading = tab === "products" ? productsLoading : servicesLoading;
           const error = tab === "products" ? productsError : servicesError;
-          
+
           if (isLoading) {
             return (
               <View style={styles.loadingContainer}>
@@ -387,7 +435,7 @@ export default function MyProductsServicesScreen({ navigation }) {
               </View>
             );
           }
-          
+
           if (error) {
             return (
               <View style={styles.errorContainer}>
@@ -409,7 +457,7 @@ export default function MyProductsServicesScreen({ navigation }) {
               </View>
             );
           }
-          
+
           if (shouldShowEmptyState) {
             console.log("Showing empty state for:", tab);
             console.log("Empty state reason - API empty:", isCurrentTabEmpty);
@@ -421,7 +469,7 @@ export default function MyProductsServicesScreen({ navigation }) {
                   No {tab === "products" ? "Products" : "Services"} Found
                 </ThemedText>
                 <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
-                  {tab === "products" 
+                  {tab === "products"
                     ? "You haven't created any products yet. Start by adding your first product to begin selling!"
                     : "You haven't created any services yet. Start by adding your first service to begin offering!"
                   }
@@ -449,7 +497,7 @@ export default function MyProductsServicesScreen({ navigation }) {
                   No Results Found
                 </ThemedText>
                 <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
-                  {query.trim().length > 0 
+                  {query.trim().length > 0
                     ? `No ${tab} match your search "${query}". Try different keywords or clear the search.`
                     : `No ${tab} match your current filters. Try adjusting your filters or clear them to see all ${tab}.`
                   }
@@ -469,7 +517,7 @@ export default function MyProductsServicesScreen({ navigation }) {
               </View>
             );
           }
-          
+
           return (
             <FlatList
               data={filtered}
@@ -478,19 +526,9 @@ export default function MyProductsServicesScreen({ navigation }) {
                 <ItemCard
                   item={item}
                   C={C}
-                  onPress={() => {
-                    if (item.type === "product") {
-                      navigation.navigate("ChatNavigator", {
-                        screen: "ProductDetails",
-                        params: { id: item.id, item },
-                      });
-                    } else {
-                      navigation.navigate("ChatNavigator", {
-                        screen: "ServiceDetails",
-                        params: { id: item.id, item },
-                      });
-                    }
-                  }}
+                  onPress={() => openDetails(item)}   // tapping the whole card
+                  onMore={() => openDetails(item)}    // "more" icon
+                  onEdit={() => editItem(item)}
                 />
               )}
               numColumns={2}
@@ -532,7 +570,7 @@ export default function MyProductsServicesScreen({ navigation }) {
 
 /* ───────── card ───────── */
 
-function ItemCard({ item, C, onPress }) {
+function ItemCard({ item, C, onPress, onMore, onEdit }) {
   const priceFmt = (n) => `₦${Number(n || 0).toLocaleString()}`;
   const isService = item.type === "service";
   const isOut = item.status === "out_of_stock";
@@ -665,7 +703,7 @@ function ItemCard({ item, C, onPress }) {
         </View>
 
         {/* footer buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
+        {/* <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12 }}>
           <View style={[styles.catPill, { borderColor: C.primary + "33" }]}>
             <ThemedText style={{ color: C.primary, fontSize: 8 }}>{item.category}</ThemedText>
           </View>
@@ -673,10 +711,31 @@ function ItemCard({ item, C, onPress }) {
           <TouchableOpacity style={styles.squareBtn}>
             <Image source={ICON_EDIT} style={{ width: 18, height: 18 }} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.squareBtn, { marginLeft: 10 }]}>
+          <TouchableOpacity
+            onPress={() => openDetails(navigation, item)}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            style={[styles.squareBtn, { marginLeft: 10 }]}>
+            <Image source={ICON_MORE} style={{ width: 18, height: 18 }} />
+          </TouchableOpacity>
+        </View> */}
+        {/* Service footer icons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+          <View style={[styles.catPill, { borderColor: C.primary + '33' }]}>
+            <ThemedText style={{ color: C.primary, fontSize: 8 }}>{item.category}</ThemedText>
+          </View>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity style={styles.squareBtn} onPress={onEdit}>
+            <Image source={ICON_EDIT} style={{ width: 18, height: 18 }} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onMore}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            style={[styles.squareBtn, { marginLeft: 10 }]}
+          >
             <Image source={ICON_MORE} style={{ width: 18, height: 18 }} />
           </TouchableOpacity>
         </View>
+
       </View>
     </TouchableOpacity>
   );

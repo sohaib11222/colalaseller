@@ -17,9 +17,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
+
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { API_DOMAIN } from "../../apiConfig";
@@ -33,9 +36,8 @@ const absUrl = (maybePath) =>
   !maybePath
     ? null
     : maybePath.startsWith("http")
-    ? maybePath
-    : `${API_DOMAIN.replace(/\/api$/, "")}${
-        maybePath.startsWith("/") ? "" : "/"
+      ? maybePath
+      : `${API_DOMAIN.replace(/\/api$/, "")}${maybePath.startsWith("/") ? "" : "/"
       }${maybePath}`;
 
 const timeAgo = (iso) => {
@@ -53,6 +55,21 @@ const timeAgo = (iso) => {
   return `${d}d ago`;
 };
 
+const FALLBACK_AVATAR = require("../../assets/Ellipse 18.png");
+const src = (v) =>
+  typeof v === "number" ? v : v ? { uri: String(v) } : FALLBACK_AVATAR;
+
+const extFromUri = (uri = "") => {
+  const path = uri.split("?")[0];
+  const m = path.match(/\.(png|jpe?g|webp|gif|mp4|mov)$/i);
+  return m ? m[1].toLowerCase() : "jpg"; // default to jpg
+};
+
+const safeFilename = (postId, ext) =>
+  `post_${String(postId || "unknown")}_${Date.now()}.${ext}`;
+
+
+
 const addQuery = (url, kv) => {
   const [base, qs] = url.split("?");
   const search = new URLSearchParams(qs || "");
@@ -62,8 +79,9 @@ const addQuery = (url, kv) => {
 
 const mapPost = (p) => {
   const storeName = p?.user?.store?.store_name || p?.user?.full_name || "Store";
-  const avatar =
-    absUrl(p?.user?.profile_picture) || "https://via.placeholder.com/80";
+  // const avatar =
+  //   absUrl(p?.user?.profile_picture) || "https://via.placeholder.com/80";
+  const avatar = absUrl(p?.user?.profile_picture) || null;
   const ver = p?.updated_at ? new Date(p.updated_at).getTime() : Date.now();
 
   const images = (p?.media_urls || [])
@@ -331,7 +349,7 @@ function FeedHeader({ C, onNotificationPress }) {
 }
 
 /* -------------------- POST CARD -------------------- */
-function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, C }) {
+function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownload, C }) {
   const [liked, setLiked] = useState(!!item.is_liked);
   useEffect(() => setLiked(!!item.is_liked), [item.is_liked]);
 
@@ -352,7 +370,8 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, C }) {
   return (
     <View style={styles.postCard}>
       <View style={styles.postTop}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        {/* <Image source={{ uri: item.avatar }} style={styles.avatar} /> */}
+        <Image source={src(item.avatar)} style={styles.avatar} />
         <View style={{ flex: 1 }}>
           <ThemedText style={styles.storeName}>{item.store}</ThemedText>
           <ThemedText style={styles.metaText}>
@@ -440,18 +459,19 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, C }) {
         </View>
 
         <View style={styles.actionsRight}>
-          {/* <TouchableOpacity
-            style={[styles.visitBtn, { backgroundColor: C.primary }]}
+          <TouchableOpacity
+            style={{ marginLeft: 10, opacity: images.length ? 1 : 0.4 }}
+            disabled={!images.length}
+            onPress={() => {
+              const uri = images[activeIdx]; // download the visible one
+              onDownload?.(uri, item.id);
+            }}
           >
-            <ThemedText style={styles.visitBtnText}>Visit Store</ThemedText>
-          </TouchableOpacity> */}
-          <TouchableOpacity style={{ marginLeft: 10 }}>
             <Image
               source={require("../../assets/DownloadSimple.png")}
               style={{ width: 30, height: 30 }}
             />
-          </TouchableOpacity>
-        </View>
+          </TouchableOpacity>        </View>
       </View>
     </View>
   );
@@ -494,7 +514,8 @@ function CommentsSheet({ visible, onClose, postId }) {
     body: c.body,
     time: timeAgo(c.created_at),
     user: c.user?.full_name || "User",
-    avatar: absUrl(c.user?.profile_picture) || "https://via.placeholder.com/56",
+    // avatar: absUrl(c.user?.profile_picture) || "https://via.placeholder.com/56",
+    avatar: absUrl(c.user?.profile_picture) || null,
     replies: c.replies || [],
     _raw: c,
   }));
@@ -524,11 +545,7 @@ function CommentsSheet({ visible, onClose, postId }) {
   const ReplyBlock = ({ reply }) => (
     <View style={styles.replyContainer}>
       <Image
-        source={{
-          uri:
-            absUrl(reply.user?.profile_picture) ||
-            "https://via.placeholder.com/56",
-        }}
+        source={src(absUrl(reply.user?.profile_picture))}
         style={styles.commentAvatar}
       />
       <View style={{ flex: 1 }}>
@@ -590,10 +607,11 @@ function CommentsSheet({ visible, onClose, postId }) {
               comments.map((c) => (
                 <View key={c.id} style={{ paddingBottom: 4 }}>
                   <View style={styles.commentRow}>
-                    <Image
+                    {/* <Image
                       source={{ uri: c.avatar }}
                       style={styles.commentAvatar}
-                    />
+                    /> */}
+                    <Image source={src(c.avatar)} style={styles.commentAvatar} />
                     <View style={{ flex: 1 }}>
                       <View
                         style={{ flexDirection: "row", alignItems: "center" }}
@@ -907,10 +925,10 @@ function useToggleLikeMutation() {
           arr.map((p) =>
             p.id === String(postId)
               ? {
-                  ...p,
-                  is_liked: !p.is_liked,
-                  likes: (p.likes || 0) + (p.is_liked ? -1 : 1),
-                }
+                ...p,
+                is_liked: !p.is_liked,
+                likes: (p.likes || 0) + (p.is_liked ? -1 : 1),
+              }
               : p
           );
         qc.setQueryData(["posts", "lists"], {
@@ -963,6 +981,69 @@ export default function FeedScreen() {
     }),
     [theme]
   );
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async (uri, postId) => {
+    try {
+      if (!uri) {
+        Alert.alert("Nothing to download", "This post has no media.");
+        return;
+      }
+
+      // 1) Photos permission
+      const perm = await MediaLibrary.requestPermissionsAsync();
+      if (perm.status !== "granted") {
+        Alert.alert(
+          "Permission needed",
+          "Please allow Photos permission to save images."
+        );
+        return;
+      }
+
+      setIsDownloading(true);
+
+      // 2) Pick a local filename
+      const ext = extFromUri(uri);
+      const local = FileSystem.documentDirectory + safeFilename(postId, ext);
+
+      // 3) Download to local file
+      const { uri: localUri, status } = await FileSystem.downloadAsync(uri, local);
+      if (status !== 200) {
+        throw new Error(`Download failed with status ${status}`);
+      }
+
+      // 4) Save to gallery (create album once)
+      const asset = await MediaLibrary.createAssetAsync(localUri);
+      // Change "SocialFeed" to your app/brand name
+      await MediaLibrary.createAlbumAsync("SocialFeed", asset, false);
+
+      Alert.alert("Saved", "Image saved to your gallery.");
+    } catch (e) {
+      // 🔎 Robust error messages for common cases
+      const msg = String(e?.message || e);
+      if (/cleartext/i.test(msg) || /CLEARTEXT/i.test(msg)) {
+        Alert.alert(
+          "Blocked: HTTP image",
+          "Android blocks non-HTTPS downloads by default. Serve media over HTTPS or enable cleartext traffic for dev."
+        );
+      } else if (/Network request failed/i.test(msg)) {
+        Alert.alert(
+          "Network error",
+          "Could not reach the file URL. Check the link or your connection."
+        );
+      } else if (/denied/i.test(msg) || /not granted/i.test(msg)) {
+        Alert.alert(
+          "Permission denied",
+          "Photos permission is required to save images."
+        );
+      } else {
+        Alert.alert("Download failed", msg);
+      }
+      console.log("download error:", e);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -1118,6 +1199,7 @@ export default function FeedScreen() {
             onOpenComments={openComments}
             onOpenOptions={openOptions}
             onToggleLike={handleToggleLike}
+            onDownload={handleDownload}
             C={C}
           />
         )}

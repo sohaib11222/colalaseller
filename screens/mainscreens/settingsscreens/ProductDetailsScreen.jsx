@@ -114,7 +114,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const chart = chartData?.data || [];
   const stats = statisticsData?.data || {};
   const productImages = product?.images || [];
-  
+
   // Extract balance data from API response
   const shoppingBalance = balanceData?.data?.shopping_balance || 0;
 
@@ -169,17 +169,17 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const finalSeries =
     chart.length > 0
       ? {
-          labels: chart.map((_, i) => String(i + 1)),
-          impressions: chart.map((item) => item.impressions || 0),
-          visitors: chart.map((item) => item.visitors || 0),
-          orders: chart.map((item) => item.orders || 0),
-        }
+        labels: chart.map((_, i) => String(i + 1)),
+        impressions: chart.map((item) => item.impressions || 0),
+        visitors: chart.map((item) => item.visitors || 0),
+        orders: chart.map((item) => item.orders || 0),
+      }
       : {
-          labels: ["N/A"],
-          impressions: [0],
-          visitors: [0],
-          orders: [0],
-        };
+        labels: ["N/A"],
+        impressions: [0],
+        visitors: [0],
+        orders: [0],
+      };
 
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -298,7 +298,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 productImages[0]?.path
                   ? `https://colala.hmstech.xyz/storage/${productImages[0].path}`
                   : item.image ||
-                      "https://via.placeholder.com/118x93?text=No+Image"
+                  "https://via.placeholder.com/118x93?text=No+Image"
               )}
               style={styles.summaryImg}
             />
@@ -327,7 +327,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 </ThemedText>
               )}
               <ThemedText style={{ color: C.sub, marginTop: 6 }}>
-                Qty left: {product.qty }
+                Qty left: {product.qty}
               </ThemedText>
             </View>
           </View>
@@ -507,10 +507,10 @@ function ViewProductModal({
     images.length > 0
       ? images.map((img) => `https://colala.hmstech.xyz/storage/${img.path}`)
       : [
-          item.image,
-          "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
-          "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
-        ];
+        item.image,
+        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
+        "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
+      ];
 
   const [active, setActive] = useState(0);
   const [tab, setTab] = useState("overview");
@@ -586,6 +586,21 @@ function ViewProductModal({
   const [dailyBudget, setDailyBudget] = useState(2000);
   const [boostDays, setBoostDays] = useState(20);
 
+  useEffect(() => {
+    const params = route?.params || {};
+    if (params.openBoostFlow) {
+      // open the full view first (so UI matches your normal path)
+      setViewOpen(true);
+      // then open the Boost flow just after that for a smooth UX
+      setTimeout(() => setBoostOpen(true), 250);
+
+      // prefill from incoming preset, if provided
+      const preset = params.boostPreset || {};
+      if (preset.location) setBoostLocation(String(preset.location));
+      if (preset.budget) setDailyBudget(Number(preset.budget));
+      if (preset.duration) setBoostDays(Number(preset.duration));
+    }
+  }, [route?.params?.openBoostFlow]);
   const openSetup = () => {
     setBoostOpen(false);
     setTimeout(() => setSetupOpen(true), 220);
@@ -861,14 +876,14 @@ function ViewProductModal({
                         fontSize: 14,
                       }}
                     >
-                      {item.qty }
+                      {item.qty}
                     </ThemedText>
 
                     <View
                       style={{ flexDirection: "row", alignItems: "center" }}
                     >
                       <TouchableOpacity
-                        onPress={() => {}}
+                        onPress={() => { }}
                         style={[
                           styles.qtySquare,
                           { backgroundColor: C.primary },
@@ -885,12 +900,12 @@ function ViewProductModal({
                             fontSize: 18,
                           }}
                         >
-                          {item.qty }
+                          {item.qty}
                         </ThemedText>
                       </View>
 
                       <TouchableOpacity
-                        onPress={() => {}}
+                        onPress={() => { }}
                         style={[
                           styles.qtySquare,
                           { backgroundColor: C.primary },
@@ -1392,20 +1407,20 @@ function BoostSetupModal({
           <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.proceedBtn, { backgroundColor: C.primary }]}
-             onPress={() => {
-               if (!location || !daily || !days) {
-                 alert("Please select location, daily budget and duration");
-                 return;
-               }
-               const payload = {
-                 product_id: item?.id || productId, // item or productId available
-                 location,
-                 budget: daily, // Changed from daily_budget to budget
-                 duration: days,
-               };
-               console.log("Preview Boost Payload:", payload);
-               previewMutation.mutate(payload);
-             }}
+            onPress={() => {
+              if (!location || !daily || !days) {
+                alert("Please select location, daily budget and duration");
+                return;
+              }
+              const payload = {
+                product_id: item?.id || productId, // item or productId available
+                location,
+                budget: daily, // Changed from daily_budget to budget
+                duration: days,
+              };
+              console.log("Preview Boost Payload:", payload);
+              previewMutation.mutate(payload);
+            }}
           >
             <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
               Proceed
@@ -1588,7 +1603,7 @@ function ReviewAdModal({
                   product?.images?.[0]?.url || product?.images?.[0]?.path
                     ? `https://colala.hmstech.xyz/storage/${product.images[0].path}`
                     : item.image ||
-                        "https://via.placeholder.com/300x300?text=No+Image"
+                    "https://via.placeholder.com/300x300?text=No+Image"
                 )}
                 style={{ width: "100%", height: 150 }}
                 resizeMode="cover"
@@ -1620,9 +1635,8 @@ function ReviewAdModal({
           {/* Budget row */}
           <RowTile
             icon="cash-outline"
-            text={`₦${Number(daily).toLocaleString()} for ${days} day${
-              days > 1 ? "s" : ""
-            }`}
+            text={`₦${Number(daily).toLocaleString()} for ${days} day${days > 1 ? "s" : ""
+              }`}
             trailingIcon="create-outline"
           />
 

@@ -26,6 +26,7 @@ import NotificationsScreen from "../screens/mainscreens/NotificationsScreen";
 import ServiceDetailsScreen from "../screens/mainscreens/settingsscreens/ServiceDetailsScreen";
 import LeaderboardScreen from "../screens/mainscreens/settingsscreens/LeaderboardScreen";
 import HelpScreen from "../screens/mainscreens/settingsscreens/HelpScreen";
+import OrdersScreen from "../screens/mainscreens/orderscreen/OrdersScreen";
 
 // import RegisterScreen from "../screens/RegisterScreen";
 
@@ -61,6 +62,7 @@ export default function ChatNavigator() {
       <Stack.Screen name="ServiceDetails" component={ServiceDetailsScreen} />
       <Stack.Screen name="SellerLeaderBoard" component={LeaderboardScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
+      <Stack.Screen name="Orders" component={OrdersScreen} />
 
 
 

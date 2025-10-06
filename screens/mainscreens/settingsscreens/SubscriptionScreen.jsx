@@ -25,6 +25,7 @@ import { StatusBar } from "expo-status-bar";
 import {
   getPlans,
   getSubscriptionStatus,
+  getBalance,
 } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
@@ -79,10 +80,10 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
   const planPrice = item.price === "0.00" ? "Free" : `N${parseFloat(item.price).toLocaleString()}`;
   const planCurrency = item.currency;
   const planDuration = item.duration_days;
-  
+
   // Convert features object to array
   const features = item.features ? Object.values(item.features) : [];
-  
+
   // Default gradients based on plan type
   const getGradients = (planName) => {
     if (planName.toLowerCase().includes('free')) {
@@ -102,7 +103,7 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
       };
     }
   };
-  
+
   const gradients = getGradients(planTitle);
 
   return (
@@ -165,7 +166,16 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
 }
 
 /* -------- Payment Method (BOTTOM SHEET) -------- */
-function PaymentMethodSheet({ visible, onClose, selectedPlan, onPaymentMethodSelect, onSubscribe, isLoading }) {
+function PaymentMethodSheet({
+  visible,
+  onClose,
+  selectedPlan,
+  onPaymentMethodSelect,
+  onSubscribe,
+  isLoading,
+  walletAmount = 0,
+  balanceLoading = false,
+}) {
   const [selected, setSelected] = useState("wallet"); // 'flutterwave' | 'wallet' | 'card'
   const [hasCard, setHasCard] = useState(false);
 
@@ -202,13 +212,22 @@ function PaymentMethodSheet({ visible, onClose, selectedPlan, onPaymentMethodSel
             style={styles.walletCard}
           >
             <ThemedText style={styles.walletSmall}>Wallet Balance</ThemedText>
-            <ThemedText style={styles.walletAmount}>N3,000,000</ThemedText>
+
+            {balanceLoading ? (
+              <ActivityIndicator size="small" color="#fff" style={{ marginTop: 6 }} />
+            ) : (
+              <ThemedText style={styles.walletAmount}>
+                {`N${Number(walletAmount).toLocaleString()}`}
+              </ThemedText>
+            )}
+
             <TouchableOpacity style={styles.topUp}>
               <ThemedText style={{ color: "#fff", fontSize: 12 }}>
                 Top Up
               </ThemedText>
             </TouchableOpacity>
           </LinearGradient>
+
 
           {/* Options */}
           <ScrollView
@@ -323,6 +342,12 @@ export default function SubscriptionScreen() {
   const [showPay, setShowPay] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("wallet");
+  // choose which balance you want to show in the sheet:
+const walletAmount =
+  balanceData?.data?.escrow_balance ??
+  balanceData?.data?.shopping_balance ??
+  0;
+
 
   const BG = require("../../../assets/baaloon.png");
 
@@ -339,7 +364,7 @@ export default function SubscriptionScreen() {
         console.error("Error loading onboarding token:", error);
       }
     };
-    
+
     if (!authToken) {
       loadOnboardingToken();
     }
@@ -372,6 +397,21 @@ export default function SubscriptionScreen() {
     staleTime: 5 * 60 * 1000, // 5 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
   });
+
+
+  const {
+    data: balanceData,
+    isLoading: balanceLoading,
+    isError: balanceError,
+    refetch: refetchBalance,
+  } = useQuery({
+    queryKey: ["wallet-balance", token],
+    queryFn: () => getBalance(token),
+    enabled: !!token,
+    staleTime: 2 * 60 * 1000,
+  });
+
+
 
   // Extract data from API responses
   const plans = plansData?.data || [];
@@ -441,8 +481,8 @@ export default function SubscriptionScreen() {
         'Are you sure you want to cancel your subscription?',
         [
           { text: 'No', style: 'cancel' },
-          { 
-            text: 'Yes', 
+          {
+            text: 'Yes',
             style: 'destructive',
             onPress: () => cancelSubscriptionMutation.mutate({ id: subscription.id })
           }
@@ -552,8 +592,8 @@ export default function SubscriptionScreen() {
       </ImageBackground>
 
       {/* bottom sheet */}
-      <PaymentMethodSheet 
-        visible={showPay} 
+      <PaymentMethodSheet
+        visible={showPay}
         onClose={() => {
           setShowPay(false);
           setSelectedPlan(null);
@@ -562,6 +602,8 @@ export default function SubscriptionScreen() {
         onPaymentMethodSelect={handlePaymentMethodSelect}
         onSubscribe={handleSubscribe}
         isLoading={addSubscriptionMutation.isPending}
+        walletAmount={walletAmount}     // ← NEW
+        balanceLoading={balanceLoading}
       />
     </SafeAreaView>
   );

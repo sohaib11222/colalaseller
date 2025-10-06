@@ -34,6 +34,11 @@ const ASSETS = {
   stats_followers: require("../../assets/profile-2user.png"),
   stats_rating: require("../../assets/star.png"),
   promo_fallback: require("../../assets/Frame 253.png"),
+
+  tile_my_orders: require("../../assets/Vector (26).png"),
+  tile_my_ps: require("../../assets/Vector (27).png"),
+  tile_stats: require("../../assets/Vector (28).png"),
+  tile_sub: require("../../assets/Vector (29).png"),
 };
 
 /* helpers */
@@ -454,6 +459,58 @@ export default function StoreHomeScreen() {
           resizeMode="cover"
         />
 
+        {/* --- Menu tiles grid --- */}
+        <View style={styles.grid}>
+          <MenuTile
+            img={ASSETS.tile_my_orders}
+            title="My Orders"
+            subtitle={"Manage your orders effectively\nview and monitor every\naspect of your customer orders"}
+            color={theme.colors.primary}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Orders",
+              })
+            }
+          />
+
+          <MenuTile
+            img={ASSETS.tile_my_ps}
+            title="My Products/Service"
+            subtitle={"This is home for all your Products manage everything here"}
+            color={theme.colors.primary}
+            onPress={() =>
+              navigation.navigate("SettingsNavigator", {
+                screen: "myproducts",
+              })
+            }
+          />
+
+          <MenuTile
+            img={ASSETS.tile_stats}
+            title="Statistics"
+            subtitle={"View detailed statistics for all your products."}
+            color={theme.colors.primary}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Analytics",
+              })
+            }
+          />
+
+          <MenuTile
+            img={ASSETS.tile_sub}
+            title="Subscription"
+            subtitle={"Manage your subscription package here effectively"}
+            color={theme.colors.primary}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Subscription",
+              })
+            }
+          />
+        </View>
+
+
         {/* Latest Orders (now from API, only 3) */}
         <ThemedText style={styles.sectionHeader}>Latest Orders</ThemedText>
         {(latest3 ?? []).map((o, idx) => (
@@ -491,6 +548,19 @@ function InfoRow({ icon, text }) {
     </View>
   );
 }
+
+function MenuTile({ img, title, subtitle, color, onPress }) {
+  return (
+    <TouchableOpacity style={styles.tile} onPress={onPress} activeOpacity={0.9}>
+      <View style={[styles.tileIconCircle, { backgroundColor: "#FFF1F1" }]}>
+        <Image source={img} style={styles.tileImg} />
+      </View>
+      <ThemedText style={[styles.tileTitle, { color }]}>{title}</ThemedText>
+      <ThemedText style={styles.tileSub}>{subtitle}</ThemedText>
+    </TouchableOpacity>
+  );
+}
+
 function Stat({ img, label, value, divider }) {
   return (
     <>
@@ -677,6 +747,33 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 15,
   },
+  // ⬇️ NEW styles for the tiles grid
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: 16,
+    marginTop: 14,
+    gap: 12,
+  },
+  tile: {
+    width: (width - 16 * 2 - 12) / 2,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 14,
+    height: 190,
+  },
+  tileIconCircle: {
+    width: 53,
+    height: 53,
+    borderRadius: 35,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  tileImg: { width: 22, height: 20, resizeMode: "contain" },
+  tileTitle: { fontSize: 14, fontWeight: "800" },
+  tileSub: { fontSize: 10, color: "#7D7D7D", marginTop: 4 },
+
   orderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   orderAvatar: {
     width: 51,
@@ -695,3 +792,4 @@ const styles = StyleSheet.create({
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
 });
+

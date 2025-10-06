@@ -62,18 +62,7 @@ export const createCard = async ({ payload, token }) => {
 };
 
 export const updateCard = async ({ id, payload, token }) => {
-  console.log("Update Card - ID:", id);
-  console.log("Update Card - Payload:", payload);
-  console.log("Update Card - Token:", token);
-  console.log("Update Card - URL:", API_ENDPOINTS.SETTINGS.Update_Card(id));
-  try {
-    const result = await apiCall(API_ENDPOINTS.SETTINGS.Update_Card(id), "POST", payload, token);
-    console.log("Update Card - Success:", result);
-    return result;
-  } catch (error) {
-    console.log("Update Card - Error:", error);
-    throw error;
-  }
+  return await apiCall(API_ENDPOINTS.SETTINGS.Update_Card(id), "POST", payload, token);
 };
 
 export const deleteCard = async ({ id, token }) => {
@@ -134,6 +123,11 @@ export const updateBoostStatus = async ({ id, payload, token }) => {
   await apiCall(API_ENDPOINTS.SETTINGS.Boost_Status(id), "PATCH", payload, token);
 };
 
+export const updateBoost = async ({ id, payload, token }) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Boost_Update(id), "POST", payload, token);
+};
+
+
 
 
 //Supports
@@ -142,3 +136,4 @@ export const createSupport = async ({ payload, token }) =>
 
 export const sendMessage = async ({ id, payload, token }) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Send_Message(id), "POST", payload, token);
+

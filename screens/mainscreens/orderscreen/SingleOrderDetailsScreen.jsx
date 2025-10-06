@@ -1,8 +1,3 @@
-
-
-// screens/orders/SingleOrderDetailsScreen.jsx
-// screens/orders/SingleOrderDetailsScreen.jsx
-// screens/orders/SingleOrderDetailsScreen.jsx
 import React, { useMemo, useState } from "react";
 import {
   View,
@@ -138,6 +133,7 @@ function TrackOrderModal({
     showRequest,
     onRequestCode,
     disabledRequest,
+    onDisputePress,
   }) => (
     <View style={styles.stepCard}>
       <View style={{ flexDirection: "row" }}>
@@ -199,7 +195,7 @@ function TrackOrderModal({
 
           <TouchableOpacity
             style={[styles.ghostBtn, { borderColor: C.line, marginTop: 10 }]}
-            onPress={() => { }}
+            onPress={onDisputePress}
           >
             <ThemedText style={{ color: C.text }}>Dispute</ThemedText>
           </TouchableOpacity>
@@ -304,6 +300,7 @@ function TrackOrderModal({
               showRequest
               onRequestCode={() => setCodeOpen(true)}
               disabledRequest={isDelivered}
+              onDisputePress={onOpenChat}
             />
           </View>
 
@@ -460,14 +457,14 @@ function StoreBlock({ C, detail, onOpenTracker }) {
     detail?.subtotal_with_shipping != null
       ? Number(detail.subtotal_with_shipping)
       : itemsCost - coupon - points + fee;
-      const onOpenChat = () => {
-        navigation.navigate("ChatNavigator", {
-          screen: "ChatDetails",
-          params: {
-            chat_id: detail?.chat?.id,
-          },
-        });
-      };
+  const onOpenChat = () => {
+    navigation.navigate("ChatNavigator", {
+      screen: "ChatDetails",
+      params: {
+        chat_id: detail?.chat?.id,
+      },
+    });
+  };
 
   const InfoRow = ({ left, right, strongRight, topBorder }) => (
     <View
@@ -489,8 +486,8 @@ function StoreBlock({ C, detail, onOpenTracker }) {
       <View style={[styles.storeHeader, { backgroundColor: C.primary }]}>
         <ThemedText style={styles.storeName}>{detail?.store?.store_name || "Store"}</ThemedText>
 
-        <TouchableOpacity style={[styles.chatBtn, { backgroundColor: "#fff" }]} activeOpacity={0.9}  
-        onPress={onOpenChat}
+        <TouchableOpacity style={[styles.chatBtn, { backgroundColor: "#fff" }]} activeOpacity={0.9}
+          onPress={onOpenChat}
         >
           <ThemedText style={[styles.chatBtnTxt, { color: C.primary }]}>Start Chat</ThemedText>
         </TouchableOpacity>
@@ -616,6 +613,7 @@ export default function SingleOrderDetailsScreen() {
 
   const selectedId = String(route.params?.orderId ?? "");
 
+
   const { data: detail } = useQuery({
     queryKey: ["orders", "detail", selectedId],
     enabled: !!selectedId,
@@ -626,6 +624,13 @@ export default function SingleOrderDetailsScreen() {
     },
     staleTime: 15_000,
   });
+
+  const openChat = () => {
+    navigation.navigate("ChatNavigator", {
+      screen: "ChatDetails",
+      params: { chat_id: detail?.chat?.id },
+    });
+  };
 
   const STATUS = ["Order placed", "Out for delivery", "Delivered", "Completed"];
   const [statusIdx, setStatusIdx] = useState(statusIndex(detail?.status || "placed"));
@@ -693,9 +698,7 @@ export default function SingleOrderDetailsScreen() {
         statusStr={detail?.status || "placed"}
         items={detail?.items || []}
         orderId={selectedId}
-        onOpenChat={() => {
-          // Wire to your chat navigator if needed
-        }}
+        onOpenChat={openChat}
       />
     </SafeAreaView>
   );
@@ -833,19 +836,19 @@ function makeStyles(C) {
 
     sectionTitle: { marginTop: 6, marginLeft: 12, marginBottom: 6 },
     addressCard: {
-    marginHorizontal: 12,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-  },
-  addrRow: {
-    justifyContent: "space-between",
-  },
-  addrLabel: { color: "#6C727A", fontSize: 12 },
-  addrRight: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "70%" },
-  addrValue: { color: "#000", flexShrink: 1, fontSize: 12 },
+      marginHorizontal: 12,
+      backgroundColor: "#fff",
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: "#ccc",
+      padding: 12,
+    },
+    addrRow: {
+      justifyContent: "space-between",
+    },
+    addrLabel: { color: "#6C727A", fontSize: 12 },
+    addrRight: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "70%" },
+    addrValue: { color: "#000", flexShrink: 1, fontSize: 12 },
 
     summaryWrap: {
       marginHorizontal: 12,

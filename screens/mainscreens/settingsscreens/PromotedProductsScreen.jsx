@@ -28,6 +28,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { getSingleBoost } from "../../../utils/queries/settings";
 import { updateBoostStatus } from "../../../utils/mutations/settings";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 /* ---------- helpers ---------- */
 const shadow = (e = 10) =>
@@ -73,7 +74,7 @@ const PRODUCTS = Array.from({ length: 8 }).map((_, i) => ({
 // Transform boost data from API to UI format
 const transformBoostData = (boosts) => {
   if (!boosts || !Array.isArray(boosts)) return [];
-  
+
   return boosts.map(boost => ({
     id: boost?.id?.toString() || Math.random().toString(),
     title: boost?.product?.name || `Product Boost #${boost?.id || 'Unknown'}`,
@@ -310,7 +311,7 @@ const CategorySheet = ({
 };
 
 /* ---------- Full-screen Promotion Details modal ---------- */
-const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
+const PromotionDetailsModal = ({ visible, onClose, item, C, token, navigation }) => {
   if (!visible || !item) return null;
 
   // Get single boost details
@@ -418,8 +419,8 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
           >
             <View style={{ height: 180, backgroundColor: "#EEE" }}>
               <Image
-                source={{ 
-                  uri: boostDetails?.data?.product?.images?.[0]?.url || item.image 
+                source={{
+                  uri: boostDetails?.data?.product?.images?.[0]?.url || item.image
                 }}
                 style={{ width: "100%", height: "100%" }}
               />
@@ -511,38 +512,38 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
           </View>
 
           {/* Stats rows */}
-          <Row 
-            label="Reach" 
-            value={boostDetails?.data?.reach ? boostDetails.data.reach.toLocaleString() : (item.reach ? item.reach.toLocaleString() : "N/A")} 
+          <Row
+            label="Reach"
+            value={boostDetails?.data?.reach ? boostDetails.data.reach.toLocaleString() : (item.reach ? item.reach.toLocaleString() : "N/A")}
           />
-          <Row 
-            label="Impressions" 
-            value={boostDetails?.data?.impressions ? boostDetails.data.impressions.toLocaleString() : (item.impressions ? item.impressions.toLocaleString() : "N/A")} 
+          <Row
+            label="Impressions"
+            value={boostDetails?.data?.impressions ? boostDetails.data.impressions.toLocaleString() : (item.impressions ? item.impressions.toLocaleString() : "N/A")}
           />
-          <Row 
-            label="Cost/Click" 
-            value={boostDetails?.data?.cpc ? `₦${boostDetails.data.cpc}` : (item.cpc ? `₦${item.cpc}` : "N/A")} 
+          <Row
+            label="Cost/Click"
+            value={boostDetails?.data?.cpc ? `₦${boostDetails.data.cpc}` : (item.cpc ? `₦${item.cpc}` : "N/A")}
           />
-          <Row 
-            label="Amount Spent" 
-            value={boostDetails?.data?.total_amount ? `₦${boostDetails.data.total_amount.toLocaleString()}` : (item.price ? `₦${item.price.toLocaleString()}` : "N/A")} 
+          <Row
+            label="Amount Spent"
+            value={boostDetails?.data?.total_amount ? `₦${boostDetails.data.total_amount.toLocaleString()}` : (item.price ? `₦${item.price.toLocaleString()}` : "N/A")}
           />
-          <Row 
-            label="Date Created" 
-            value={boostDetails?.data?.created_at ? new Date(boostDetails.data.created_at).toLocaleDateString() : "N/A"} 
+          <Row
+            label="Date Created"
+            value={boostDetails?.data?.created_at ? new Date(boostDetails.data.created_at).toLocaleDateString() : "N/A"}
           />
-          <Row 
-            label="Duration" 
-            value={boostDetails?.data?.duration ? `${boostDetails.data.duration} days` : (item.duration ? `${item.duration} days` : "N/A")} 
+          <Row
+            label="Duration"
+            value={boostDetails?.data?.duration ? `${boostDetails.data.duration} days` : (item.duration ? `${item.duration} days` : "N/A")}
           />
-          <Row 
-            label="Budget" 
-            value={boostDetails?.data?.budget ? `₦${boostDetails.data.budget.toLocaleString()}` : (item.oldPrice ? `₦${item.oldPrice.toLocaleString()}` : "N/A")} 
+          <Row
+            label="Budget"
+            value={boostDetails?.data?.budget ? `₦${boostDetails.data.budget.toLocaleString()}` : (item.oldPrice ? `₦${item.oldPrice.toLocaleString()}` : "N/A")}
           />
-          <Row 
-            label="Status" 
-            value={boostDetails?.data?.status || item.status || "N/A"} 
-            green={(boostDetails?.data?.status === "running" || boostDetails?.data?.status === "active") || (item.status === "running" || item.status === "active")} 
+          <Row
+            label="Status"
+            value={boostDetails?.data?.status || item.status || "N/A"}
+            green={(boostDetails?.data?.status === "running" || boostDetails?.data?.status === "active") || (item.status === "running" || item.status === "active")}
           />
 
           {/* Footer actions */}
@@ -554,7 +555,24 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
             }}
           >
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <MiniIconBtn icon="create-outline" C={C} />
+              {/* <MiniIconBtn icon="create-outline" C={C} /> */}
+              <MiniIconBtn
+                icon="create-outline"
+                C={C}
+                onPress={() => {
+                  const boost = boostDetails?.data || {};
+                  navigation.navigate("ProductDetails", {
+                    id: boost.product_id || item.productId || item.id,
+                    openBoostFlow: true,
+                    boostPreset: {
+                      boostId: boost.id || item.id,
+                      location: boost.location || item.location,
+                      duration: boost.duration || item.duration,
+                      budget: boost.budget || item.oldPrice,
+                    },
+                  });
+                }}
+              />
               <TouchableOpacity
                 style={{
                   width: 40,
@@ -578,10 +596,10 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
                 {updateStatusMutation.isPending ? (
                   <ActivityIndicator size="small" color={C.primary} />
                 ) : (
-                  <Ionicons 
-                    name={(boostDetails?.data?.status === "running" || boostDetails?.data?.status === "active") ? "pause" : "play"} 
-                    size={18} 
-                    color={C.text} 
+                  <Ionicons
+                    name={(boostDetails?.data?.status === "running" || boostDetails?.data?.status === "active") ? "pause" : "play"}
+                    size={18}
+                    color={C.text}
                   />
                 )}
               </TouchableOpacity>
@@ -591,6 +609,21 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
             <TouchableOpacity
               style={[styles.extendBtn, { backgroundColor: C.primary }]}
               activeOpacity={0.9}
+              onPress={() => {
+                const boost = boostDetails?.data || {};
+                const baseDuration = Number(boost.duration || item.duration || 0);
+                navigation.navigate("ProductDetails", {
+                  id: boost.product_id || item.productId || item.id,
+                  openBoostFlow: true,
+                  boostPreset: {
+                    boostId: boost.id || item.id,
+                    location: boost.location || item.location,
+                    budget: boost.budget || item.oldPrice,
+                    // simple extend heuristic: +7 days (adjust as you like)
+                    duration: baseDuration ? baseDuration + 7 : 7,
+                  },
+                });
+              }}
             >
               <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
                 Extend Promotion
@@ -603,7 +636,7 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   );
 };
 
-const MiniIconBtn = ({ icon, C }) => (
+const MiniIconBtn = ({ icon, C, onPress }) => (
   <TouchableOpacity
     style={{
       width: 40,
@@ -616,6 +649,7 @@ const MiniIconBtn = ({ icon, C }) => (
       backgroundColor: "#fff",
     }}
     activeOpacity={0.9}
+    onPress={onPress}
   >
     <Ionicons name={icon} size={18} color={C.text} />
   </TouchableOpacity>
@@ -646,11 +680,11 @@ export default function PromotedProductsScreen() {
   const [activeItem, setActiveItem] = useState(null);
 
   // API queries
-  const { 
-    data: boostsData, 
-    isLoading, 
-    error, 
-    refetch 
+  const {
+    data: boostsData,
+    isLoading,
+    error,
+    refetch
   } = useQuery({
     queryKey: ['boosts', token],
     queryFn: () => getBoostsList(token),
@@ -659,7 +693,7 @@ export default function PromotedProductsScreen() {
 
   // Transform API data
   const boosts = boostsData?.data ? transformBoostData(boostsData.data) : [];
-  
+
   // Check if we have real API data but it's empty
   const hasBoostsData = boostsData?.data !== undefined;
   const isBoostsEmpty = hasBoostsData && Array.isArray(boostsData.data) && boostsData.data.length === 0;
@@ -834,6 +868,7 @@ export default function PromotedProductsScreen() {
         item={activeItem}
         C={C}
         token={token}
+        navigation={navigation}
       />
     </SafeAreaView>
   );

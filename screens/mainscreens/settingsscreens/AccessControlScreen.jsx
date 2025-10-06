@@ -10,6 +10,7 @@ import {
   Platform,
   TextInput,
   ScrollView,
+  
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -374,6 +375,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    zIndex:5
   },
   headerTitle: {
     position: "absolute",
