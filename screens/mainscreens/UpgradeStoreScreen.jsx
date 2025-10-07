@@ -1824,14 +1824,14 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
               <SelectRow
                 C={C}
                 label={address ? "Address added" : "Add Store Address"}
-                onPress={() => navigation.navigate("Auth", { screen: "StoreAdress" })}
+                onPress={() => navigation.navigate("SettingsNavigator", { screen: "StoreAdress" })}
               />
               <SelectRow
                 C={C}
                 label={
                   delivery ? "Delivery pricing set" : "Add Delivery pricing"
                 }
-                onPress={() => navigation.navigate("Auth", { screen: "DeliveryDetails" })}
+                onPress={() => navigation.navigate("SettingsNavigator", { screen: "DeliveryDetails" })}
               />
 
               <ThemedText style={{ color: C.text, marginTop: 16 }}>

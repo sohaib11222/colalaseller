@@ -12,6 +12,7 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  Linking,
 } from "react-native";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
@@ -149,8 +150,8 @@ function AddressCard({ index, item, onEdit, onDelete, onMap }) {
             activeOpacity={0.9}
           >
             <Image
-              //   source={require("../../assets/icons/map.png")}
-              style={{ width: 14, height: 14, marginRight: 6 }}
+              source={require("../../assets/home.png")}
+              style={{ width: 14, height: 14, marginRight: 6, tintColor: "#E53E3E" }}
             />
             <ThemedText style={styles.mapBtnText}>View on Map</ThemedText>
           </TouchableOpacity>
@@ -289,13 +290,72 @@ export default function StoreAddressesScreen() {
   };
 
   const addNew = () => {
-    nav.navigate("AddAddress", {
-      onSaved: (addr) => {
-        // Refetch addresses after adding new one
-        refetch();
-        onPick?.(addr);
-      },
-    });
+    // Check if we're in the main app flow (SettingsNavigator) or auth flow
+    const isMainAppFlow = nav.getState()?.routes?.some(route => 
+      route.name === 'SettingsNavigator' || 
+      route.state?.routes?.some(nestedRoute => nestedRoute.name === 'StoreAdress')
+    );
+    
+    if (isMainAppFlow) {
+      // Navigate through SettingsNavigator
+      nav.navigate("SettingsNavigator", { 
+        screen: "AddAddress",
+        params: {
+          onSaved: (addr) => {
+            refetch();
+            onPick?.(addr);
+          },
+        }
+      });
+    } else {
+      // Navigate directly (Auth flow)
+      nav.navigate("AddAddress", {
+        onSaved: (addr) => {
+          refetch();
+          onPick?.(addr);
+        },
+      });
+    }
+  };
+
+  // Function to open address in map
+  const openInMap = (address) => {
+    try {
+      // Create a search query from the address components
+      const searchQuery = `${address.full_address}, ${address.local_government}, ${address.state}`;
+      
+      // Encode the query for URL
+      const encodedQuery = encodeURIComponent(searchQuery);
+      
+      // Try to open in Google Maps first, then fallback to Apple Maps
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedQuery}`;
+      const appleMapsUrl = `http://maps.apple.com/?q=${encodedQuery}`;
+      
+      // Check if we can open Google Maps, otherwise use Apple Maps
+      Linking.canOpenURL(googleMapsUrl)
+        .then((supported) => {
+          if (supported) {
+            return Linking.openURL(googleMapsUrl);
+          } else {
+            return Linking.openURL(appleMapsUrl);
+          }
+        })
+        .catch((error) => {
+          console.error('Error opening map:', error);
+          Alert.alert(
+            "Error",
+            "Unable to open map. Please check if you have a maps app installed.",
+            [{ text: "OK" }]
+          );
+        });
+    } catch (error) {
+      console.error('Error preparing map URL:', error);
+      Alert.alert(
+        "Error",
+        "Unable to open map. Please try again.",
+        [{ text: "OK" }]
+      );
+    }
   };
 
   return (
@@ -361,7 +421,14 @@ export default function StoreAddressesScreen() {
                 item={mappedItem}
                 onEdit={() => {
                   console.log("Edit address:", item.id);
-                  nav.navigate("AddAddress", {
+                  
+                  // Check if we're in the main app flow (SettingsNavigator) or auth flow
+                  const isMainAppFlow = nav.getState()?.routes?.some(route => 
+                    route.name === 'SettingsNavigator' || 
+                    route.state?.routes?.some(nestedRoute => nestedRoute.name === 'StoreAdress')
+                  );
+                  
+                  const editParams = {
                     editData: {
                       id: item.id,
                       state: item.state,
@@ -375,10 +442,21 @@ export default function StoreAddressesScreen() {
                       refetch();
                       onPick?.(updatedAddr);
                     },
-                  });
+                  };
+                  
+                  if (isMainAppFlow) {
+                    // Navigate through SettingsNavigator
+                    nav.navigate("SettingsNavigator", { 
+                      screen: "AddAddress",
+                      params: editParams
+                    });
+                  } else {
+                    // Navigate directly (Auth flow)
+                    nav.navigate("AddAddress", editParams);
+                  }
                 }}
                 onDelete={() => handleDeletePress(item)}
-                onMap={() => {}}
+                onMap={() => openInMap(item)}
               />
             );
           }}
