@@ -32,58 +32,65 @@ const HARDCODE_FALLBACK = [
     lastMessage: "How will i get my goods delivered ?",
     time: "Today | 07:22 AM",
     unread: 1,
+    chatType: "general",
   },
   {
     id: "2",
     name: "Adam Wande",
     avatar: "https://i.pravatar.cc/100?img=47",
-    lastMessage: "How will i get my goods delivered ?",
+    lastMessage: "I need help with my order",
     time: "Today | 07:22 AM",
     unread: 1,
+    chatType: "order",
   },
   {
     id: "3",
     name: "Raheem Din",
     avatar: "https://i.pravatar.cc/100?img=36",
-    lastMessage: "How will i get my goods delivered ?",
+    lastMessage: "Can you provide this service?",
     time: "Today | 07:22 AM",
     unread: 0,
+    chatType: "service",
   },
   {
     id: "4",
     name: "Scent Villa Stores",
     avatar:
       "https://images.unsplash.com/photo-1541643600914-78b084683601?q=80&w=200&auto=format&fit=crop",
-    lastMessage: "How will i get my goods delivered ?",
+    lastMessage: "General inquiry about products",
     time: "Today | 07:22 AM",
     unread: 0,
+    chatType: "general",
   },
   {
     id: "5",
     name: "Power Stores",
     avatar:
       "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=200&auto=format&fit=crop",
-    lastMessage: "How will i get my goods delivered ?",
+    lastMessage: "Order status update needed",
     time: "Today | 07:22 AM",
     unread: 0,
+    chatType: "order",
   },
   {
     id: "6",
     name: "Creamlia Stores",
     avatar:
       "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=200&auto=format&fit=crop",
-    lastMessage: "How will i get my goods delivered ?",
+    lastMessage: "Service booking request",
     time: "Today | 07:22 AM",
     unread: 0,
+    chatType: "service",
   },
   {
     id: "7",
     name: "Dannova Stores",
     avatar:
       "https://images.unsplash.com/photo-1521579770471-740fe0cf4be0?q=80&w=200&auto=format&fit=crop",
-    lastMessage: "How will i get my goods delivered ?",
+    lastMessage: "General store information",
     time: "Today | 07:22 AM",
     unread: 0,
+    chatType: "general",
   },
 ];
 
@@ -114,6 +121,7 @@ const mapChatItem = (it) => ({
     ? formatTime(it.last_message_at)
     : "Today | 07:22 AM",
   unread: Number(it.unread_count || 0),
+  chatType: it.chat_type || "general", // Include chat type from API
   _raw: it,
 });
 
@@ -133,7 +141,7 @@ export default function ChatListScreen({ navigation }) {
   );
 
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState("Products");
+  const [filter, setFilter] = useState("All");
   const [ddOpen, setDdOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -164,16 +172,35 @@ export default function ChatListScreen({ navigation }) {
   const usingFallback = isError;
   const baseList = usingFallback ? HARDCODE_FALLBACK : listFromApi;
 
-  // Search
+  // Search and Filter
   const data = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return baseList;
-    return baseList.filter(
-      (c) =>
-        c.name.toLowerCase().includes(t) ||
-        (c.lastMessage || "").toLowerCase().includes(t)
-    );
-  }, [q, baseList]);
+    let filteredList = baseList;
+    
+    // Apply chat type filter
+    if (filter !== "All") {
+      const filterMap = {
+        "General": "general",
+        "Service": "service", 
+        "Order": "order"
+      };
+      const chatTypeToFilter = filterMap[filter];
+      if (chatTypeToFilter) {
+        filteredList = filteredList.filter(c => c.chatType === chatTypeToFilter);
+      }
+    }
+    
+    // Apply search filter
+    const searchTerm = q.trim().toLowerCase();
+    if (searchTerm) {
+      filteredList = filteredList.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchTerm) ||
+          (c.lastMessage || "").toLowerCase().includes(searchTerm)
+      );
+    }
+    
+    return filteredList;
+  }, [q, filter, baseList]);
 
   // When opening a chat: navigate + clear unread
   const openChat = (item) => {
@@ -391,7 +418,7 @@ export default function ChatListScreen({ navigation }) {
           onPress={() => setDdOpen(false)}
         />
         <View style={[styles.ddCard, { borderColor: C.line }]}>
-          {["Products", "Stores", "People"].map((opt, i) => (
+          {["All", "General", "Service", "Order"].map((opt, i) => (
             <TouchableOpacity
               key={opt}
               style={[
