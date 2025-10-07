@@ -37,6 +37,7 @@ export default function ServiceDetailsScreen({ route, navigation }) {
   const queryClient = useQueryClient();
   const [viewOpen, setViewOpen] = useState(false); // ⬅️ modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false); // ⬅️ delete confirmation modal
+  const [statsModalOpen, setStatsModalOpen] = useState(false); // ⬅️ stats modal state
 
   console.log("The Service Id is", serviceId);
   const C = useMemo(
@@ -156,6 +157,17 @@ export default function ServiceDetailsScreen({ route, navigation }) {
         ["Chats", "5"],
         ["Phone Views", "15"],
       ];
+
+  // Format stats data for modal (similar to ProductDetailsScreen)
+  const finalStats = {
+    views: serviceStats?.data?.view || 0,
+    impressions: serviceStats?.data?.impression || 0,
+    profileClicks: serviceStats?.data?.click || 0,
+    chats: serviceStats?.data?.chat || 0,
+    phoneViews: serviceStats?.data?.phone_view || 0,
+    inCart: 0, // Services don't have cart, but keeping for consistency
+    completed: 0, // This might need to be from API
+  };
 
   // Transform chart data or use dummy data
   // Check if chartData exists and has valid data (not empty array)
@@ -419,6 +431,7 @@ export default function ServiceDetailsScreen({ route, navigation }) {
         serviceData={serviceData}
         navigation={navigation}
         onDelete={() => setDeleteModalOpen(true)}
+        onStatsOpen={() => setStatsModalOpen(true)}
         store={{
           name: serviceData?.store?.store_name || "Store Name",
           service: serviceData?.name || item.title || "Service Name",
@@ -439,6 +452,16 @@ export default function ServiceDetailsScreen({ route, navigation }) {
           mediaType: serviceData?.media?.[0]?.type || "image",
           subServices: serviceData?.sub_services || [],
         }}
+      />
+
+      {/* STATS MODAL */}
+      <StatsModal
+        visible={statsModalOpen}
+        onClose={() => setStatsModalOpen(false)}
+        stats={finalStats}
+        chart={series}
+        isLoading={statsLoading}
+        C={C}
       />
 
       {/* Delete Confirmation Modal */}
@@ -514,6 +537,7 @@ function ViewServiceModal({
   serviceData,
   navigation,
   onDelete,
+  onStatsOpen,
 }) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   
@@ -777,7 +801,10 @@ function ViewServiceModal({
                   style={styles.profileImage}
                 />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn}>
+              <TouchableOpacity 
+                style={styles.iconBtn}
+                onPress={onStatsOpen}
+              >
                 <Image
                   source={require("../../../assets/Vector (10).png")}
                   style={styles.profileImage}
@@ -1149,4 +1176,275 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#fff",
   },
+  
+  // Stats Modal Styles
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  backBtn: {
+    padding: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  statsCard: {
+    borderRadius: 12,
+    padding: 16,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 16,
+  },
+  chartCard: {
+    borderRadius: 12,
+    padding: 16,
+  },
+  chartLegend: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
 });
+
+/* ───────── Stats Modal ───────── */
+function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={C.text} />
+          </TouchableOpacity>
+          <ThemedText style={styles.modalTitle}>Service Statistics</ThemedText>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+                Loading statistics...
+              </ThemedText>
+            </View>
+          ) : (
+            <>
+              {/* Stats Cards */}
+              <View style={{ padding: 16, gap: 12 }}>
+                {/* Views */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.views?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Views
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Impressions */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.impressions?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Impressions
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Profile Clicks */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.profileClicks?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Profile Clicks
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Chats */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.chats?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Chats
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Phone Views */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.phoneViews?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Phone Views
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* No Clicks */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {((stats.impressions || 0) - (stats.profileClicks || 0)).toLocaleString()}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        No Clicks
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Chart Section */}
+              {chart.labels.length > 0 && chart.labels[0] !== "N/A" && (
+                <View style={{ padding: 16 }}>
+                  <ThemedText style={[styles.chartTitle, { color: C.text }]}>
+                    Performance Over Time
+                  </ThemedText>
+                  <View style={[styles.chartCard, { backgroundColor: C.card }]}>
+                    <View style={styles.chartLegend}>
+                      <View style={styles.legendItem}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            { backgroundColor: C.primary },
+                          ]}
+                        />
+                        <ThemedText
+                          style={[styles.legendText, { color: C.sub }]}
+                        >
+                          Impressions
+                        </ThemedText>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            { backgroundColor: "#10B981" },
+                          ]}
+                        />
+                        <ThemedText
+                          style={[styles.legendText, { color: C.sub }]}
+                        >
+                          Visitors
+                        </ThemedText>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            { backgroundColor: "#EF4444" },
+                          ]}
+                        />
+                        <ThemedText
+                          style={[styles.legendText, { color: C.sub }]}
+                        >
+                          Chats
+                        </ThemedText>
+                      </View>
+                    </View>
+                    {/* Chart would go here - you can add a chart component if needed */}
+                    <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
+                      <ThemedText style={{ color: C.sub }}>
+                        Chart visualization would go here
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}

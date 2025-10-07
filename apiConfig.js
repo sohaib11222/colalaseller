@@ -193,6 +193,10 @@ const API_ENDPOINTS = {
     // POST -> create/update store builder payload
     Builder: `${API_DOMAIN}/seller/store/builder`,
   },
+
+  LEADERBOARD: {
+    Sellers: `${API_DOMAIN}/leaderboard/sellers`, // GET
+  },
 };
 
 export { API_DOMAIN, API_ENDPOINTS };
