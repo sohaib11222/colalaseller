@@ -34,3 +34,11 @@ export const setBulkPrices = async (productId, payload, token) =>
 // payload = { delivery_option_ids: [1, 2] }
 export const attachDeliveryOptions = async (productId, payload, token) =>
   await apiCall(API_ENDPOINTS.PRODUCTS.AttachDeliveryOptions(productId), "POST", payload, token);
+
+// Mark as Sold
+export const markAsSold = async (productId, token) =>
+  await apiCall(API_ENDPOINTS.PRODUCTS.Product_Mark_As_Sold(productId), "POST", undefined, token);
+
+// Mark as Unavailable
+export const markAsUnavailable = async (productId, token) =>
+  await apiCall(API_ENDPOINTS.PRODUCTS.Product_Mark_As_Unavailable(productId), "POST", undefined, token);

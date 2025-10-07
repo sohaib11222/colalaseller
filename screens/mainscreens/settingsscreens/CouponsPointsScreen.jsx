@@ -32,8 +32,9 @@ import { useQuery } from "@tanstack/react-query";
 import { getOnboardingToken } from "../../../utils/tokenStorage";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useMutation } from "@tanstack/react-query";
-import { getMyPoints } from "../../../utils/queries/settings";
+import { getLoyaltiyPoints, getLoyaltiySetting } from "../../../utils/queries/settings";
 
+import { updateLoyaltiySetting } from "../../../utils/mutations/settings";
 
 /* helpers */
 const pad = (n) => String(n).padStart(2, "0");
@@ -110,15 +111,29 @@ export default function CouponsPointsScreen({ navigation }) {
   // Extract data from API response
   const coupons = couponsData?.data || [];
 
-  // Fetch customer points using React Query
+  // Fetch loyalty points using React Query
   const {
-    data: pointsData,
-    isLoading: pointsLoading,
-    isError: pointsError,
-    refetch: refetchPoints,
+    data: loyaltyPointsData,
+    isLoading: loyaltyPointsLoading,
+    isError: loyaltyPointsError,
+    refetch: refetchLoyaltyPoints,
   } = useQuery({
-    queryKey: ["customerPoints", token],
-    queryFn: () => getMyPoints(token),
+    queryKey: ["loyaltyPoints", token],
+    queryFn: () => getLoyaltiyPoints(token),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  // Fetch loyalty settings using React Query
+  const {
+    data: loyaltySettingsData,
+    isLoading: loyaltySettingsLoading,
+    isError: loyaltySettingsError,
+    refetch: refetchLoyaltySettings,
+  } = useQuery({
+    queryKey: ["loyaltySettings", token],
+    queryFn: () => getLoyaltiySetting(token),
     enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
@@ -160,11 +175,24 @@ export default function CouponsPointsScreen({ navigation }) {
     },
   });
 
+  // Loyalty settings mutation
+  const updateLoyaltySettingsMutation = useMutation({
+    mutationFn: ({ payload }) => updateLoyaltiySetting({ payload, token }),
+    onSuccess: () => {
+      refetchLoyaltySettings();
+      Alert.alert("Success", "Loyalty settings updated successfully");
+    },
+    onError: (error) => {
+      console.error("Error updating loyalty settings:", error);
+      Alert.alert("Error", "Failed to update loyalty settings");
+    },
+  });
+
   // Handle pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refetchCoupons(), refetchPoints()]);
+      await Promise.all([refetchCoupons(), refetchLoyaltyPoints(), refetchLoyaltySettings()]);
     } finally {
       setRefreshing(false);
     }
@@ -210,9 +238,12 @@ export default function CouponsPointsScreen({ navigation }) {
     setEditing(null);
   };
 
-  // Extract points data from API response
-  const pointsTotal = pointsData?.data?.total_points || 0;
-  const customers = pointsData?.data?.stores || [];
+  // Extract loyalty points data from API response
+  const pointsTotal = loyaltyPointsData?.data?.total_points_balance || 0;
+  const customers = loyaltyPointsData?.data?.customers || [];
+
+  // Extract loyalty settings data from API response
+  const loyaltySettings = loyaltySettingsData?.data || {};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -420,7 +451,7 @@ export default function CouponsPointsScreen({ navigation }) {
               Customers Points
             </ThemedText>
 
-            {pointsLoading ? (
+            {loyaltyPointsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={C.primary} />
                 <ThemedText style={[styles.loadingText, { color: C.sub }]}>
@@ -433,8 +464,11 @@ export default function CouponsPointsScreen({ navigation }) {
                 <ThemedText style={[styles.emptyStateTitle, { color: C.text }]}>
                   No Customer Points
                 </ThemedText>
-                <ThemedText style={[styles.emptyStateMessage, { color: C.sub }]}>
-                  Customer points will appear here when customers earn points from your store.
+                <ThemedText
+                  style={[styles.emptyStateMessage, { color: C.sub }]}
+                >
+                  Customer points will appear here when customers earn points
+                  from your store.
                 </ThemedText>
               </View>
             ) : (
@@ -450,6 +484,8 @@ export default function CouponsPointsScreen({ navigation }) {
             visible={settingsOpen}
             onClose={() => setSettingsOpen(false)}
             onSave={() => setSettingsOpen(false)}
+            loyaltySettings={loyaltySettings}
+            updateLoyaltySettingsMutation={updateLoyaltySettingsMutation}
           />
         </>
       )}
@@ -620,24 +656,50 @@ const CustomerRow = ({ C, user }) => (
       { backgroundColor: C.card, borderColor: "#EFEFEF" },
     ]}
   >
-    <Image 
-      source={{ uri: user.profile_image ? `https://colala.hmstech.xyz/storage/${user.profile_image}` : "https://i.pravatar.cc/150?img=1" }} 
-      style={styles.avatar} 
+    <Image
+      source={{
+        uri: user.profile_picture
+          ? `https://colala.hmstech.xyz/storage/${user.profile_picture}`
+          : "https://i.pravatar.cc/150?img=1",
+      }}
+      style={styles.avatar}
     />
     <ThemedText style={{ color: C.text, fontWeight: "600", flex: 1 }}>
-      {user.store_name}
+      {user.name}
     </ThemedText>
     <ThemedText style={{ color: "#E53935", fontWeight: "800" }}>
-      {user.total_points}
+      {user.points}
     </ThemedText>
   </View>
 );
 
-function PointsSettingsModal({ C, visible, onClose, onSave }) {
+function PointsSettingsModal({ C, visible, onClose, onSave, loyaltySettings, updateLoyaltySettingsMutation }) {
   const [pointsPerOrder, setPointsPerOrder] = useState("");
   const [pointsPerReferral, setPointsPerReferral] = useState("");
   const [enableOrder, setEnableOrder] = useState(true);
   const [enableReferral, setEnableReferral] = useState(true);
+
+  // Initialize form with loyalty settings data
+  React.useEffect(() => {
+    if (loyaltySettings && Object.keys(loyaltySettings).length > 0) {
+      setPointsPerOrder(loyaltySettings.points_per_order?.toString() || "");
+      setPointsPerReferral(loyaltySettings.points_per_referral?.toString() || "");
+      setEnableOrder(loyaltySettings.enable_order_points === 1);
+      setEnableReferral(loyaltySettings.enable_referral_points === 1);
+    }
+  }, [loyaltySettings, visible]);
+
+  const handleSave = () => {
+    const payload = {
+      points_per_order: pointsPerOrder,
+      points_per_referral: pointsPerReferral,
+      enable_order_points: enableOrder ? "1" : "0",
+      enable_referral_points: enableReferral ? "1" : "0",
+    };
+    
+    updateLoyaltySettingsMutation.mutate({ payload });
+    onSave();
+  };
 
   return (
     <Modal
@@ -700,12 +762,23 @@ function PointsSettingsModal({ C, visible, onClose, onSave }) {
 
         <View style={[styles.footer, { backgroundColor: C.bg }]}>
           <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: C.primary }]}
-            onPress={onSave}
+            style={[
+              styles.primaryBtn, 
+              { 
+                backgroundColor: C.primary,
+                opacity: updateLoyaltySettingsMutation.isPending ? 0.6 : 1
+              }
+            ]}
+            onPress={handleSave}
+            disabled={updateLoyaltySettingsMutation.isPending}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-              Save
-            </ThemedText>
+            {updateLoyaltySettingsMutation.isPending ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                Save
+              </ThemedText>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>

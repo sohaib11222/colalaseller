@@ -137,3 +137,7 @@ export const createSupport = async ({ payload, token }) =>
 export const sendMessage = async ({ id, payload, token }) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Send_Message(id), "POST", payload, token);
 
+
+//Loyaltiy
+export const updateLoyaltiySetting = async ({ payload, token }) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Update_loyaltiy_Setting, "POST", payload, token);

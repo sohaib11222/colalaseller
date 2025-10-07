@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Modal,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -25,6 +26,8 @@ import {
 import { deleteService } from "../../../utils/mutations/services";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { markAsUnavailable } from "../../../utils/mutations/services";
+import { markAsAvailable } from "../../../utils/mutations/services";
 export default function ServiceDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? {};
   const serviceId = route?.params?.id || item?.id;
@@ -48,32 +51,32 @@ export default function ServiceDetailsScreen({ route, navigation }) {
   );
 
   // Fetch service details, statistics, and chart data
-  const { 
-    data: serviceDetails, 
-    isLoading: detailsLoading, 
-    error: detailsError 
+  const {
+    data: serviceDetails,
+    isLoading: detailsLoading,
+    error: detailsError,
   } = useQuery({
-    queryKey: ['serviceDetails', serviceId, token],
+    queryKey: ["serviceDetails", serviceId, token],
     queryFn: () => getServiceDetails(serviceId, token),
     enabled: !!serviceId && !!token,
   });
 
-  const { 
-    data: serviceStats, 
-    isLoading: statsLoading, 
-    error: statsError 
+  const {
+    data: serviceStats,
+    isLoading: statsLoading,
+    error: statsError,
   } = useQuery({
-    queryKey: ['serviceStats', serviceId, token],
+    queryKey: ["serviceStats", serviceId, token],
     queryFn: () => getServiceStatistics(serviceId, token),
     enabled: !!serviceId && !!token,
   });
 
-  const { 
-    data: chartData, 
-    isLoading: chartLoading, 
-    error: chartError 
+  const {
+    data: chartData,
+    isLoading: chartLoading,
+    error: chartError,
   } = useQuery({
-    queryKey: ['serviceChart', serviceId, token],
+    queryKey: ["serviceChart", serviceId, token],
     queryFn: () => getServiceChartData(serviceId, token),
     enabled: !!serviceId && !!token,
   });
@@ -83,13 +86,13 @@ export default function ServiceDetailsScreen({ route, navigation }) {
     mutationFn: () => deleteService(serviceId, token),
     onSuccess: (data) => {
       console.log("Service deleted successfully:", data);
-      
+
       // Invalidate and refetch services query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['services', token] });
-      
+      queryClient.invalidateQueries({ queryKey: ["services", token] });
+
       // Close the view modal if open
       setViewOpen(false);
-      
+
       // Navigate back to the services list
       navigation.goBack();
     },
@@ -98,7 +101,21 @@ export default function ServiceDetailsScreen({ route, navigation }) {
       Alert.alert("Error", "Failed to delete service. Please try again.");
     },
   });
-  
+
+  // Mark as unavailable mutation
+  const markAsUnavailableMutation = useMutation({
+    mutationFn: () => markAsUnavailable(serviceId, token),
+    onSuccess: () => {
+      Alert.alert("Success", "Service has been marked as unavailable");
+      // Refresh the service data
+      queryClient.invalidateQueries(["serviceDetails", serviceId, token]);
+    },
+    onError: (error) => {
+      console.error("Error marking service as unavailable:", error);
+      Alert.alert("Error", "Failed to mark service as unavailable");
+    },
+  });
+
   console.log("Service Details", serviceDetails);
   console.log("Service Stats", serviceStats);
   console.log("Service Chart Data", chartData);
@@ -109,37 +126,46 @@ export default function ServiceDetailsScreen({ route, navigation }) {
   const hasError = detailsError || statsError || chartError;
 
   // Transform statistics data
-  const stats = serviceStats?.data ? [
-    ["Views", serviceStats.data.view?.toString() || "0"],
-    ["Impressions", serviceStats.data.impression?.toString() || "0"],
-    ["Clicks", serviceStats.data.click?.toString() || "0"],
-    ["Chats", serviceStats.data.chat?.toString() || "0"],
-    ["Phone Views", serviceStats.data.phone_view?.toString() || "0"],
-  ] : [
-    ["Views", "2000"],
-    ["Impressions", "1500"],
-    ["Clicks", "300"],
-    ["Chats", "5"],
-    ["Phone Views", "15"],
-  ];
+  const stats = serviceStats?.data
+    ? [
+        ["Views", serviceStats.data.view?.toString() || "0"],
+        ["Impressions", serviceStats.data.impression?.toString() || "0"],
+        ["Clicks", serviceStats.data.click?.toString() || "0"],
+        ["Chats", serviceStats.data.chat?.toString() || "0"],
+        ["Phone Views", serviceStats.data.phone_view?.toString() || "0"],
+      ]
+    : [
+        ["Views", "2000"],
+        ["Impressions", "1500"],
+        ["Clicks", "300"],
+        ["Chats", "5"],
+        ["Phone Views", "15"],
+      ];
 
   // Transform chart data or use dummy data
-  const series = chartData?.data ? {
-    labels: chartData.data.labels || ["1", "2", "3", "4", "5", "6", "7"],
-    impressions: chartData.data.impressions || [65, 40, 75, 30, 90, 65, 55],
-    visitors: chartData.data.visitors || [35, 60, 20, 18, 70, 55, 45],
-    chats: chartData.data.chats || [25, 20, 10, 6, 40, 35, 22],
-  } : {
-    labels: ["1", "2", "3", "4", "5", "6", "7"],
-    impressions: [65, 40, 75, 30, 90, 65, 55],
-    visitors: [35, 60, 20, 18, 70, 55, 45],
-    chats: [25, 20, 10, 6, 40, 35, 22],
-  };
+  const series = chartData?.data
+    ? {
+        labels: chartData.data.labels || ["1", "2", "3", "4", "5", "6", "7"],
+        impressions: chartData.data.impressions || [65, 40, 75, 30, 90, 65, 55],
+        visitors: chartData.data.visitors || [35, 60, 20, 18, 70, 55, 45],
+        chats: chartData.data.chats || [25, 20, 10, 6, 40, 35, 22],
+      }
+    : {
+        labels: ["1", "2", "3", "4", "5", "6", "7"],
+        impressions: [65, 40, 75, 30, 90, 65, 55],
+        visitors: [35, 60, 20, 18, 70, 55, 45],
+        chats: [25, 20, 10, 6, 40, 35, 22],
+      };
 
   // Price range from API data or fallback
-  const priceRange = serviceData?.price_from && serviceData?.price_to 
-    ? `₦${Number(serviceData.price_from).toLocaleString()} - ₦${Number(serviceData.price_to).toLocaleString()}`
-    : `₦${Number(item?.minPrice || 0).toLocaleString()} - ₦${Number(item?.maxPrice || 0).toLocaleString()}`;
+  const priceRange =
+    serviceData?.price_from && serviceData?.price_to
+      ? `₦${Number(serviceData.price_from).toLocaleString()} - ₦${Number(
+          serviceData.price_to
+        ).toLocaleString()}`
+      : `₦${Number(item?.minPrice || 0).toLocaleString()} - ₦${Number(
+          item?.maxPrice || 0
+        ).toLocaleString()}`;
 
   // Handle delete service
   const handleDeleteService = () => {
@@ -212,115 +238,140 @@ export default function ServiceDetailsScreen({ route, navigation }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
         >
-        {/* Summary card */}
-        <View
-          style={[
-            styles.summaryCard,
-            { backgroundColor: C.card, borderColor: C.line },
-          ]}
-        >
-          <Image 
-            source={toSrc(
-              serviceData?.media?.[0]?.path 
-                ? `https://colala.hmstech.xyz/storage/${serviceData.media[0].path}`
-                : item.image
-            )} 
-            style={styles.summaryImg} 
-          />
-          <View style={{ flex: 1 }}>
-            <ThemedText
-              style={{ color: C.text, fontWeight: "700" }}
-              numberOfLines={1}
-            >
-              {serviceData?.name || item.title || "Service Name"}
-            </ThemedText>
-            <ThemedText
-              style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}
-            >
-              {priceRange}
-            </ThemedText>
-            <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 4 }}>
-              07-10-25
-            </ThemedText>
-          </View>
-        </View>
-
-        {/* Buttons */}
-        <View style={{ flexDirection: "row", gap: 12, marginTop: 10 }}>
-        <TouchableOpacity
-          style={[styles.bigBtn, { backgroundColor: C.primary }]}
-          onPress={() => {
-            console.log("Navigating to edit service with ID:", serviceId);
-            navigation.navigate("ChatNavigator", {
-              screen: "AddService",
-              params: {
-                mode: "edit",
-                serviceId: serviceId,
-                serviceData: serviceData,
-                isEdit: true
-              }
-            });
-          }}
-        >
-          <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-            Edit Service
-          </ThemedText>
-        </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bigBtn, { backgroundColor: "#111" }]}
-            onPress={() => setViewOpen(true)}
+          {/* Summary card */}
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: C.card, borderColor: C.line },
+            ]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-              View Service
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        {/* Chart card */}
-        <View
-          style={[
-            styles.chartCard,
-            { backgroundColor: C.card, borderColor: C.line },
-          ]}
-        >
-          <Legend />
-          <MiniGroupedBars series={series} />
-          <View style={[styles.pagerBar, { backgroundColor: "#E5E7EB" }]} />
-        </View>
-
-        {/* Stats card */}
-        <View
-          style={[
-            styles.statsCard,
-            { backgroundColor: C.card, borderColor: C.line },
-          ]}
-        >
-          <View style={[styles.statsHeader, { backgroundColor: C.primary }]}>
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-              Service Statistics
-            </ThemedText>
-          </View>
-          {stats.map(([k, v]) => (
-            <View key={k} style={[styles.statRow, { borderTopColor: C.line }]}>
-              <ThemedText style={{ color: C.sub }}>{k}</ThemedText>
-              <ThemedText style={{ color: C.text, fontWeight: "700" }}>
-                {v}
+            <Image
+              source={toSrc(
+                serviceData?.media?.[0]?.path
+                  ? `https://colala.hmstech.xyz/storage/${serviceData.media[0].path}`
+                  : item.image
+              )}
+              style={styles.summaryImg}
+            />
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                style={{ color: C.text, fontWeight: "700" }}
+                numberOfLines={1}
+              >
+                {serviceData?.name || item.title || "Service Name"}
+              </ThemedText>
+              <ThemedText
+                style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}
+              >
+                {priceRange}
+              </ThemedText>
+              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 4 }}>
+                07-10-25
               </ThemedText>
             </View>
-          ))}
-        </View>
+          </View>
 
-        <TouchableOpacity
-          style={[
-            styles.bottomBtn,
-            { borderColor: "#000", backgroundColor: C.card },
-          ]}
-        >
-          <ThemedText style={{ color: C.text, fontWeight: "700" }}>
-            Mark as Unavailable
-          </ThemedText>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Buttons */}
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 10 }}>
+            <TouchableOpacity
+              style={[styles.bigBtn, { backgroundColor: C.primary }]}
+              onPress={() => {
+                console.log("Navigating to edit service with ID:", serviceId);
+                navigation.navigate("ChatNavigator", {
+                  screen: "AddService",
+                  params: {
+                    mode: "edit",
+                    serviceId: serviceId,
+                    serviceData: serviceData,
+                    isEdit: true,
+                  },
+                });
+              }}
+            >
+              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                Edit Service
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bigBtn, { backgroundColor: "#111" }]}
+              onPress={() => setViewOpen(true)}
+            >
+              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                View Service
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Chart card */}
+          <View
+            style={[
+              styles.chartCard,
+              { backgroundColor: C.card, borderColor: C.line },
+            ]}
+          >
+            <Legend />
+            <MiniGroupedBars series={series} />
+            <View style={[styles.pagerBar, { backgroundColor: "#E5E7EB" }]} />
+          </View>
+
+          {/* Stats card */}
+          <View
+            style={[
+              styles.statsCard,
+              { backgroundColor: C.card, borderColor: C.line },
+            ]}
+          >
+            <View style={[styles.statsHeader, { backgroundColor: C.primary }]}>
+              <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                Service Statistics
+              </ThemedText>
+            </View>
+            {stats.map(([k, v]) => (
+              <View
+                key={k}
+                style={[styles.statRow, { borderTopColor: C.line }]}
+              >
+                <ThemedText style={{ color: C.sub }}>{k}</ThemedText>
+                <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                  {v}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.bottomBtn,
+              { 
+                borderColor: "#6B7280", 
+                backgroundColor: C.card,
+                opacity: markAsUnavailableMutation.isPending ? 0.6 : 1
+              },
+            ]}
+            onPress={() => {
+              Alert.alert(
+                "Mark as Unavailable",
+                "Are you sure you want to mark this service as unavailable? This will hide it from customers.",
+                [
+                  {
+                    text: "Cancel",
+                    style: "cancel"
+                  },
+                  {
+                    text: "Mark as Unavailable",
+                    style: "destructive",
+                    onPress: () => markAsUnavailableMutation.mutate()
+                  }
+                ]
+              );
+            }}
+            disabled={markAsUnavailableMutation.isPending}
+          >
+            <ThemedText style={{ color: "#6B7280", fontWeight: "700" }}>
+              Mark as Unavailable
+            </ThemedText>
+          </TouchableOpacity>
+        </ScrollView>
       )}
 
       {/* FULL-SCREEN VIEW SERVICE MODAL */}
@@ -336,13 +387,17 @@ export default function ServiceDetailsScreen({ route, navigation }) {
           service: serviceData?.name || item.title || "Service Name",
           price: priceRange,
           rating: "4.5",
-          image: serviceData?.media?.[0]?.path 
+          image: serviceData?.media?.[0]?.path
             ? `https://colala.hmstech.xyz/storage/${serviceData.media[0].path}`
-            : item.image || "https://images.unsplash.com/photo-1518773553398-650c184e0bb3?w=1200&q=60",
+            : item.image ||
+              "https://images.unsplash.com/photo-1518773553398-650c184e0bb3?w=1200&q=60",
           profileImage: serviceData?.store?.profile_image
             ? `https://colala.hmstech.xyz/storage/${serviceData.store.profile_image}`
             : "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-          description: serviceData?.full_description || serviceData?.short_description || "Service description not available",
+          description:
+            serviceData?.full_description ||
+            serviceData?.short_description ||
+            "Service description not available",
           media: serviceData?.media || [],
           mediaType: serviceData?.media?.[0]?.type || "image",
           subServices: serviceData?.sub_services || [],
@@ -357,25 +412,43 @@ export default function ServiceDetailsScreen({ route, navigation }) {
         onRequestClose={() => setDeleteModalOpen(false)}
       >
         <View style={styles.deleteModalOverlay}>
-          <View style={[styles.deleteModalContent, { backgroundColor: C.card }]}>
-            <Ionicons name="warning" size={48} color="#EF4444" style={{ marginBottom: 16 }} />
+          <View
+            style={[styles.deleteModalContent, { backgroundColor: C.card }]}
+          >
+            <Ionicons
+              name="warning"
+              size={48}
+              color="#EF4444"
+              style={{ marginBottom: 16 }}
+            />
             <ThemedText style={[styles.deleteModalTitle, { color: C.text }]}>
               Delete Service
             </ThemedText>
             <ThemedText style={[styles.deleteModalMessage, { color: C.sub }]}>
-              Are you sure you want to delete this service? This action cannot be undone.
+              Are you sure you want to delete this service? This action cannot
+              be undone.
             </ThemedText>
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.cancelButton, { borderColor: C.line }]}
+                style={[
+                  styles.deleteModalButton,
+                  styles.cancelButton,
+                  { borderColor: C.line },
+                ]}
                 onPress={() => setDeleteModalOpen(false)}
               >
-                <ThemedText style={[styles.cancelButtonText, { color: C.text }]}>
+                <ThemedText
+                  style={[styles.cancelButtonText, { color: C.text }]}
+                >
                   Cancel
                 </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.deleteButton, { backgroundColor: "#EF4444" }]}
+                style={[
+                  styles.deleteModalButton,
+                  styles.deleteButton,
+                  { backgroundColor: "#EF4444" },
+                ]}
                 onPress={handleDeleteService}
                 disabled={deleteServiceMutation.isPending}
               >
@@ -396,7 +469,15 @@ export default function ServiceDetailsScreen({ route, navigation }) {
 }
 
 /* ---------- Full-screen modal component (your design) ---------- */
-function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, navigation, onDelete }) {
+function ViewServiceModal({
+  visible,
+  onClose,
+  store,
+  serviceId,
+  serviceData,
+  navigation,
+  onDelete,
+}) {
   return (
     <Modal
       visible={visible}
@@ -426,7 +507,7 @@ function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, nav
           <View style={{ position: "relative" }}>
             <Image
               source={toSrc(
-                store.media && store.media.length > 0 
+                store.media && store.media.length > 0
                   ? `https://colala.hmstech.xyz/storage/${store.media[0].path}`
                   : store.image
               )}
@@ -489,7 +570,9 @@ function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, nav
               store.media.map((media, i) => (
                 <Image
                   key={media.id || i}
-                  source={toSrc(`https://colala.hmstech.xyz/storage/${media.path}`)}
+                  source={toSrc(
+                    `https://colala.hmstech.xyz/storage/${media.path}`
+                  )}
                   style={{
                     width: 60,
                     height: 60,
@@ -547,7 +630,8 @@ function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, nav
 
             <ThemedText style={styles.sectionTitle}>Description</ThemedText>
             <ThemedText style={styles.description}>
-              {store.description || "We sew all kinds of dresses, we are your one stop shop for any form of dresses"}
+              {store.description ||
+                "We sew all kinds of dresses, we are your one stop shop for any form of dresses"}
             </ThemedText>
 
             <View style={styles.divider} />
@@ -563,24 +647,29 @@ function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, nav
                     idx === arr.length - 1 && styles.lastPriceRow,
                   ]}
                 >
-                  <ThemedText style={styles.breakdownLabel}>{subService.name}</ThemedText>
+                  <ThemedText style={styles.breakdownLabel}>
+                    {subService.name}
+                  </ThemedText>
                   <ThemedText style={styles.breakdownPrice}>
-                    ₦{Number(subService.price_from).toLocaleString()} - ₦{Number(subService.price_to).toLocaleString()}
+                    ₦{Number(subService.price_from).toLocaleString()} - ₦
+                    {Number(subService.price_to).toLocaleString()}
                   </ThemedText>
                 </View>
               ))
             ) : (
-              <ThemedText style={[styles.breakdownLabel, { textAlign: "center", paddingVertical: 20, color: "#666" }]}>
+              <ThemedText
+                style={[
+                  styles.breakdownLabel,
+                  { textAlign: "center", paddingVertical: 20, color: "#666" },
+                ]}
+              >
                 No sub-services available
               </ThemedText>
             )}
 
             {/* Bottom actions */}
             <View style={styles.actions}>
-              <TouchableOpacity 
-                style={styles.iconBtn}
-                onPress={onDelete}
-              >
+              <TouchableOpacity style={styles.iconBtn} onPress={onDelete}>
                 <Image
                   source={require("../../../assets/Vector (9).png")}
                   style={styles.profileImage}
@@ -593,10 +682,13 @@ function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, nav
                 />
               </TouchableOpacity>
               {/* <TouchableOpacity style={styles.iconBtn}><Ionicons name="chatbox-outline" size={20} color="#000" /></TouchableOpacity> */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.messageBtn}
                 onPress={() => {
-                  console.log("Modal: Navigating to edit service with ID:", serviceId);
+                  console.log(
+                    "Modal: Navigating to edit service with ID:",
+                    serviceId
+                  );
                   onClose(); // Close the modal first
                   navigation.navigate("ChatNavigator", {
                     screen: "AddService",
@@ -604,8 +696,8 @@ function ViewServiceModal({ visible, onClose, store, serviceId, serviceData, nav
                       mode: "edit",
                       serviceId: serviceId,
                       serviceData: serviceData,
-                      isEdit: true
-                    }
+                      isEdit: true,
+                    },
                   });
                 }}
               >
