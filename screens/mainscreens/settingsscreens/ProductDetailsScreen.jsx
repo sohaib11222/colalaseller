@@ -590,6 +590,9 @@ export default function ProductDetailsScreen({ route, navigation }) {
         C={C}
         shoppingBalance={shoppingBalance}
         quantityMutation={quantityMutation}
+        stats={finalStats}
+        chart={finalSeries}
+        statsLoading={statsLoading}
       />
 
       {/* DELETE CONFIRMATION MODAL */}
@@ -630,6 +633,9 @@ function ViewProductModal({
   productId,
   shoppingBalance,
   quantityMutation,
+  stats,
+  chart,
+  statsLoading,
 }) {
   // Create gallery from API images or fallback to dummy images
   const gallery =
@@ -1302,21 +1308,9 @@ function ViewProductModal({
         <StatsModal
           visible={statsModalOpen}
           onClose={() => setStatsModalOpen(false)}
-          stats={{
-            impressions: 0,
-            views: 0,
-            profileClicks: 0,
-            inCart: 0,
-            completed: 0,
-            chats: 0,
-          }}
-          chart={{
-            labels: ["N/A"],
-            impressions: [0],
-            visitors: [0],
-            orders: [0],
-          }}
-          isLoading={false}
+          stats={stats}
+          chart={chart}
+          isLoading={statsLoading}
           C={C}
         />
       </SafeAreaView>
@@ -3322,18 +3316,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
             <>
               {/* Stats Cards */}
               <View style={{ padding: 16, gap: 12 }}>
+                {/* Views */}
                 <View style={[styles.statsCard, { backgroundColor: C.card }]}>
                   <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <ThemedText
-                        style={[styles.statValue, { color: C.primary }]}
-                      >
-                        {stats.impressions?.toLocaleString() || "0"}
-                      </ThemedText>
-                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
-                        Impressions
-                      </ThemedText>
-                    </View>
                     <View style={styles.statItem}>
                       <ThemedText
                         style={[styles.statValue, { color: C.primary }]}
@@ -3347,6 +3332,55 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                   </View>
                 </View>
 
+                {/* In Cart */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.inCart?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        In Cart
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Completed Order */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.completed?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Completed Order
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Impressions */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {stats.impressions?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Impressions
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Profile Clicks */}
                 <View style={[styles.statsCard, { backgroundColor: C.card }]}>
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
@@ -3359,31 +3393,12 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                         Profile Clicks
                       </ThemedText>
                     </View>
-                    <View style={styles.statItem}>
-                      <ThemedText
-                        style={[styles.statValue, { color: C.primary }]}
-                      >
-                        {stats.inCart?.toLocaleString() || "0"}
-                      </ThemedText>
-                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
-                        Added to Cart
-                      </ThemedText>
-                    </View>
                   </View>
                 </View>
 
+                {/* Chats */}
                 <View style={[styles.statsCard, { backgroundColor: C.card }]}>
                   <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <ThemedText
-                        style={[styles.statValue, { color: C.primary }]}
-                      >
-                        {stats.completed?.toLocaleString() || "0"}
-                      </ThemedText>
-                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
-                        Orders
-                      </ThemedText>
-                    </View>
                     <View style={styles.statItem}>
                       <ThemedText
                         style={[styles.statValue, { color: C.primary }]}
@@ -3392,6 +3407,22 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
                         Chats
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                {/* No Clicks */}
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
+                        {((stats.impressions || 0) - (stats.profileClicks || 0)).toLocaleString()}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        No Clicks
                       </ThemedText>
                     </View>
                   </View>
