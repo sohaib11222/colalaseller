@@ -51,7 +51,49 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
   const productId = route?.params?.id || item?.id;
   console.log("The Product Id is", productId);
+  console.log("Navigation object in main component:", navigation);
   const { theme } = useTheme();
+
+  // Navigation handler for ViewProductModal
+  const handleTopUpNavigation = () => {
+    console.log("handleTopUpNavigation called");
+    console.log("handleTopUpNavigation - navigation object:", navigation);
+    console.log("handleTopUpNavigation - navigation.navigate:", navigation?.navigate);
+    
+    if (navigation && navigation.navigate) {
+      console.log("handleTopUpNavigation - navigating to FlutterwaveWebView");
+      navigation.navigate('FlutterwaveWebView', {
+        amount: 1000,
+        order_id: `topup_${Date.now()}`,
+        isTopUp: true
+      });
+    } else {
+      console.error('Navigation not available in handleTopUpNavigation');
+      Alert.alert('Error', 'Navigation not available');
+    }
+  };
+
+  // Navigation handler for Edit Product
+  const handleEditProductNavigation = () => {
+    console.log("handleEditProductNavigation called");
+    console.log("handleEditProductNavigation - navigation object:", navigation);
+    console.log("handleEditProductNavigation - productId:", productId);
+    
+    if (navigation && navigation.navigate) {
+      console.log("handleEditProductNavigation - navigating to AddProduct");
+      navigation.navigate("AddProduct", {
+        editMode: true,
+        productData: product,
+        productId: productId,
+      });
+    } else {
+      console.error('Navigation not available in handleEditProductNavigation');
+      Alert.alert('Error', 'Navigation not available');
+    }
+  };
+  
+  // Debug the function creation
+  console.log("handleTopUpNavigation function created:", typeof handleTopUpNavigation);
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
 
@@ -579,13 +621,17 @@ export default function ProductDetailsScreen({ route, navigation }) {
       )}
 
       {/* FULL-SCREEN PRODUCT MODAL */}
+      {console.log("About to render ViewProductModal with navigation:", navigation)}
+      {console.log("About to render ViewProductModal with handleTopUpNavigation:", handleTopUpNavigation)}
+      {console.log("About to render ViewProductModal - handleTopUpNavigation type:", typeof handleTopUpNavigation)}
       <ViewProductModal
         visible={viewOpen}
         onClose={() => setViewOpen(false)}
         item={product}
         images={productImages}
         onDelete={() => deleteProductMutation.mutate()}
-        navigation={navigation}
+        onTopUp={handleTopUpNavigation}
+        onEditProduct={handleEditProductNavigation}
         productId={productId}
         C={C}
         shoppingBalance={shoppingBalance}
@@ -622,21 +668,49 @@ export default function ProductDetailsScreen({ route, navigation }) {
 
 /* ───────── Full-screen modal ───────── */
 
-function ViewProductModal({
-  visible,
-  onClose,
-  item,
-  images = [],
-  C,
-  onDelete,
-  navigation,
-  productId,
-  shoppingBalance,
-  quantityMutation,
-  stats,
-  chart,
-  statsLoading,
-}) {
+function ViewProductModal(props) {
+  const {
+    visible,
+    onClose,
+    item,
+    images = [],
+    C,
+    onDelete,
+    onTopUp,
+    onEditProduct,
+    productId,
+    shoppingBalance,
+    quantityMutation,
+    stats,
+    chart,
+    statsLoading,
+  } = props;
+  
+  // Debug props
+  console.log("ViewProductModal received props:", {
+    visible,
+    onClose: !!onClose,
+    item: !!item,
+    images: images?.length,
+    C: !!C,
+    onDelete: !!onDelete,
+    onTopUp: !!onTopUp,
+    onEditProduct: !!onEditProduct,
+    productId,
+    shoppingBalance,
+    quantityMutation: !!quantityMutation,
+    stats: !!stats,
+    chart: !!chart,
+    statsLoading
+  });
+  
+  // Additional debugging for onTopUp specifically
+  console.log("onTopUp prop details:", {
+    onTopUp,
+    onTopUpType: typeof onTopUp,
+    onTopUpExists: !!onTopUp,
+    onTopUpFromProps: !!props.onTopUp
+  });
   // Create gallery from API images or fallback to dummy images
   const gallery =
     images.length > 0
@@ -1155,26 +1229,14 @@ function ViewProductModal({
                   <TouchableOpacity
                     style={[styles.editWide, { backgroundColor: C.primary }]}
                     onPress={() => {
-                      console.log(
-                        "ViewProductModal navigating to AddProduct with:",
-                        {
-                          editMode: true,
-                          productData: item,
-                          productId: productId,
-                        }
-                      );
-                      console.log("ViewProductModal Product ID details:", {
-                        productId,
-                        productIdType: typeof productId,
-                        productIdTruthy: !!productId,
-                        productIdString: String(productId),
-                      });
-                      onClose();
-                      navigation.navigate("AddProduct", {
-                        editMode: true,
-                        productData: item,
-                        productId: productId,
-                      });
+                      console.log("Edit Product button pressed in ViewProductModal, onEditProduct exists:", !!onEditProduct);
+                      if (onEditProduct) {
+                        onClose();
+                        onEditProduct();
+                      } else {
+                        console.error("onEditProduct function not available in ViewProductModal");
+                        Alert.alert('Error', 'Edit Product functionality not available');
+                      }
                     }}
                   >
                     <ThemedText
@@ -1289,6 +1351,7 @@ function ViewProductModal({
           previewData={previewData}
           productId={productId}
           shoppingBalance={shoppingBalance}
+          onTopUp={onTopUp}
         />
 
         {/* Delete Confirmation Modal */}
@@ -1682,6 +1745,7 @@ function ReviewAdModal({
   previewData,
   productId,
   shoppingBalance,
+  onTopUp,
 }) {
   const totalApprox = Math.round((daily / 1000) * days * 35); // arbitrary demo math
   const { token } = useAuth();
@@ -1902,6 +1966,15 @@ function ReviewAdModal({
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 999,
+              }}
+              onPress={() => {
+                console.log("Top Up button pressed in ReviewAdModal, onTopUp exists:", !!onTopUp);
+                if (onTopUp) {
+                  onTopUp();
+                } else {
+                  console.error("onTopUp function not available in ReviewAdModal");
+                  Alert.alert('Error', 'Top Up functionality not available');
+                }
               }}
             >
               <ThemedText style={{ color: "#111", fontWeight: "700" }}>
