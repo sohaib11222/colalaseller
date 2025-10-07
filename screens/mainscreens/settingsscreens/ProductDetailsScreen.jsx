@@ -819,6 +819,19 @@ function ViewProductModal(props) {
     setTimeout(() => setReviewOpen(true), 220);
   };
 
+  // Navigation handlers for editing from ReviewAdModal
+  const handleEditLocation = () => {
+    console.log("Edit Location button pressed - going back to setup");
+    setReviewOpen(false);
+    setTimeout(() => setSetupOpen(true), 220);
+  };
+
+  const handleEditBudget = () => {
+    console.log("Edit Budget button pressed - going back to setup");
+    setReviewOpen(false);
+    setTimeout(() => setSetupOpen(true), 220);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -1352,6 +1365,8 @@ function ViewProductModal(props) {
           productId={productId}
           shoppingBalance={shoppingBalance}
           onTopUp={onTopUp}
+          onEditLocation={handleEditLocation}
+          onEditBudget={handleEditBudget}
         />
 
         {/* Delete Confirmation Modal */}
@@ -1746,6 +1761,8 @@ function ReviewAdModal({
   productId,
   shoppingBalance,
   onTopUp,
+  onEditLocation,
+  onEditBudget,
 }) {
   const totalApprox = Math.round((daily / 1000) * days * 35); // arbitrary demo math
   const { token } = useAuth();
@@ -1866,7 +1883,7 @@ function ReviewAdModal({
                   This is how your ad will appear to your customers
                 </ThemedText>
               </View>
-              <Ionicons name="create-outline" size={18} color="#111" />
+              {/* <Ionicons name="create-outline" size={18} color="#111" /> */}
             </View>
 
             <View
@@ -1909,6 +1926,7 @@ function ReviewAdModal({
             icon="location-outline"
             text={location ? location : "Select location"}
             trailingIcon="create-outline"
+            onTrailingIconPress={onEditLocation}
           />
 
           {/* Budget row */}
@@ -1918,6 +1936,7 @@ function ReviewAdModal({
               days > 1 ? "s" : ""
             }`}
             trailingIcon="create-outline"
+            onTrailingIconPress={onEditBudget}
           />
 
           {/* Total approximate */}
@@ -2038,7 +2057,7 @@ function ReviewAdModal({
   );
 }
 
-function RowTile({ icon, text, trailingIcon }) {
+function RowTile({ icon, text, trailingIcon, onTrailingIconPress }) {
   return (
     <View
       style={{
@@ -2060,7 +2079,13 @@ function RowTile({ icon, text, trailingIcon }) {
       />
       <ThemedText style={{ flex: 1, color: "#111" }}>{text}</ThemedText>
       {trailingIcon ? (
-        <Ionicons name={trailingIcon} size={18} color="#111" />
+        <TouchableOpacity
+          onPress={onTrailingIconPress}
+          style={{ padding: 4 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name={trailingIcon} size={18} color="#111" />
+        </TouchableOpacity>
       ) : null}
     </View>
   );
