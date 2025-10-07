@@ -29,6 +29,7 @@ export default function NotificationsScreen() {
   const { user, token: authToken } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [onboardingToken, setOnboardingToken] = useState(null);
+  const [markingAsRead, setMarkingAsRead] = useState(null); // Track which notification is being marked as read
 
   // Get token for API calls - use auth token first, then onboarding token
   const token = authToken || onboardingToken;
@@ -92,11 +93,15 @@ export default function NotificationsScreen() {
   const markAsReadMutation = useMutation({
     mutationFn: ({ notificationId }) => markAsReadNotification(notificationId, token),
     onSuccess: () => {
+      // Clear the marking state
+      setMarkingAsRead(null);
       // Refetch notifications to update the UI
       refetch();
     },
     onError: (error) => {
       console.error('Error marking notification as read:', error);
+      // Clear the marking state on error too
+      setMarkingAsRead(null);
     },
   });
 
@@ -112,6 +117,7 @@ export default function NotificationsScreen() {
 
   // Handle mark as read
   const handleMarkAsRead = (notificationId) => {
+    setMarkingAsRead(notificationId);
     markAsReadMutation.mutate({ notificationId });
   };
 
@@ -166,13 +172,13 @@ export default function NotificationsScreen() {
               styles.markAsReadButton,
               { 
                 backgroundColor: C.primary,
-                opacity: markAsReadMutation.isPending ? 0.6 : 1
+                opacity: markingAsRead === item.id ? 0.6 : 1
               }
             ]}
             onPress={() => handleMarkAsRead(item.id)}
-            disabled={markAsReadMutation.isPending}
+            disabled={markingAsRead === item.id}
           >
-            {markAsReadMutation.isPending ? (
+            {markingAsRead === item.id ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
               <ThemedText style={[styles.markAsReadButtonText, { color: "white" }]}>
