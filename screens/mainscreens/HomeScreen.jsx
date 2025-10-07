@@ -301,7 +301,7 @@ export default function StoreHomeScreen() {
                 <ThemedText style={styles.headerLocation}>
                   {store.location}
                 </ThemedText>
-                <Ionicons name="caret-down" size={14} color="#FFEFEF" />
+                {/* <Ionicons name="caret-down" size={14} color="#FFEFEF" /> */}
               </View>
             </View>
           </View>

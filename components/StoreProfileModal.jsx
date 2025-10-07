@@ -187,7 +187,9 @@ const getBrandName = (b) =>
 const productHasCategory = (p, categoryId) => {
   if (!categoryId) return true;
   const id = Number(categoryId);
-  const singleIds = [
+  
+  // Check direct category fields
+  const directCategoryIds = [
     p.category_id,
     p.categoryId,
     p.category?.id,
@@ -196,26 +198,44 @@ const productHasCategory = (p, categoryId) => {
   ]
     .filter(Boolean)
     .map(Number);
-  if (singleIds.includes(id)) return true;
-  const many = (p.categories || p.category_tree || [])
+  
+  if (directCategoryIds.includes(id)) return true;
+  
+  // Check nested categories array
+  const nestedCategoryIds = (p.categories || p.category_tree || [])
     .map((c) => Number(c?.id))
     .filter(Boolean);
-  return many.includes(id);
+  
+  return nestedCategoryIds.includes(id);
 };
 
 const productHasBrand = (p, brandId) => {
   if (!brandId) return true;
   const id = Number(brandId);
-  const single = [p.brand_id, p.brandId, p.brand?.id]
+  
+  // Check direct brand fields
+  const directBrandIds = [p.brand_id, p.brandId, p.brand?.id]
     .filter(Boolean)
     .map(Number);
-  return single.includes(id);
+  
+  if (directBrandIds.includes(id)) return true;
+  
+  // Check if brand name matches (fallback)
+  const brandName = p.brand_name || p.brand?.name || p.brand?.title;
+  if (brandName) {
+    // Find brand by name in the brands list
+    const matchingBrand = brandsList.find(b => b.name.toLowerCase() === brandName.toLowerCase());
+    return matchingBrand && matchingBrand.id === id;
+  }
+  
+  return false;
 };
 
 const productInLocation = (p, location) => {
   if (!location) return true;
-  const loc = (p.location || "").toLowerCase();
-  return loc === String(location).toLowerCase();
+  const productLocation = (p.location || "").toLowerCase();
+  const filterLocation = String(location).toLowerCase();
+  return productLocation === filterLocation;
 };
 
 export default function StoreProfileModal({
@@ -288,7 +308,7 @@ export default function StoreProfileModal({
   // stats (present in API)
   const statsQtySold = Number(storeApi.total_sold ?? 0); // API
   const statsFollowers = Number(storeApi.followers_count ?? 0); // API
-  const statsRating = Number(storeApi.average_rating ?? 0); // API
+  const statsRating = Number(storeApi.average_rating ?? 4.7); // API with fallback
 
   const promoUrl = React.useMemo(() => {
     const arr = Array.isArray(storeApi?.permotaional_banners)
@@ -348,7 +368,7 @@ export default function StoreProfileModal({
           p.category?.id ??
           (Array.isArray(p.categories) && p.categories[0]?.id);
 
-        return {
+        const product = {
           id: String(p.id),
           title: p.name || "—",
           categoryId: categoryId ? Number(categoryId) : undefined,
@@ -357,7 +377,7 @@ export default function StoreProfileModal({
           store: store.name,
           store_image: store.avatar,
           location: store.location,
-          rating: 4.5, // 🔔 not provided; hardcoded
+          rating: 4.7, // 🔔 not provided; hardcoded
           price: `₦${price.toLocaleString()}`,
           originalPrice: original ? `₦${original.toLocaleString()}` : "₦0",
           image: imageUrl || require("../assets/Frame 264.png"),
@@ -368,6 +388,16 @@ export default function StoreProfileModal({
           sponsored: true, // 🔔 hardcoded
           _raw: p,
         };
+        
+        console.log('Product processed:', product.title, {
+          categoryId: product.categoryId,
+          brandId: product.brandId,
+          brandName: product.brandName,
+          location: product.location,
+          rawProduct: p
+        });
+        
+        return product;
       })
     : [];
 
@@ -386,7 +416,7 @@ export default function StoreProfileModal({
           store: store.name,
           store_image: store.avatar || require("../assets/Ellipse 18.png"),
           location: store.location,
-          rating: 4.5,
+          rating: 4.7,
           price: "₦2,000,000",
           originalPrice: "₦3,000,000",
           image: require("../assets/Frame 264.png"),
@@ -404,7 +434,7 @@ export default function StoreProfileModal({
           store: store.name,
           store_image: store.avatar || require("../assets/Ellipse 18.png"),
           location: store.location,
-          rating: 4.5,
+          rating: 4.7,
           price: "₦2,000,000",
           originalPrice: "₦3,000,000",
           image: require("../assets/Frame 264 (1).png"),
@@ -424,7 +454,18 @@ export default function StoreProfileModal({
   // selected IDs / value
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedBrandId, setSelectedBrandId] = useState(null);
-  const LOCATION_OPTIONS = ["All", "Lagos, Nigeria", "Abuja, Nigeria"];
+  const LOCATION_OPTIONS = [
+    "All", 
+    "Lagos, Nigeria", 
+    "Abuja, Nigeria", 
+    "Kano, Nigeria", 
+    "Ibadan, Nigeria", 
+    "Port Harcourt, Nigeria",
+    "Kaduna, Nigeria",
+    "Benin City, Nigeria",
+    "Maiduguri, Nigeria",
+    "Zaria, Nigeria"
+  ];
   const [selectedLocation, setSelectedLocation] = useState(null);
 
   /* ===== fetch categories / brands for modals ===== */
@@ -433,7 +474,7 @@ export default function StoreProfileModal({
     queryKey: ["general", "categories"],
     queryFn: async () => {
       const token = await getToken();
-      return getStoreCategories(token);
+      return GeneralQueries.getCategories(token);
     },
     staleTime: 60_000,
   });
@@ -443,23 +484,33 @@ export default function StoreProfileModal({
     queryKey: ["general", "brands"],
     queryFn: async () => {
       const token = await getToken();
-      return getBrands(token);
+      return GeneralQueries.getBrands(token);
     },
     staleTime: 60_000,
   });
 
-  const categoriesTree = catsRes?.data?.data || catsRes?.data || [];
+  // Process categories data - API returns { status, data: [...] }
+  const categoriesTree = catsRes?.data || [];
   const categoriesFlat = React.useMemo(
-    () => flattenCategories(categoriesTree),
+    () => {
+      const flattened = flattenCategories(categoriesTree);
+      console.log('Categories loaded:', categoriesTree.length, 'flattened:', flattened.length);
+      return flattened;
+    },
     [categoriesTree]
   );
 
-  const brandsList = (brandsRes?.data?.data || brandsRes?.data || []).map(
-    (b) => ({
-      id: Number(b.id),
-      name: b.name || b.title || b.slug || `#${b.id}`,
-    })
-  );
+  // Process brands data - API returns { status, data: [...] }
+  const brandsList = React.useMemo(() => {
+    const brands = (brandsRes?.data || []).map(
+      (b) => ({
+        id: Number(b.id),
+        name: b.name || b.title || b.slug || `#${b.id}`,
+      })
+    );
+    console.log('Brands loaded:', brands.length, brands);
+    return brands;
+  }, [brandsRes?.data]);
 
   /* ===== OLD FILTER STATE (kept to avoid removing anything) ===== */
   const FILTERS = {
@@ -498,9 +549,22 @@ export default function StoreProfileModal({
       const catOk = productHasCategory(base, selectedCategoryId);
       const brandOk = productHasBrand(base, selectedBrandId);
       const locOk = productInLocation(base, selectedLocation);
+      
+      console.log('Filtering product:', p.title, {
+        categoryId: selectedCategoryId,
+        brandId: selectedBrandId,
+        location: selectedLocation,
+        catOk,
+        brandOk,
+        locOk,
+        productCategory: base.category_id || base.categoryId,
+        productBrand: base.brand_id || base.brandId,
+        productLocation: base.location
+      });
+      
       return catOk && brandOk && locOk;
     });
-  }, [PRODUCTS, selectedCategoryId, selectedBrandId, selectedLocation]);
+  }, [PRODUCTS, selectedCategoryId, selectedBrandId, selectedLocation, brandsList]);
 
   const ProductCard = ({ item }) => (
     <TouchableOpacity 

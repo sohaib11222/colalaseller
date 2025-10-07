@@ -188,13 +188,11 @@ const API_ENDPOINTS = {
     Details: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/messages`,
     Send: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/send`,
   },
-
   STORES: {
     // GET -> fetch current store + all_categories
     // POST -> create/update store builder payload
     Builder: `${API_DOMAIN}/seller/store/builder`,
   },
-
   LEADERBOARD: {
     Sellers: `${API_DOMAIN}/leaderboard/sellers`, // GET
   },

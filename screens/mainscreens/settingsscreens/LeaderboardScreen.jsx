@@ -25,9 +25,18 @@ import { API_DOMAIN } from "../../../apiConfig";
 
 // Helper function to construct full file URLs
 const fileUrl = (path) => {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `${API_DOMAIN.replace('/api', '')}/${path}`;
+  if (!path) {
+    console.log('fileUrl: No path provided');
+    return null;
+  }
+  if (path.startsWith('http')) {
+    console.log('fileUrl: Already full URL:', path);
+    return path;
+  }
+  const fullUrl = `${API_DOMAIN.replace('/api', '')}/${path}`;
+  console.log('fileUrl: Generated URL:', fullUrl, 'from path:', path);
+  console.log('fileUrl: API_DOMAIN:', API_DOMAIN);
+  return fullUrl;
 };
 
 // Enable LayoutAnimation on Android
@@ -58,9 +67,38 @@ const OTHERS = [
 // ---------- Avatar primitives ----------
 const resolveSource = (src) => {
   // src can be a local require() (number) or a remote string
-  if (typeof src === "number") return src;
-  if (typeof src === "string") return { uri: src };
+  console.log('resolveSource called with:', src, 'type:', typeof src);
+  if (typeof src === "number") {
+    console.log('resolveSource: returning local require');
+    return src;
+  }
+  if (typeof src === "string") {
+    console.log('resolveSource: returning URI object for:', src);
+    return { uri: src };
+  }
+  console.log('resolveSource: returning null');
   return null;
+};
+
+// Custom Image component with fallback
+const AvatarImage = ({ src, style, fallbackSrc }) => {
+  const [imageError, setImageError] = useState(false);
+  
+  const handleError = () => {
+    console.log('AvatarImage: Image failed to load, using fallback');
+    setImageError(true);
+  };
+  
+  const imageSource = imageError ? fallbackSrc : resolveSource(src);
+  
+  return (
+    <Image 
+      source={imageSource} 
+      style={style}
+      onError={handleError}
+      onLoad={() => console.log('AvatarImage: Image loaded successfully')}
+    />
+  );
 };
 
 const PodiumAvatar = ({ src, size = 84 }) => {
@@ -83,7 +121,11 @@ const PodiumAvatar = ({ src, size = 84 }) => {
             backgroundColor: "#fff",
           }}
         >
-          <Image source={resolveSource(src)} style={{ width: "100%", height: "100%" }} />
+          <AvatarImage 
+            src={src}
+            style={{ width: "100%", height: "100%" }}
+            fallbackSrc={require("../../../assets/Ellipse 18.png")}
+          />
         </View>
       </View>
     </View>
@@ -110,7 +152,11 @@ const ListAvatar = ({ src, size = 44 }) => {
             backgroundColor: "#fff",
           }}
         >
-          <Image source={resolveSource(src)} style={{ width: "100%", height: "100%" }} />
+          <AvatarImage 
+            src={src}
+            style={{ width: "100%", height: "100%" }}
+            fallbackSrc={require("../../../assets/Ellipse 18.png")}
+          />
         </View>
       </View>
     </View>
@@ -133,7 +179,9 @@ export default function LeaderboardScreen() {
       console.log('Making API call with token:', token ? 'Token exists' : 'No token');
       const res = await getLeaderboardSellers(token);
       console.log('API response:', res);
-      return res?.data ?? res;
+      console.log('API response.data:', res?.data);
+      // Return the data property which contains the arrays
+      return res?.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
@@ -178,7 +226,7 @@ export default function LeaderboardScreen() {
   const processedLeaderboardData = useMemo(() => {
     console.log('Raw leaderboardData:', leaderboardData);
     
-    if (!leaderboardData?.data) {
+    if (!leaderboardData || !leaderboardData.today) {
       console.log('No leaderboard data available');
       return {
         today: [],
@@ -188,7 +236,7 @@ export default function LeaderboardScreen() {
       };
     }
 
-    const { today, weekly, monthly, all } = leaderboardData.data;
+    const { today, weekly, monthly, all } = leaderboardData;
     console.log('API data received:', { 
       today: today?.length || 0, 
       weekly: weekly?.length || 0, 
@@ -251,14 +299,20 @@ export default function LeaderboardScreen() {
   const top3 = useMemo(() => {
     const data = currentData.slice(0, 3);
     console.log('Top3 raw data:', data);
-    const processedData = data.map((store, index) => ({
-      id: store.store_id.toString(),
-      name: store.store_name,
-      score: store.total_points || 0,
-      avatar: store.profile_image ? fileUrl(store.profile_image) : require("../../../assets/Ellipse 18.png"),
-      followers: store.followers_count || 0,
-      rating: store.average_rating || 0,
-    }));
+    const processedData = data.map((store, index) => {
+      // Try server image first, fallback will be handled by AvatarImage component
+      const avatarUrl = store.profile_image ? fileUrl(store.profile_image) : require("../../../assets/Ellipse 18.png");
+      console.log(`Store ${store.store_name} - Original image: ${store.profile_image}, Generated URL: ${avatarUrl}`);
+      
+      return {
+        id: store.store_id.toString(),
+        name: store.store_name,
+        score: store.total_points || 0,
+        avatar: avatarUrl,
+        followers: store.followers_count || 0,
+        rating: store.average_rating || 0,
+      };
+    });
     
     console.log('Top3 processed data:', processedData);
     
@@ -279,14 +333,19 @@ export default function LeaderboardScreen() {
 
   const others = useMemo(() => {
     // Show ALL stores in the list, not just those after the top 3
-    const processedOthers = currentData.map((store, index) => ({
-      id: store.store_id.toString(),
-      name: store.store_name,
-      score: store.total_points || 0,
-      avatar: store.profile_image ? fileUrl(store.profile_image) : require("../../../assets/Ellipse 18.png"),
-      followers: store.followers_count || 0,
-      rating: store.average_rating || 0,
-    }));
+    const processedOthers = currentData.map((store, index) => {
+      // Try server image first, fallback will be handled by AvatarImage component
+      const avatarUrl = store.profile_image ? fileUrl(store.profile_image) : require("../../../assets/Ellipse 18.png");
+      console.log(`Others Store ${store.store_name} - Original image: ${store.profile_image}, Generated URL: ${avatarUrl}`);
+      return {
+        id: store.store_id.toString(),
+        name: store.store_name,
+        score: store.total_points || 0,
+        avatar: avatarUrl,
+        followers: store.followers_count || 0,
+        rating: store.average_rating || 0,
+      };
+    });
     console.log('Others processed data:', processedOthers);
     return processedOthers;
   }, [currentData]);
