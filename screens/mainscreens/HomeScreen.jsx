@@ -116,7 +116,11 @@ export default function StoreHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   /* -------- fetch store builder -------- */
-  const { data: builder } = useQuery({
+  const {
+    data: builder,
+    isLoading: builderLoading,
+    isError: builderError,
+  } = useQuery({
     queryKey: ["store", "builder"],
     queryFn: async () => {
       const token = await getToken();
@@ -201,7 +205,7 @@ export default function StoreHomeScreen() {
     : ASSETS.promo_fallback;
 
   /* -------- fetch latest orders (show only 3) -------- */
-  const { data: latest3 } = useQuery({
+  const { data: latest3, isLoading: ordersLoading } = useQuery({
     queryKey: ["orders", "latest3"],
     queryFn: async () => {
       const token = await getToken();
@@ -266,17 +270,23 @@ export default function StoreHomeScreen() {
       style={{ flex: 1, backgroundColor: "#F6F6F6", marginBottom: 60 }}
     >
       <StatusBar style="light" />
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 48 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.colors.primary]}
-            tintColor={theme.colors.primary}
-          />
-        }
-      >
+      {builderLoading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 48 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[theme.colors.primary]}
+                tintColor={theme.colors.primary}
+              />
+            }
+          >
         {/* header bar */}
         <View
           style={[styles.header, { backgroundColor: theme.colors.primary }]}
@@ -513,28 +523,36 @@ export default function StoreHomeScreen() {
 
         {/* Latest Orders (now from API, only 3) */}
         <ThemedText style={styles.sectionHeader}>Latest Orders</ThemedText>
-        {(latest3 ?? []).map((o, idx) => (
-          <OrderRow
-            key={`${o.id}-${idx}`}
-            name={o.customer}
-            items={`${o.items} items`}
-            price={formatNaira(o.total)}
-            color={theme.colors.primary}
-            onPress={() =>
-              navigation.navigate("ChatNavigator", {
-                screen: "SingleOrderDetails",
-                params: { orderId: o.id },
-              })
-            }
-          />
-        ))}
-      </ScrollView>
+        {ordersLoading ? (
+          <View style={{ paddingVertical: 20 }}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          </View>
+        ) : (
+          (latest3 ?? []).map((o, idx) => (
+            <OrderRow
+              key={`${o.id}-${idx}`}
+              name={o.customer}
+              items={`${o.items} items`}
+              price={formatNaira(o.total)}
+              color={theme.colors.primary}
+              onPress={() =>
+                navigation.navigate("ChatNavigator", {
+                  screen: "SingleOrderDetails",
+                  params: { orderId: o.id },
+                })
+              }
+            />
+          ))
+        )}
+          </ScrollView>
 
-      <StoreProfileModal
-        visible={profileVisible}
-        onClose={() => setProfileVisible(false)}
-        store={store}
-      />
+          <StoreProfileModal
+            visible={profileVisible}
+            onClose={() => setProfileVisible(false)}
+            store={store}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }

@@ -324,6 +324,26 @@ export default function AddServiceScreen({ navigation, route }) {
         return;
       }
 
+      // Validate files before submission
+      const validImages = images.filter(img => img && img.uri && img.uri.trim());
+      const hasValidVideo = video && video.uri && video.uri.trim();
+      
+      console.log("File validation:", {
+        totalImages: images.length,
+        validImages: validImages.length,
+        hasValidVideo,
+        videoUri: video?.uri,
+        imageUris: images.map(img => img?.uri)
+      });
+
+      if (validImages.length === 0 && !hasValidVideo) {
+        Alert.alert(
+          "Error",
+          "Please add at least one image or video before submitting."
+        );
+        return;
+      }
+
       // Create FormData
       const formData = new FormData();
 
@@ -348,10 +368,8 @@ export default function AddServiceScreen({ navigation, route }) {
         formData.append("discount_price", parseFloat(discountPrice));
       }
 
-      // Add media files using indexed format (media.0, media.1, etc.)
-      let mediaIndex = 0;
-      
-      if (video) {
+      // Add video file separately (not in media array)
+      if (video && video.uri && video.uri.trim()) {
         console.log("Adding video file:", video.uri);
         console.log("Video file exists:", video.uri ? "Yes" : "No");
         console.log("Video URI type:", typeof video.uri);
@@ -363,12 +381,21 @@ export default function AddServiceScreen({ navigation, route }) {
           type: "video/mp4",
           name: "service_video.mp4",
         };
-        formData.append(`media.${mediaIndex}`, videoFile);
-        console.log(`✅ Video added to FormData as media.${mediaIndex}`);
-        mediaIndex++;
+        console.log("Video file object being sent:", videoFile);
+        formData.append("video", videoFile);
+        console.log(`✅ Video added to FormData as 'video' field`);
+      } else if (video) {
+        console.log("❌ Video object exists but has no valid URI:", video);
       }
 
+      // Add images using media.* format
       images.forEach((image, index) => {
+        // Validate image URI before processing
+        if (!image || !image.uri || !image.uri.trim()) {
+          console.log(`❌ Image ${index + 1} has no valid URI:`, image);
+          return; // Skip this image
+        }
+
         // Determine file type from URI
         const getFileType = (uri) => {
           const extension = uri.split(".").pop().toLowerCase();
@@ -400,9 +427,9 @@ export default function AddServiceScreen({ navigation, route }) {
           type: getFileType(image.uri),
           name: fileName,
         };
-        formData.append(`media.${mediaIndex}`, imageFile);
-        console.log(`✅ Image ${index + 1} added to FormData as media.${mediaIndex}`);
-        mediaIndex++;
+        console.log(`Image ${index + 1} file object being sent:`, imageFile);
+        formData.append(`media[]`, imageFile);
+        console.log(`✅ Image ${index + 1} added to FormData as media[]`);
       });
 
       // Add sub-services
@@ -446,9 +473,14 @@ export default function AddServiceScreen({ navigation, route }) {
       const mediaEntries = formData._parts.filter((pair) =>
         pair[0].startsWith("media")
       );
+      const videoEntries = formData._parts.filter((pair) =>
+        pair[0] === "video"
+      );
       console.log(`📊 Total media entries: ${mediaEntries.length}`);
+      console.log(`📊 Total video entries: ${videoEntries.length}`);
       console.log("📊 Media field names:", mediaEntries.map((pair) => pair[0]));
-      console.log("📊 Expected format: media.0, media.1, media.2, etc.");
+      console.log("📊 Video field names:", videoEntries.map((pair) => pair[0]));
+      console.log("📊 Expected format: media[], media[], media[], etc. and separate 'video' field");
       
       // Log all FormData entries for debugging
       console.log("📋 All FormData entries:");
@@ -467,8 +499,52 @@ export default function AddServiceScreen({ navigation, route }) {
           value: entry[1],
           isFileObject:
             entry[1] && typeof entry[1] === "object" && entry[1].uri,
+          hasValidUri: entry[1] && entry[1].uri && entry[1].uri.trim(),
         });
       });
+      
+      videoEntries.forEach((entry, index) => {
+        console.log(`Video entry ${index}:`, {
+          fieldName: entry[0],
+          value: entry[1],
+          isFileObject:
+            entry[1] && typeof entry[1] === "object" && entry[1].uri,
+          hasValidUri: entry[1] && entry[1].uri && entry[1].uri.trim(),
+        });
+      });
+
+      // Final validation: Check for empty file URIs
+      const allFileEntries = [...mediaEntries, ...videoEntries];
+      const emptyFileEntries = allFileEntries.filter(entry => 
+        entry[1] && typeof entry[1] === "object" && (!entry[1].uri || !entry[1].uri.trim())
+      );
+      
+      if (emptyFileEntries.length > 0) {
+        console.log("❌ Found files with empty URIs:", emptyFileEntries);
+        Alert.alert(
+          "Error",
+          "Some files have invalid paths. Please remove and re-add them."
+        );
+        return;
+      }
+
+      // Additional validation: Check if file URIs are valid file paths
+      const invalidFileEntries = allFileEntries.filter(entry => {
+        if (!entry[1] || typeof entry[1] !== "object" || !entry[1].uri) return false;
+        const uri = entry[1].uri;
+        // Check if URI is a valid file path (starts with file:// or content:// or is a local path)
+        return !uri.startsWith('file://') && !uri.startsWith('content://') && !uri.startsWith('/');
+      });
+      
+      if (invalidFileEntries.length > 0) {
+        console.log("❌ Found files with invalid URI formats:", invalidFileEntries);
+        console.log("Expected formats: file://, content://, or local paths starting with /");
+        Alert.alert(
+          "Error",
+          "Some files have invalid URI formats. Please remove and re-add them."
+        );
+        return;
+      }
 
       // Use appropriate mutation based on edit mode
       if (isEditMode) {

@@ -7,6 +7,8 @@ import {
   ScrollView,
   Platform,
   Dimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +17,10 @@ import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
+import { getAnalytics } from "../../../utils/queries/settings";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../../contexts/AuthContext";
+
 
 const { width } = Dimensions.get("window");
 
@@ -33,11 +39,6 @@ function shadow(e = 8) {
 
 /* ---------- chart demo data ---------- */
 const days = ["1", "2", "3", "4", "5", "6", "7"];
-const chartData = {
-  impressions: [70, 45, 60, 12, 80, 23, 66],
-  visitors:    [50, 60, 30, 10, 55, 40, 72],
-  orders:      [28, 22, 18,  6, 20, 14, 30],
-};
 
 const LEGEND = [
   { key: "impressions", label: "Impressions", color: "#FDB022" },
@@ -80,7 +81,7 @@ const MetricCard = ({ title, value = "200", percent = "10%", color = "#A855F7", 
 );
 
 /* ---------- composed widgets ---------- */
-const BarsChart = ({ data, C }) => {
+const BarsChart = ({ data, C, dayLabels = days }) => {
   const max = Math.max(...data.impressions, ...data.visitors, ...data.orders, 100);
   const H = 180;
 
@@ -98,7 +99,7 @@ const BarsChart = ({ data, C }) => {
 
       {/* Chart bars */}
       <View style={{ flexDirection: "row", paddingHorizontal: 14, paddingTop: 16, paddingBottom: 10, height: H }}>
-        {days.map((d, i) => (
+        {dayLabels.map((d, i) => (
           <View key={d} style={styles.groupCol}>
             <View style={styles.barWrap}>
               <View style={[styles.bar, { height: (data.impressions[i] / max) * (H - 30), backgroundColor: "#FDB022" }]} />
@@ -124,6 +125,7 @@ const BarsChart = ({ data, C }) => {
 export default function AnalyticsScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const { token } = useAuth();
 
   const C = useMemo(
     () => ({
@@ -139,6 +141,61 @@ export default function AnalyticsScreen() {
 
   const [f1Open, setF1Open] = useState(false);
   const [f2Open, setF2Open] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch analytics data
+  const {
+    data: analyticsData,
+    isLoading: analyticsLoading,
+    isError: analyticsError,
+    refetch: refetchAnalytics,
+  } = useQuery({
+    queryKey: ["analytics"],
+    queryFn: () => getAnalytics(token),
+    enabled: !!token,
+  });
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchAnalytics();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Process chart data from API
+  const processedChartData = useMemo(() => {
+    if (!analyticsData?.data?.chart_data) {
+      return {
+        impressions: [0, 0, 0, 0, 0, 0, 0],
+        visitors: [0, 0, 0, 0, 0, 0, 0],
+        orders: [0, 0, 0, 0, 0, 0, 0],
+        dayLabels: ["1", "2", "3", "4", "5", "6", "7"],
+      };
+    }
+
+    const chartData = analyticsData.data.chart_data;
+    const last7Days = chartData.slice(-7); // Get last 7 days
+    
+    return {
+      impressions: last7Days.map(day => day.impressions || 0),
+      visitors: last7Days.map(day => day.visitors || 0),
+      orders: last7Days.map(day => day.orders || 0),
+      dayLabels: last7Days.map(day => {
+        const date = new Date(day.date);
+        return date.getDate().toString();
+      }),
+    };
+  }, [analyticsData]);
+
+  // Get analytics metrics
+  const analytics = analyticsData?.data?.analytics || {};
+  const salesOrders = analytics.sales_orders || {};
+  const customerInsights = analytics.customer_insights || {};
+  const productPerformance = analytics.product_performance || {};
+  const financialMetrics = analytics.financial_metrics || {};
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={[""]}>
@@ -157,12 +214,32 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 28 }}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 28 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[C.primary]}
+            tintColor={C.primary}
+          />
+        }
+      >
         {/* top filter + chart */}
         <FilterPill C={C} open={f1Open} onToggle={() => setF1Open((p) => !p)} />
         <View style={{ height: 10 }} />
 
-        <BarsChart data={chartData} C={C} />
+        {analyticsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={C.primary} />
+            <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+              Loading analytics data...
+            </ThemedText>
+          </View>
+        ) : (
+          <BarsChart data={processedChartData} C={C} dayLabels={processedChartData.dayLabels} />
+        )}
 
         <TouchableOpacity activeOpacity={0.9} style={{ alignSelf: "center", marginTop: 10 }}>
           <ThemedText style={{ color: "#E11D48", fontWeight: "600" }}>Full Detailed Analytics</ThemedText>
@@ -174,35 +251,46 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* sections */}
-        <Section title="Sales & Orders" C={C}>
-          <MetricCard C={C} title="Total Sales" value="200" color="#E11D48" />
-          <MetricCard C={C} title="No of Orders" value="200" color="#10B981" />
-          <MetricCard C={C} title="Fulfillment rate" value="—" percent="95%" color="#6366F1" />
-          <MetricCard C={C} title="Refunded orders" value="200" color="#F97316" />
-          <MetricCard C={C} title="Repeat purchase rate" value="—" percent="10%" color="#0EA5E9" />
-        </Section>
+        {analyticsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={C.primary} />
+            <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+              Loading metrics...
+            </ThemedText>
+          </View>
+        ) : (
+          <>
+            <Section title="Sales & Orders" C={C}>
+              <MetricCard C={C} title="Total Sales" value={salesOrders.total_sales?.toString() || "0"} color="#E11D48" />
+              <MetricCard C={C} title="No of Orders" value={salesOrders.no_of_orders?.toString() || "0"} color="#10B981" />
+              <MetricCard C={C} title="Fulfillment rate" value="—" percent={`${salesOrders.fulfillment_rate || 0}%`} color="#6366F1" />
+              <MetricCard C={C} title="Refunded orders" value={salesOrders.refunded_orders?.toString() || "0"} color="#F97316" />
+              <MetricCard C={C} title="Repeat purchase rate" value="—" percent={`${salesOrders.repeat_purchase_rate || 0}%`} color="#0EA5E9" />
+            </Section>
 
-        <Section title="Customer Insights" C={C}>
-          <MetricCard C={C} title="New Customers" value="200" color="#A855F7" />
-          <MetricCard C={C} title="Returning Customers" value="100" color="#0EA5E9" />
-          <MetricCard C={C} title="Customer Reviews" value="—" percent="10%" color="#22C55E" />
-          <MetricCard C={C} title="Product Reviews" value="—" percent="10%" color="#EF4444" />
-          <MetricCard C={C} title="Store Reviews" value="—" percent="10%" color="#06B6D4" />
-          <MetricCard C={C} title="Av Product Rating" value="—" percent="4.8" color="#F59E0B" />
-          <MetricCard C={C} title="Av Store Rating" value="—" percent="4.6" color="#8B5CF6" />
-        </Section>
+            <Section title="Customer Insights" C={C}>
+              <MetricCard C={C} title="New Customers" value={customerInsights.new_customers?.toString() || "0"} color="#A855F7" />
+              <MetricCard C={C} title="Returning Customers" value={customerInsights.returning_customers?.toString() || "0"} color="#0EA5E9" />
+              <MetricCard C={C} title="Customer Reviews" value={customerInsights.customer_reviews?.toString() || "0"} color="#22C55E" />
+              <MetricCard C={C} title="Product Reviews" value={customerInsights.product_reviews?.toString() || "0"} color="#EF4444" />
+              <MetricCard C={C} title="Store Reviews" value={customerInsights.store_reviews?.toString() || "0"} color="#06B6D4" />
+              <MetricCard C={C} title="Av Product Rating" value="—" percent={customerInsights.av_product_rating?.toString() || "0"} color="#F59E0B" />
+              <MetricCard C={C} title="Av Store Rating" value="—" percent={customerInsights.av_store_rating?.toString() || "0"} color="#8B5CF6" />
+            </Section>
 
-        <Section title="Product Performance" C={C}>
-          <MetricCard C={C} title="Total Impression" value="—" percent="10%" color="#8B5CF6" />
-          <MetricCard C={C} title="Total Clicks" value="—" percent="10%" color="#22C55E" />
-          <MetricCard C={C} title="Orders Placed" value="—" percent="10%" color="#EF4444" />
-        </Section>
+            <Section title="Product Performance" C={C}>
+              <MetricCard C={C} title="Total Impression" value={productPerformance.total_impression?.toString() || "0"} color="#8B5CF6" />
+              <MetricCard C={C} title="Total Clicks" value={productPerformance.total_clicks?.toString() || "0"} color="#22C55E" />
+              <MetricCard C={C} title="Orders Placed" value={productPerformance.orders_placed?.toString() || "0"} color="#EF4444" />
+            </Section>
 
-        <Section title="Financial Metrics" C={C}>
-          <MetricCard C={C} title="Total Revenue" value="—" percent="10%" color="#3B82F6" />
-          <MetricCard C={C} title="Loss from promo" value="—" percent="10%" color="#6366F1" />
-          <MetricCard C={C} title="Profit Margin" value="—" percent="10%" color="#22C55E" />
-        </Section>
+            <Section title="Financial Metrics" C={C}>
+              <MetricCard C={C} title="Total Revenue" value={financialMetrics.total_revenue?.toString() || "0"} color="#3B82F6" />
+              <MetricCard C={C} title="Loss from promo" value={financialMetrics.loss_from?.toString() || "0"} color="#6366F1" />
+              <MetricCard C={C} title="Profit Margin" value="—" percent={`${financialMetrics.profit_margin || 0}%`} color="#22C55E" />
+            </Section>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -322,4 +410,17 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   colorDot: { width: 6, height: 12, borderRadius: 3, marginRight: 6 },
+  
+  /* Loading styles */
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    textAlign: "center",
+  },
 });

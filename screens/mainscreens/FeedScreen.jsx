@@ -117,6 +117,7 @@ function CreatePostModal({
   mode = "create", // "create" | "edit"
   initialCaption = "",
   initialImageUrls = [], // array of absolute URLs
+  headerAvatar = null, // optional avatar/url to display in modal header
 }) {
   const { theme } = useTheme();
   const C = useMemo(
@@ -254,12 +255,10 @@ function CreatePostModal({
                 marginBottom: 10,
               }}
             >
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-                }}
-                style={stylesCP.avatar}
-              />
+            <Image
+              source={src(headerAvatar)}
+              style={stylesCP.avatar}
+            />
               <TextInput
                 placeholder="What is on your mind"
                 placeholderTextColor={C.sub}
@@ -315,7 +314,7 @@ function CreatePostModal({
 }
 
 /* -------------------- FEED HEADER -------------------- */
-function FeedHeader({ C, onNotificationPress }) {
+function FeedHeader({ C, onNotificationPress, searchQuery, onChangeSearch }) {
   return (
     <View style={[styles.header, { backgroundColor: C.primary }]}>
       <View style={styles.headerTopRow}>
@@ -342,6 +341,9 @@ function FeedHeader({ C, onNotificationPress }) {
           placeholder="Search any product, shop or category"
           placeholderTextColor="#888"
           style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={onChangeSearch}
+          returnKeyType="search"
         />
       </View>
     </View>
@@ -450,7 +452,16 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownloa
             </ThemedText>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() =>
+              Alert.alert(
+                "Not available in development",
+                "This feature will only work in the live application.",
+                [{ text: "OK" }]
+              )
+            }
+          >
             <Ionicons name="arrow-redo-outline" size={25} color="#101318" />
             <ThemedText style={styles.actionCount}>
               {item.shares || 0}
@@ -683,7 +694,7 @@ function CommentsSheet({ visible, onClose, postId }) {
 }
 
 /* -------------------- OPTIONS SHEETS -------------------- */
-function OptionsSheetAll({ visible, onClose }) {
+function OptionsSheetAll({ visible, onClose, onHidePost }) {
   return (
     <Modal
       visible={visible}
@@ -716,7 +727,17 @@ function OptionsSheetAll({ visible, onClose }) {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => {
+              Alert.alert(
+                "Not available in development",
+                "This feature will only work in the live application.",
+                [{ text: "OK" }]
+              );
+              onClose?.();
+            }}
+          >
             <View style={styles.optionLeft}>
               <Ionicons name="share-outline" size={20} color="#101318" />
               <ThemedText style={styles.optionLabel}>
@@ -726,15 +747,21 @@ function OptionsSheetAll({ visible, onClose }) {
             <Ionicons name="chevron-forward" size={18} color="#6C727A" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionRow}>
+          {/* <TouchableOpacity style={styles.optionRow}>
             <View style={styles.optionLeft}>
               <Ionicons name="person-add-outline" size={20} color="#101318" />
               <ThemedText style={styles.optionLabel}>Follow User</ThemedText>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#6C727A" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => {
+              onHidePost?.();
+              onClose?.();
+            }}
+          >
             <View style={styles.optionLeft}>
               <Ionicons name="grid-outline" size={20} color="#101318" />
               <ThemedText style={styles.optionLabel}>Hide Post</ThemedText>
@@ -790,7 +817,17 @@ function OptionsSheetMine({ visible, onClose, onEditPost, onDeletePost }) {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.optionRow} onPress={onClose}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => {
+              Alert.alert(
+                "Not available in development",
+                "This feature will only work in the live application.",
+                [{ text: "OK" }]
+              );
+              onClose?.();
+            }}
+          >
             <View style={styles.optionLeft}>
               <Ionicons name="share-outline" size={20} color="#101318" />
               <ThemedText style={styles.optionLabel}>
@@ -925,10 +962,10 @@ function useToggleLikeMutation() {
           arr.map((p) =>
             p.id === String(postId)
               ? {
-                ...p,
-                is_liked: !p.is_liked,
-                likes: (p.likes || 0) + (p.is_liked ? -1 : 1),
-              }
+                  ...p,
+                  is_liked: !p.is_liked,
+                  likes: (p.likes || 0) + (p.is_liked ? -1 : 1),
+                }
               : p
           );
         qc.setQueryData(["posts", "lists"], {
@@ -940,7 +977,7 @@ function useToggleLikeMutation() {
     },
     onError: (_e, _v, ctx) =>
       ctx?.prev && qc.setQueryData(["posts", "lists"], ctx.prev),
-    onSettled: () => qc.invalidateQueries({ queryKey: ["posts", "lists"] }),
+    // Note: intentionally avoid invalidating/refetching here to prevent image reloading
   });
 }
 
@@ -982,6 +1019,7 @@ export default function FeedScreen() {
     [theme]
   );
   const [isDownloading, setIsDownloading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleDownload = async (uri, postId) => {
     try {
@@ -1052,6 +1090,7 @@ export default function FeedScreen() {
   const [activePost, setActivePost] = useState(null);
   const [tab, setTab] = useState("my"); // 'my' | 'all'
   const [refreshing, setRefreshing] = useState(false);
+  const [hiddenPostIds, setHiddenPostIds] = useState(new Set());
 
   const { data, isLoading, error, refetch } = useAllAndMyPosts();
   const create = useCreatePost();
@@ -1061,7 +1100,20 @@ export default function FeedScreen() {
 
   const posts = data?.posts || [];
   const myPosts = data?.myPosts || [];
-  const listData = tab === "my" ? myPosts : posts;
+  const rawList = tab === "my" ? myPosts : posts;
+  const listData = rawList
+    .filter((p) => !hiddenPostIds.has(String(p.id)))
+    .filter((p) => {
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return true;
+      const inCaption = (p.caption || "").toLowerCase().includes(q);
+      const inStore = (p.store || "").toLowerCase().includes(q);
+      return inCaption || inStore;
+    });
+  const isActivePostMine = useMemo(
+    () => (activePost ? myPosts.some((p) => String(p.id) === String(activePost.id)) : false),
+    [activePost, myPosts]
+  );
 
   const openComments = (post) => {
     setActivePost(post);
@@ -1070,6 +1122,12 @@ export default function FeedScreen() {
   const openOptions = (post) => {
     setActivePost(post);
     setOptionsVisible(true);
+  };
+
+  const handleHidePost = () => {
+    if (!activePost) return;
+    setHiddenPostIds((prev) => new Set(prev).add(String(activePost.id)));
+    setOptionsVisible(false);
   };
 
   const handleToggleLike = (postId) => likeMut.mutate({ postId });
@@ -1129,8 +1187,12 @@ export default function FeedScreen() {
         }
         ListHeaderComponent={
           <>
-            <FeedHeader C={C} onNotificationPress={handleNotificationPress} />{" "}
-            // ✅ pass handler
+            <FeedHeader
+              C={C}
+              onNotificationPress={handleNotificationPress}
+              searchQuery={searchQuery}
+              onChangeSearch={setSearchQuery}
+            />
             <View style={styles.tabsWrap}>
               <TouchableOpacity
                 onPress={() => setTab("my")}
@@ -1221,13 +1283,8 @@ export default function FeedScreen() {
         postId={activePost?.id}
       />
 
-      {/* Options: All vs My */}
-      {tab === "all" ? (
-        <OptionsSheetAll
-          visible={optionsVisible}
-          onClose={() => setOptionsVisible(false)}
-        />
-      ) : (
+      {/* Options: show Mine sheet if the post belongs to current user */}
+      {isActivePostMine ? (
         <OptionsSheetMine
           visible={optionsVisible}
           onClose={() => setOptionsVisible(false)}
@@ -1236,6 +1293,12 @@ export default function FeedScreen() {
             setEditVisible(true);
           }}
           onDeletePost={handleDeletePost}
+        />
+      ) : (
+        <OptionsSheetAll
+          visible={optionsVisible}
+          onClose={() => setOptionsVisible(false)}
+          onHidePost={handleHidePost}
         />
       )}
 
@@ -1257,6 +1320,7 @@ export default function FeedScreen() {
         mode="edit"
         initialCaption={activePost?.caption}
         initialImageUrls={getPostImageUrls(activePost)}
+        headerAvatar={activePost?.avatar}
         onSubmit={async ({ body, newFiles /* keptUrls, removedUrls */ }) => {
           // NOTE: backend delete/replace behavior is unknown.
           // We upload new files with caption update. Tell me if it needs "replace_media" or "remove_media_ids[]".

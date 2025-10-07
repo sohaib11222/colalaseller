@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getOnboardingToken } from "../../../utils/tokenStorage";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useMutation } from "@tanstack/react-query";
+import { getMyPoints } from "../../../utils/queries/settings";
 
 
 /* helpers */
@@ -86,7 +87,7 @@ export default function CouponsPointsScreen({ navigation }) {
         console.error("Error loading onboarding token:", error);
       }
     };
-    
+
     if (!authToken) {
       loadOnboardingToken();
     }
@@ -109,6 +110,20 @@ export default function CouponsPointsScreen({ navigation }) {
   // Extract data from API response
   const coupons = couponsData?.data || [];
 
+  // Fetch customer points using React Query
+  const {
+    data: pointsData,
+    isLoading: pointsLoading,
+    isError: pointsError,
+    refetch: refetchPoints,
+  } = useQuery({
+    queryKey: ["customerPoints", token],
+    queryFn: () => getMyPoints(token),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  });
+
   // Coupon mutations
   const createCouponMutation = useMutation({
     mutationFn: ({ payload }) => createCoupon(payload, token),
@@ -116,8 +131,8 @@ export default function CouponsPointsScreen({ navigation }) {
       refetchCoupons();
     },
     onError: (error) => {
-      console.error('Error creating coupon:', error);
-      Alert.alert('Error', 'Failed to create coupon');
+      console.error("Error creating coupon:", error);
+      Alert.alert("Error", "Failed to create coupon");
     },
   });
 
@@ -127,8 +142,8 @@ export default function CouponsPointsScreen({ navigation }) {
       refetchCoupons();
     },
     onError: (error) => {
-      console.error('Error updating coupon:', error);
-      Alert.alert('Error', 'Failed to update coupon');
+      console.error("Error updating coupon:", error);
+      Alert.alert("Error", "Failed to update coupon");
     },
   });
 
@@ -140,8 +155,8 @@ export default function CouponsPointsScreen({ navigation }) {
       setItemToDelete(null);
     },
     onError: (error) => {
-      console.error('Error deleting coupon:', error);
-      Alert.alert('Error', 'Failed to delete coupon');
+      console.error("Error deleting coupon:", error);
+      Alert.alert("Error", "Failed to delete coupon");
     },
   });
 
@@ -149,7 +164,7 @@ export default function CouponsPointsScreen({ navigation }) {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refetchCoupons();
+      await Promise.all([refetchCoupons(), refetchPoints()]);
     } finally {
       setRefreshing(false);
     }
@@ -182,71 +197,22 @@ export default function CouponsPointsScreen({ navigation }) {
     };
 
     if (editing) {
-      updateCouponMutation.mutate({ 
-        id: editing.id, 
-        payload: apiPayload 
+      updateCouponMutation.mutate({
+        id: editing.id,
+        payload: apiPayload,
       });
     } else {
-      createCouponMutation.mutate({ 
-        payload: apiPayload 
+      createCouponMutation.mutate({
+        payload: apiPayload,
       });
     }
     setCreateOpen(false);
     setEditing(null);
   };
 
-  /* points demo state */
-  const [pointsTotal] = useState(5000);
-  const [customers] = useState([
-    {
-      id: "u1",
-      name: "Adewale Faizah",
-      avatar: "https://i.pravatar.cc/150?img=1",
-      points: 200,
-    },
-    {
-      id: "u2",
-      name: "Adewale Faizah",
-      avatar: "https://i.pravatar.cc/150?img=2",
-      points: 200,
-    },
-    {
-      id: "u3",
-      name: "Liam Chen",
-      avatar: "https://i.pravatar.cc/150?img=3",
-      points: 150,
-    },
-    {
-      id: "u4",
-      name: "Sophia Martinez",
-      avatar: "https://i.pravatar.cc/150?img=4",
-      points: 220,
-    },
-    {
-      id: "u5",
-      name: "Omar Patel",
-      avatar: "https://i.pravatar.cc/150?img=5",
-      points: 180,
-    },
-    {
-      id: "u6",
-      name: "Isabella Johnson",
-      avatar: "https://i.pravatar.cc/150?img=6",
-      points: 170,
-    },
-    {
-      id: "u7",
-      name: "Mia Robinson",
-      avatar: "https://i.pravatar.cc/150?img=7",
-      points: 210,
-    },
-    {
-      id: "u8",
-      name: "Noah Thompson",
-      avatar: "https://i.pravatar.cc/150?img=8",
-      points: 190,
-    },
-  ]);
+  // Extract points data from API response
+  const pointsTotal = pointsData?.data?.total_points || 0;
+  const customers = pointsData?.data?.stores || [];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -344,7 +310,11 @@ export default function CouponsPointsScreen({ navigation }) {
               </View>
             ) : couponsError ? (
               <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={48}
+                  color={C.primary}
+                />
                 <ThemedText style={[styles.errorText, { color: C.text }]}>
                   Failed to load coupons
                 </ThemedText>
@@ -395,6 +365,14 @@ export default function CouponsPointsScreen({ navigation }) {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[C.primary]}
+                tintColor={C.primary}
+              />
+            }
           >
             {/* Gradient total card */}
             <LinearGradient
@@ -442,9 +420,28 @@ export default function CouponsPointsScreen({ navigation }) {
               Customers Points
             </ThemedText>
 
-            {customers.map((u) => (
-              <CustomerRow key={u.id} C={C} user={u} />
-            ))}
+            {pointsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={C.primary} />
+                <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+                  Loading customer points...
+                </ThemedText>
+              </View>
+            ) : customers.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="people-outline" size={48} color={C.sub} />
+                <ThemedText style={[styles.emptyStateTitle, { color: C.text }]}>
+                  No Customer Points
+                </ThemedText>
+                <ThemedText style={[styles.emptyStateMessage, { color: C.sub }]}>
+                  Customer points will appear here when customers earn points from your store.
+                </ThemedText>
+              </View>
+            ) : (
+              customers.map((u) => (
+                <CustomerRow key={u.store_id} C={C} user={u} />
+              ))
+            )}
           </ScrollView>
 
           {/* settings full-screen modal */}
@@ -467,7 +464,9 @@ export default function CouponsPointsScreen({ navigation }) {
         onSave={onSaveCoupon}
         C={C}
         editing={editing}
-        isLoading={createCouponMutation.isPending || updateCouponMutation.isPending}
+        isLoading={
+          createCouponMutation.isPending || updateCouponMutation.isPending
+        }
       />
 
       {/* Delete Confirmation Modal */}
@@ -484,24 +483,39 @@ export default function CouponsPointsScreen({ navigation }) {
               Delete Coupon?
             </ThemedText>
             <ThemedText style={[styles.deleteModalText, { color: C.sub }]}>
-              This action cannot be undone. Are you sure you want to delete this coupon?
+              This action cannot be undone. Are you sure you want to delete this
+              coupon?
             </ThemedText>
             <View style={styles.deleteModalButtons}>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.cancelButton, { borderColor: C.line }]}
+                style={[
+                  styles.deleteModalButton,
+                  styles.cancelButton,
+                  { borderColor: C.line },
+                ]}
                 onPress={() => setDeleteModalVisible(false)}
               >
-                <ThemedText style={[styles.cancelButtonText, { color: C.text }]}>Cancel</ThemedText>
+                <ThemedText
+                  style={[styles.cancelButtonText, { color: C.text }]}
+                >
+                  Cancel
+                </ThemedText>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.deleteButton, { backgroundColor: C.primary }]}
+                style={[
+                  styles.deleteModalButton,
+                  styles.deleteButton,
+                  { backgroundColor: C.primary },
+                ]}
                 onPress={confirmDelete}
                 disabled={deleteCouponMutation.isPending}
               >
                 {deleteCouponMutation.isPending ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
+                  <ThemedText style={styles.deleteButtonText}>
+                    Delete
+                  </ThemedText>
                 )}
               </TouchableOpacity>
             </View>
@@ -515,10 +529,11 @@ export default function CouponsPointsScreen({ navigation }) {
 /* ───────────── Coupons UI ───────────── */
 function CouponCard({ C, data, onEdit, onDelete }) {
   const createdDate = new Date(data.created_at);
-  const discountText = data.discount_type === "percentage" 
-    ? `${data.discount_value}%` 
-    : `$${data.discount_value}`;
-  
+  const discountText =
+    data.discount_type === "percentage"
+      ? `${data.discount_value}%`
+      : `$${data.discount_value}`;
+
   return (
     <View
       style={[
@@ -561,9 +576,14 @@ function CouponCard({ C, data, onEdit, onDelete }) {
       </View>
       <View style={[styles.row, { marginBottom: 8 }]}>
         <ThemedText style={styles.kvLabel}>Status</ThemedText>
-        <ThemedText style={[styles.kvValue, { 
-          color: data.status === 'active' ? '#10B981' : '#EF4444' 
-        }]}>
+        <ThemedText
+          style={[
+            styles.kvValue,
+            {
+              color: data.status === "active" ? "#10B981" : "#EF4444",
+            },
+          ]}
+        >
           {data.status}
         </ThemedText>
       </View>
@@ -600,12 +620,15 @@ const CustomerRow = ({ C, user }) => (
       { backgroundColor: C.card, borderColor: "#EFEFEF" },
     ]}
   >
-    <Image source={{ uri: user.avatar }} style={styles.avatar} />
+    <Image 
+      source={{ uri: user.profile_image ? `https://colala.hmstech.xyz/storage/${user.profile_image}` : "https://i.pravatar.cc/150?img=1" }} 
+      style={styles.avatar} 
+    />
     <ThemedText style={{ color: C.text, fontWeight: "600", flex: 1 }}>
-      {user.name}
+      {user.store_name}
     </ThemedText>
     <ThemedText style={{ color: "#E53935", fontWeight: "800" }}>
-      {user.points}
+      {user.total_points}
     </ThemedText>
   </View>
 );
@@ -691,7 +714,14 @@ function PointsSettingsModal({ C, visible, onClose, onSave }) {
 }
 
 /* ───────────── Create Coupon Modal (from previous step) ───────────── */
-function CreateCouponModal({ visible, onClose, onSave, C, editing, isLoading }) {
+function CreateCouponModal({
+  visible,
+  onClose,
+  onSave,
+  C,
+  editing,
+  isLoading,
+}) {
   const [code, setCode] = useState("");
   const [percent, setPercent] = useState("");
   const [maxUsage, setMaxUsage] = useState("");
@@ -800,16 +830,29 @@ function CreateCouponModal({ visible, onClose, onSave, C, editing, isLoading }) 
         <View style={[styles.footer, { backgroundColor: C.bg }]}>
           <TouchableOpacity
             style={[
-              styles.primaryBtn, 
-              { 
+              styles.primaryBtn,
+              {
                 backgroundColor: C.primary,
-                opacity: (!code.trim() || !percent.trim() || !maxUsage.trim() || !perUser.trim() || isLoading) ? 0.6 : 1
-              }
+                opacity:
+                  !code.trim() ||
+                  !percent.trim() ||
+                  !maxUsage.trim() ||
+                  !perUser.trim() ||
+                  isLoading
+                    ? 0.6
+                    : 1,
+              },
             ]}
             onPress={() =>
               onSave({ code, percent, maxUsage, perUser, expiresOn })
             }
-            disabled={!code.trim() || !percent.trim() || !maxUsage.trim() || !perUser.trim() || isLoading}
+            disabled={
+              !code.trim() ||
+              !percent.trim() ||
+              !maxUsage.trim() ||
+              !perUser.trim() ||
+              isLoading
+            }
           >
             {isLoading ? (
               <ActivityIndicator size="small" color="white" />
@@ -1278,5 +1321,35 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  // Loading and empty states
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    textAlign: "center",
+  },
+  emptyStateContainer: {
+    paddingVertical: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  emptyStateMessage: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 24,
   },
 });

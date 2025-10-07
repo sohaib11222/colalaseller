@@ -17,7 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 
-const toSrc = (v) => (typeof v === "number" ? v : v ? { uri: String(v) } : undefined);
+const toSrc = (v) =>
+  typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
 
 /* ───────── assets (update paths if different) ───────── */
 const BADGE_FREE = require("../../../assets/freedel.png");
@@ -25,58 +26,59 @@ const BADGE_BULK = require("../../../assets/bulk.png");
 const ICON_EDIT = require("../../../assets/Vector (7).png");
 const ICON_MORE = require("../../../assets/DotsThreeOutlineVertical.png");
 
-
 //Code Relate to this screen
 import { useQuery } from "@tanstack/react-query";
 import { getProducts } from "../../../utils/queries/products";
 import { getServices } from "../../../utils/queries/services";
 import { useAuth } from "../../../contexts/AuthContext";
 
-
-
 export default function MyProductsServicesScreen({ navigation }) {
   const { theme } = useTheme();
   const { token } = useAuth();
 
-
   // inside MyProductsServicesScreen component
-  const openDetails = React.useCallback((item) => {
-    if (item?.type === 'product') {
-      navigation.navigate('ChatNavigator', {
-        screen: 'ProductDetails',
-        params: { id: item.id, item },
-      });
-    } else {
-      navigation.navigate('ChatNavigator', {
-        screen: 'ServiceDetails',
-        params: { id: item.id, item },
-      });
-    }
-  }, [navigation]);
+  const openDetails = React.useCallback(
+    (item) => {
+      if (item?.type === "product") {
+        navigation.navigate("ChatNavigator", {
+          screen: "ProductDetails",
+          params: { id: item.id, item },
+        });
+      } else {
+        navigation.navigate("ChatNavigator", {
+          screen: "ServiceDetails",
+          params: { id: item.id, item },
+        });
+      }
+    },
+    [navigation]
+  );
 
-  const editItem = React.useCallback((item) => {
-    if (item?.type === 'product') {
-      // Same route & params style you used from ProductDetailsScreen
-      navigation.navigate('ChatNavigator', {
-        screen: "AddProduct",
-        params: {
-          editMode: true,
-          productId: item.id,
-        },
-      });
-    } else {
-      // Same route & params style you used from ServiceDetailsScreen
-      navigation.navigate('ChatNavigator', {
-        screen: 'AddService',
-        params: {
-          mode: 'edit',
-          serviceId: item.id,
-          isEdit: true,
-        },
-      });
-    }
-  }, [navigation]);
-
+  const editItem = React.useCallback(
+    (item) => {
+      if (item?.type === "product") {
+        // Same route & params style you used from ProductDetailsScreen
+        navigation.navigate("ChatNavigator", {
+          screen: "AddProduct",
+          params: {
+            editMode: true,
+            productId: item.id,
+          },
+        });
+      } else {
+        // Same route & params style you used from ServiceDetailsScreen
+        navigation.navigate("ChatNavigator", {
+          screen: "AddService",
+          params: {
+            mode: "edit",
+            serviceId: item.id,
+            isEdit: true,
+          },
+        });
+      }
+    },
+    [navigation]
+  );
 
   const C = useMemo(
     () => ({
@@ -96,9 +98,9 @@ export default function MyProductsServicesScreen({ navigation }) {
     data: productsData,
     isLoading: productsLoading,
     error: productsError,
-    refetch: refetchProducts
+    refetch: refetchProducts,
   } = useQuery({
-    queryKey: ['products', token],
+    queryKey: ["products", token],
     queryFn: () => getProducts(token),
     enabled: !!token,
   });
@@ -107,9 +109,9 @@ export default function MyProductsServicesScreen({ navigation }) {
     data: servicesData,
     isLoading: servicesLoading,
     error: servicesError,
-    refetch: refetchServices
+    refetch: refetchServices,
   } = useQuery({
-    queryKey: ['services', token],
+    queryKey: ["services", token],
     queryFn: () => getServices(token),
     enabled: !!token,
   });
@@ -134,19 +136,21 @@ export default function MyProductsServicesScreen({ navigation }) {
 
   // helpers/navigation.ts (or inline in your component)
 
-
-
   // Transform API data to match component expectations
   const transformProductData = (products) => {
     if (!products || !Array.isArray(products)) return [];
 
-    return products.map(product => ({
+    return products.map((product) => ({
       id: product?.id?.toString() || Math.random().toString(),
       type: "product",
       title: product?.name || "Untitled Product",
-      image: product?.images?.[0]?.path ? `https://colala.hmstech.xyz/storage/${product.images[0].path}` : "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
+      image: product?.images?.[0]?.path
+        ? `https://colala.hmstech.xyz/storage/${product.images[0].path}`
+        : "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
       price: parseFloat(product?.price || 0),
-      compareAt: product?.discount_price ? parseFloat(product.discount_price) : 0,
+      compareAt: product?.discount_price
+        ? parseFloat(product.discount_price)
+        : 0,
       category: "Electronics", // You might want to get this from category data
       views: product?.views || 0, // Use actual API data if available
       clicks: product?.clicks || 0, // Use actual API data if available
@@ -160,11 +164,13 @@ export default function MyProductsServicesScreen({ navigation }) {
   const transformServiceData = (services) => {
     if (!services || !Array.isArray(services)) return [];
 
-    return services.map(service => ({
+    return services.map((service) => ({
       id: service?.id?.toString() || Math.random().toString(),
       type: "service",
       title: service?.name || "Untitled Service",
-      image: service?.media?.[0]?.path ? `https://colala.hmstech.xyz/storage/${service.media[0].path}` : "https://images.unsplash.com/photo-1542060748-10c28b62716b?w=900&q=60",
+      image: service?.media?.[0]?.path
+        ? `https://colala.hmstech.xyz/storage/${service.media[0].path}`
+        : "https://images.unsplash.com/photo-1542060748-10c28b62716b?w=900&q=60",
       minPrice: parseFloat(service?.price_from || 0),
       maxPrice: parseFloat(service?.price_to || 0),
       views: service?.views || 0, // Use actual API data
@@ -178,25 +184,38 @@ export default function MyProductsServicesScreen({ navigation }) {
   };
 
   // Use API data if available, otherwise fallback to dummy data
-  const products = productsData?.data ?
-    transformProductData(productsData.data) : [];
-  const services = servicesData?.data ?
-    transformServiceData(servicesData.data) : [];
+  const products = productsData?.data
+    ? transformProductData(productsData.data)
+    : [];
+  const services = servicesData?.data
+    ? transformServiceData(servicesData.data)
+    : [];
 
   // Check if we have real API data but it's empty
   const hasProductsData = productsData?.data !== undefined;
   const hasServicesData = servicesData?.data !== undefined;
-  const isProductsEmpty = hasProductsData && Array.isArray(productsData.data) && productsData.data.length === 0;
-  const isServicesEmpty = hasServicesData && Array.isArray(servicesData.data) && servicesData.data.length === 0;
-  const isCurrentTabEmpty = tab === "products" ? isProductsEmpty : isServicesEmpty;
+  const isProductsEmpty =
+    hasProductsData &&
+    Array.isArray(productsData.data) &&
+    productsData.data.length === 0;
+  const isServicesEmpty =
+    hasServicesData &&
+    Array.isArray(servicesData.data) &&
+    servicesData.data.length === 0;
+  const isCurrentTabEmpty =
+    tab === "products" ? isProductsEmpty : isServicesEmpty;
 
   // Also check if the transformed data is empty (fallback detection)
   const isProductsTransformedEmpty = products.length === 0 && hasProductsData;
   const isServicesTransformedEmpty = services.length === 0 && hasServicesData;
-  const isCurrentTabTransformedEmpty = tab === "products" ? isProductsTransformedEmpty : isServicesTransformedEmpty;
+  const isCurrentTabTransformedEmpty =
+    tab === "products"
+      ? isProductsTransformedEmpty
+      : isServicesTransformedEmpty;
 
   // Final empty state detection - use either API empty detection or transformed empty detection
-  const shouldShowEmptyState = isCurrentTabEmpty || isCurrentTabTransformedEmpty;
+  const shouldShowEmptyState =
+    isCurrentTabEmpty || isCurrentTabTransformedEmpty;
 
   // Debug logging
   console.log("=== DEBUG INFO ===");
@@ -216,7 +235,10 @@ export default function MyProductsServicesScreen({ navigation }) {
   console.log("Is Services Transformed Empty:", isServicesTransformedEmpty);
   console.log("Current Tab:", tab);
   console.log("Is Current Tab Empty:", isCurrentTabEmpty);
-  console.log("Is Current Tab Transformed Empty:", isCurrentTabTransformedEmpty);
+  console.log(
+    "Is Current Tab Transformed Empty:",
+    isCurrentTabTransformedEmpty
+  );
   console.log("Should Show Empty State:", shouldShowEmptyState);
   console.log("Products Length:", products.length);
   console.log("Services Length:", services.length);
@@ -245,8 +267,6 @@ export default function MyProductsServicesScreen({ navigation }) {
     return Array.from(set);
   }, [DATA]);
 
-
-
   /* ───────── filters ───────── */
   const filtered = useMemo(() => {
     if (!DATA || !Array.isArray(DATA)) return [];
@@ -270,10 +290,10 @@ export default function MyProductsServicesScreen({ navigation }) {
   }, [DATA, tab, category, statusFilter, query]);
 
   // Check if filters result in no data
-  const hasFilters = category || statusFilter !== "all" || query.trim().length > 0;
-  const isFilteredEmpty = hasFilters && filtered.length === 0 && DATA && DATA.length > 0;
-
-
+  const hasFilters =
+    category || statusFilter !== "all" || query.trim().length > 0;
+  const isFilteredEmpty =
+    hasFilters && filtered.length === 0 && DATA && DATA.length > 0;
 
   /* ───────── render ───────── */
   return (
@@ -307,14 +327,22 @@ export default function MyProductsServicesScreen({ navigation }) {
               source={require("../../../assets/bell-icon.png")}
               style={styles.iconImg}
             />
-          </TouchableOpacity>      </View>
+          </TouchableOpacity>{" "}
+        </View>
 
         <View style={styles.headerInputs}>
-          <View style={[styles.searchBox, { backgroundColor: "#fff", minWidth: 150 }]}>
+          <View
+            style={[
+              styles.searchBox,
+              { backgroundColor: "#fff", minWidth: 150 },
+            ]}
+          >
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder={tab === "services" ? "Search services" : "Search products"}
+              placeholder={
+                tab === "services" ? "Search services" : "Search products"
+              }
               placeholderTextColor="#9CA3AF"
               style={{
                 flex: 1,
@@ -328,9 +356,18 @@ export default function MyProductsServicesScreen({ navigation }) {
           <TouchableOpacity
             onPress={() => setCatSheetOpen(true)}
             activeOpacity={0.85}
-            style={[styles.searchBox, { backgroundColor: "#fff", minWidth: 10 }]}
+            style={[
+              styles.searchBox,
+              { backgroundColor: "#fff", minWidth: 10 },
+            ]}
           >
-            <ThemedText style={{ color: category ? C.text : "#9CA3AF", flex: 1, fontSize: 12 }}>
+            <ThemedText
+              style={{
+                color: category ? C.text : "#9CA3AF",
+                flex: 1,
+                fontSize: 12,
+              }}
+            >
               {category || "Categories"}
             </ThemedText>
             <Ionicons name="chevron-down" size={18} color={C.text} />
@@ -422,7 +459,8 @@ export default function MyProductsServicesScreen({ navigation }) {
 
         {/* Products / Services Grid */}
         {(() => {
-          const isLoading = tab === "products" ? productsLoading : servicesLoading;
+          const isLoading =
+            tab === "products" ? productsLoading : servicesLoading;
           const error = tab === "products" ? productsError : servicesError;
 
           if (isLoading) {
@@ -447,10 +485,14 @@ export default function MyProductsServicesScreen({ navigation }) {
                   {error.message || "Something went wrong. Please try again."}
                 </ThemedText>
                 <TouchableOpacity
-                  onPress={() => tab === "products" ? refetchProducts() : refetchServices()}
+                  onPress={() =>
+                    tab === "products" ? refetchProducts() : refetchServices()
+                  }
                   style={[styles.retryButton, { backgroundColor: C.primary }]}
                 >
-                  <ThemedText style={[styles.retryButtonText, { color: C.card }]}>
+                  <ThemedText
+                    style={[styles.retryButtonText, { color: C.card }]}
+                  >
                     Try Again
                   </ThemedText>
                 </TouchableOpacity>
@@ -461,18 +503,26 @@ export default function MyProductsServicesScreen({ navigation }) {
           if (shouldShowEmptyState) {
             console.log("Showing empty state for:", tab);
             console.log("Empty state reason - API empty:", isCurrentTabEmpty);
-            console.log("Empty state reason - Transformed empty:", isCurrentTabTransformedEmpty);
+            console.log(
+              "Empty state reason - Transformed empty:",
+              isCurrentTabTransformedEmpty
+            );
             return (
               <View style={styles.emptyContainer}>
-                <Ionicons name={tab === "products" ? "cube-outline" : "construct-outline"} size={64} color={C.sub} />
+                <Ionicons
+                  name={
+                    tab === "products" ? "cube-outline" : "construct-outline"
+                  }
+                  size={64}
+                  color={C.sub}
+                />
                 <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
                   No {tab === "products" ? "Products" : "Services"} Found
                 </ThemedText>
                 <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
                   {tab === "products"
                     ? "You haven't created any products yet. Start by adding your first product to begin selling!"
-                    : "You haven't created any services yet. Start by adding your first service to begin offering!"
-                  }
+                    : "You haven't created any services yet. Start by adding your first service to begin offering!"}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={() => {
@@ -481,7 +531,9 @@ export default function MyProductsServicesScreen({ navigation }) {
                   }}
                   style={[styles.refreshButton, { backgroundColor: C.primary }]}
                 >
-                  <ThemedText style={[styles.refreshButtonText, { color: C.card }]}>
+                  <ThemedText
+                    style={[styles.refreshButtonText, { color: C.card }]}
+                  >
                     Refresh
                   </ThemedText>
                 </TouchableOpacity>
@@ -499,8 +551,7 @@ export default function MyProductsServicesScreen({ navigation }) {
                 <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
                   {query.trim().length > 0
                     ? `No ${tab} match your search "${query}". Try different keywords or clear the search.`
-                    : `No ${tab} match your current filters. Try adjusting your filters or clear them to see all ${tab}.`
-                  }
+                    : `No ${tab} match your current filters. Try adjusting your filters or clear them to see all ${tab}.`}
                 </ThemedText>
                 <TouchableOpacity
                   onPress={() => {
@@ -510,7 +561,9 @@ export default function MyProductsServicesScreen({ navigation }) {
                   }}
                   style={[styles.refreshButton, { backgroundColor: C.primary }]}
                 >
-                  <ThemedText style={[styles.refreshButtonText, { color: C.card }]}>
+                  <ThemedText
+                    style={[styles.refreshButtonText, { color: C.card }]}
+                  >
                     Clear Filters
                   </ThemedText>
                 </TouchableOpacity>
@@ -526,8 +579,8 @@ export default function MyProductsServicesScreen({ navigation }) {
                 <ItemCard
                   item={item}
                   C={C}
-                  onPress={() => openDetails(item)}   // tapping the whole card
-                  onMore={() => openDetails(item)}    // "more" icon
+                  onPress={() => openDetails(item)} // tapping the whole card
+                  onMore={() => openDetails(item)} // "more" icon
                   onEdit={() => editItem(item)}
                 />
               )}
@@ -552,7 +605,6 @@ export default function MyProductsServicesScreen({ navigation }) {
         })()}
       </View>
 
-
       {/* Category sheet */}
       <CategorySheet
         visible={catSheetOpen}
@@ -571,24 +623,49 @@ export default function MyProductsServicesScreen({ navigation }) {
 /* ───────── card ───────── */
 
 function ItemCard({ item, C, onPress, onMore, onEdit }) {
+  const [moreModalVisible, setMoreModalVisible] = useState(false);
   const priceFmt = (n) => `₦${Number(n || 0).toLocaleString()}`;
   const isService = item.type === "service";
   const isOut = item.status === "out_of_stock";
 
+  const handleMorePress = () => {
+    setMoreModalVisible(true);
+  };
+
+  const handleViewDetails = () => {
+    setMoreModalVisible(false);
+    onPress(); // This will call the original onPress function (openDetails)
+  };
+
   // SERVICE CARD (matches mock)
   if (isService) {
     return (
-      <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, flex: 1 }]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: C.card, borderColor: C.line, flex: 1 },
+        ]}
+      >
         <View style={styles.cardImgWrap}>
           <Image source={toSrc(item.image)} style={styles.cardImg} />
         </View>
 
         <View style={{ padding: 12 }}>
-          <ThemedText style={{ color: C.text, fontWeight: "700", fontSize: 11 }} numberOfLines={1}>
+          <ThemedText
+            style={{ color: C.text, fontWeight: "700", fontSize: 11 }}
+            numberOfLines={1}
+          >
             {item.title}
           </ThemedText>
 
-          <ThemedText style={{ color: C.primary, fontWeight: "900", marginTop: 4, fontSize: 12 }}>
+          <ThemedText
+            style={{
+              color: C.primary,
+              fontWeight: "900",
+              marginTop: 4,
+              fontSize: 12,
+            }}
+          >
             {priceFmt(item.minPrice)} - {priceFmt(item.maxPrice)}
           </ThemedText>
 
@@ -599,8 +676,12 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
               ["Messages", item.messages],
             ].map(([k, v]) => (
               <View key={k} style={styles.metricRow}>
-                <ThemedText style={{ color: C.sub, fontSize: 8 }}>{k}</ThemedText>
-                <ThemedText style={{ color: C.text, fontWeight: "700", fontSize: 8 }}>
+                <ThemedText style={{ color: C.sub, fontSize: 8 }}>
+                  {k}
+                </ThemedText>
+                <ThemedText
+                  style={{ color: C.text, fontWeight: "700", fontSize: 8 }}
+                >
                   {v}
                 </ThemedText>
               </View>
@@ -619,7 +700,11 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
               marginTop: 10,
             }}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "700", fontSize: 10 }}>Details</ThemedText>
+            <ThemedText
+              style={{ color: "#fff", fontWeight: "700", fontSize: 10 }}
+            >
+              Details
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </View>
@@ -642,14 +727,18 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
         <Image source={toSrc(item.image)} style={styles.cardImg} />
         {item.sponsored ? (
           <View style={styles.sponsoredPill}>
-            <ThemedText style={{ color: "#fff", fontWeight: "800", fontSize: 8 }}>
+            <ThemedText
+              style={{ color: "#fff", fontWeight: "800", fontSize: 8 }}
+            >
               Sponsored
             </ThemedText>
           </View>
         ) : null}
         {isOut ? (
           <View style={styles.outOverlay}>
-            <ThemedText style={{ color: "#fff", fontWeight: "800", fontSize: 8 }}>
+            <ThemedText
+              style={{ color: "#fff", fontWeight: "800", fontSize: 8 }}
+            >
               Out of Stock
             </ThemedText>
           </View>
@@ -658,16 +747,34 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
 
       {/* body */}
       <View style={{ padding: 14 }}>
-        <ThemedText style={{ color: C.text, fontWeight: "700", fontSize: 10 }} numberOfLines={1}>
+        <ThemedText
+          style={{ color: C.text, fontWeight: "700", fontSize: 10 }}
+          numberOfLines={1}
+        >
           {item.title}
         </ThemedText>
 
-        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 6 }}>
-          <ThemedText style={{ color: C.primary, fontWeight: "900", fontSize: 12 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            gap: 8,
+            marginTop: 6,
+          }}
+        >
+          <ThemedText
+            style={{ color: C.primary, fontWeight: "900", fontSize: 12 }}
+          >
             {priceFmt(item.price)}
           </ThemedText>
           {!!item.compareAt && (
-            <ThemedText style={{ color: C.sub, textDecorationLine: "line-through", fontSize: 8 }}>
+            <ThemedText
+              style={{
+                color: C.sub,
+                textDecorationLine: "line-through",
+                fontSize: 8,
+              }}
+            >
               {priceFmt(item.compareAt)}
             </ThemedText>
           )}
@@ -680,7 +787,10 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
               <Image
                 key={`${k}-${i}`}
                 source={badgeImg(k)}
-                style={[badgeSize(k), { resizeMode: "contain", marginRight: 6 }]}
+                style={[
+                  badgeSize(k),
+                  { resizeMode: "contain", marginRight: 6 },
+                ]}
               />
             ))}
           </View>
@@ -695,7 +805,9 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
           ].map(([k, v]) => (
             <View key={k} style={styles.metricRow}>
               <ThemedText style={{ color: C.sub, fontSize: 8 }}>{k}</ThemedText>
-              <ThemedText style={{ color: C.text, fontWeight: "700", fontSize: 8 }}>
+              <ThemedText
+                style={{ color: C.text, fontWeight: "700", fontSize: 8 }}
+              >
                 {v}
               </ThemedText>
             </View>
@@ -719,24 +831,53 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
           </TouchableOpacity>
         </View> */}
         {/* Service footer icons */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
-          <View style={[styles.catPill, { borderColor: C.primary + '33' }]}>
-            <ThemedText style={{ color: C.primary, fontSize: 8 }}>{item.category}</ThemedText>
+        <View
+          style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
+        >
+          <View style={[styles.catPill, { borderColor: C.primary + "33" }]}>
+            <ThemedText style={{ color: C.primary, fontSize: 8 }}>
+              {item.category}
+            </ThemedText>
           </View>
           <View style={{ flex: 1 }} />
           <TouchableOpacity style={styles.squareBtn} onPress={onEdit}>
             <Image source={ICON_EDIT} style={{ width: 18, height: 18 }} />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={onMore}
+            onPress={handleMorePress}
             hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
             style={[styles.squareBtn, { marginLeft: 10 }]}
           >
             <Image source={ICON_MORE} style={{ width: 18, height: 18 }} />
           </TouchableOpacity>
         </View>
-
       </View>
+
+      {/* More Options Modal */}
+      <Modal
+        visible={moreModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMoreModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setMoreModalVisible(false)}
+        >
+          <View style={[styles.moreModal, { backgroundColor: C.card }]}>
+            <TouchableOpacity
+              style={styles.moreOption}
+              onPress={handleViewDetails}
+            >
+              <Ionicons name="eye-outline" size={20} color={C.text} />
+              <ThemedText style={[styles.moreOptionText, { color: C.text }]}>
+                View Details
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </TouchableOpacity>
   );
 }
@@ -751,7 +892,10 @@ function CategorySheet({ visible, onClose, onSelect, options, C }) {
   const Row = ({ label }) => (
     <TouchableOpacity
       onPress={() => onSelect(label)}
-      style={[styles.sheetRow, { borderColor: C.line, backgroundColor: "#EFEFF0" }]}
+      style={[
+        styles.sheetRow,
+        { borderColor: C.line, backgroundColor: "#EFEFF0" },
+      ]}
       activeOpacity={0.9}
     >
       <ThemedText style={{ color: C.text }}>{label}</ThemedText>
@@ -759,15 +903,26 @@ function CategorySheet({ visible, onClose, onSelect, options, C }) {
   );
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={styles.sheetOverlay}>
         <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={[styles.sheetTitle, { color: C.text }]}>
+            <ThemedText
+              font="oleo"
+              style={[styles.sheetTitle, { color: C.text }]}
+            >
               Categories
             </ThemedText>
-            <TouchableOpacity onPress={onClose} style={[styles.sheetClose, { borderColor: C.line }]}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={[styles.sheetClose, { borderColor: C.line }]}
+            >
               <ThemedText style={{ color: C.text, fontSize: 16 }}>×</ThemedText>
             </TouchableOpacity>
           </View>
@@ -837,7 +992,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
   },
-  tabsRow: { flexDirection: "row", gap: 22, paddingHorizontal: 14, marginTop: 12 },
+  tabsRow: {
+    flexDirection: "row",
+    gap: 22,
+    paddingHorizontal: 14,
+    marginTop: 12,
+  },
   tabBtn: { paddingVertical: 4 },
   tabUnderline: { height: 3, borderRadius: 999, marginTop: 6 },
 
@@ -889,7 +1049,11 @@ const styles = StyleSheet.create({
   },
 
   metrics: { borderTopWidth: 1, marginTop: 12, paddingTop: 12, gap: 8 },
-  metricRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  metricRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
   catPill: {
     borderWidth: 1,
@@ -908,8 +1072,17 @@ const styles = StyleSheet.create({
   },
 
   /* sheet */
-  sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "flex-end" },
-  sheetTall: { padding: 14, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "flex-end",
+  },
+  sheetTall: {
+    padding: 14,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+  },
   sheetHandle: {
     alignSelf: "center",
     width: 68,
@@ -918,7 +1091,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#D8DCE2",
     marginBottom: 10,
   },
-  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   sheetTitle: { fontSize: 18, fontWeight: "700" },
   sheetClose: {
     width: 30,
@@ -1021,5 +1199,38 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  // More modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  moreModal: {
+    borderRadius: 12,
+    padding: 8,
+    minWidth: 150,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  moreOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  moreOptionText: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontWeight: "500",
   },
 });

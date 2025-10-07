@@ -56,3 +56,10 @@ export const getSupportList = async (token) =>
 
 export const getSupportDetail = async (token, id) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Support_Detail(id), "GET", undefined, token);
+
+
+export const getMyPoints = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.My_Points, "GET", undefined, token);
+
+export const getAnalytics = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Analytics, "GET", undefined, token);

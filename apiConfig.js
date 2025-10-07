@@ -58,6 +58,11 @@ const API_ENDPOINTS = {
       `${API_DOMAIN}/seller/products/${productId}/bulk-prices`, // POST
     AttachDeliveryOptions: (productId) =>
       `${API_DOMAIN}/seller/products/${productId}/delivery-options`, // POST
+
+    Product_Mark_As_Sold: (productId) =>
+      `${API_DOMAIN}/seller/products/${productId}/mark-sold`, // POST
+    Product_Mark_As_Unavailable: (productId) =>
+      `${API_DOMAIN}/seller/products/${productId}/mark-unavailable`, // POST
   },
 
   SERVICES: {
@@ -134,7 +139,7 @@ const API_ENDPOINTS = {
     Boosts_List: `${API_DOMAIN}/seller/boosts`, // GET
     Boost_Preview: `${API_DOMAIN}/seller/boosts/preview`, // POST
     Boost_Create: `${API_DOMAIN}/seller/boosts`, // POST
-    Boost_Update: (id) => `${API_DOMAIN}/seller/boosts/update/${id}`, 
+    Boost_Update: (id) => `${API_DOMAIN}/seller/boosts/update/${id}`,
     Single_Boost: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // GET
     Boost_Status: (id) => `${API_DOMAIN}/seller/boosts/${id}/status`, // PATCH
 
@@ -144,6 +149,9 @@ const API_ENDPOINTS = {
     Support_Create: `${API_DOMAIN}/buyer/support/tickets`, // POST
     Support_Detail: (id) => `${API_DOMAIN}/buyer/support/tickets/${id}`, // GET
     Send_Message: (id) => `${API_DOMAIN}/buyer/support/messages`, // POST
+
+    My_Points: `${API_DOMAIN}/my-points`, // GET
+    Analytics: `${API_DOMAIN}/seller/analytics`, // GET
 
   },
   GENERAL: {

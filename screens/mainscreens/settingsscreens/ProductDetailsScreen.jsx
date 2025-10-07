@@ -12,6 +12,7 @@ import {
   Dimensions,
   TextInput,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -114,12 +115,13 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const chart = chartData?.data || [];
   const stats = statisticsData?.data || {};
   const productImages = product?.images || [];
-  
+
   // Extract balance data from API response
   const shoppingBalance = balanceData?.data?.shopping_balance || 0;
 
   // Debug logging
   console.log("product qty", product.qty);
+  console.log("product quantity", product.quantity);
   console.log("Product Data:", product);
   console.log("Product ID from product object:", product?.id);
   console.log("Product ID from route params:", productId);
@@ -129,7 +131,8 @@ export default function ProductDetailsScreen({ route, navigation }) {
   console.log("Final Stats:", finalStats);
 
   // Loading states
-  const isLoading = productLoading || chartLoading || statsLoading || balanceLoading;
+  const isLoading =
+    productLoading || chartLoading || statsLoading || balanceLoading;
 
   // Error states
   const hasAuthError =
@@ -183,6 +186,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
 
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -221,7 +225,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
             style={[
               styles.hIcon,
               { borderColor: C.line, backgroundColor: C.card },
-            ]}
+            ]}P
           >
             <Ionicons name="ellipsis-vertical" size={18} color={C.text} />
           </TouchableOpacity> */}
@@ -327,7 +331,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 </ThemedText>
               )}
               <ThemedText style={{ color: C.sub, marginTop: 6 }}>
-                Qty left: {product.qty }
+                Qty left: {product.qty || product.quantity || 0}
               </ThemedText>
             </View>
           </View>
@@ -485,6 +489,16 @@ export default function ProductDetailsScreen({ route, navigation }) {
         productName={product.name || item.title || "this product"}
         C={C}
       />
+
+      {/* STATS MODAL */}
+      <StatsModal
+        visible={statsModalOpen}
+        onClose={() => setStatsModalOpen(false)}
+        stats={finalStats}
+        chart={finalSeries}
+        isLoading={statsLoading}
+        C={C}
+      />
     </SafeAreaView>
   );
 }
@@ -515,6 +529,7 @@ function ViewProductModal({
   const [active, setActive] = useState(0);
   const [tab, setTab] = useState("overview");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
   const priceNow = `₦${Number(item.price || 0).toLocaleString()}`;
   const oldPrice = item.discount_price
     ? `₦${Number(item.discount_price).toLocaleString()}`
@@ -523,6 +538,8 @@ function ViewProductModal({
   // Debug gallery info
   console.log("Gallery images:", gallery);
   console.log("Current active index:", active);
+  console.log("ViewProductModal item qty:", item.qty);
+  console.log("ViewProductModal item quantity:", item.quantity);
 
   // Check if there's a video
   const hasVideo = item.video && item.video.trim() !== "";
@@ -533,45 +550,50 @@ function ViewProductModal({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         // Only respond to horizontal swipes
-        return (
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
-          Math.abs(gestureState.dx) > 5
-        );
+        return Math.abs(gestureState.dx) > 5;
       },
       onPanResponderGrant: () => {
-        // Reset any ongoing gestures
+        console.log("Gesture started");
       },
       onPanResponderMove: (_, gestureState) => {
-        // Track the gesture but don't act on it yet
+        // Track the gesture movement
+        console.log("Gesture moving:", { dx: gestureState.dx, dy: gestureState.dy });
       },
       onPanResponderRelease: (_, gestureState) => {
-        const { dx, vx } = gestureState;
-        const threshold = 30; // Reduced threshold for easier swiping
-        const velocityThreshold = 0.2; // Reduced velocity threshold
+        const { dx, vx, dy } = gestureState;
+        const threshold = 30; // Distance threshold for swipe
+        const velocityThreshold = 0.2; // Velocity threshold for quick swipes
 
-        console.log("Swipe gesture:", {
+        console.log("Swipe gesture release:", {
           dx,
           vx,
+          dy,
           active,
           galleryLength: gallery.length,
         });
 
-        // Check if it's a valid swipe
-        if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
-          if (dx > 0) {
-            // Swipe right - go to previous image
-            if (active > 0) {
-              console.log("Swipe right - going to previous image");
-              setActive(active - 1);
-            }
-          } else if (dx < 0) {
-            // Swipe left - go to next image
-            if (active < gallery.length - 1) {
-              console.log("Swipe left - going to next image");
-              setActive(active + 1);
+        // Only respond to horizontal swipes (dx should be greater than dy)
+        if (Math.abs(dx) > Math.abs(dy)) {
+          // Check if it's a valid swipe (either distance or velocity)
+          if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
+            if (dx > 0) {
+              // Swipe right - go to previous image
+              if (active > 0) {
+                console.log("Swipe right - going to previous image");
+                setActive(active - 1);
+              }
+            } else if (dx < 0) {
+              // Swipe left - go to next image
+              if (active < gallery.length - 1) {
+                console.log("Swipe left - going to next image");
+                setActive(active + 1);
+              }
             }
           }
         }
+      },
+      onPanResponderTerminate: () => {
+        console.log("Gesture terminated");
       },
     })
   ).current;
@@ -617,34 +639,41 @@ function ViewProductModal({
           >
             Product Details
           </ThemedText>
-          <TouchableOpacity style={styles.mHeaderBtn}>
-            <Ionicons name="ellipsis-vertical" size={18} color={C.text} />
-          </TouchableOpacity>
+          <View>
+            {/* <TouchableOpacity style={styles.mHeaderBtn}>
+              <Ionicons name="ellipsis-vertical" size={18} color={C.text} />
+            </TouchableOpacity> */}
+          </View>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 24 }}
         >
-          {/* Hero image */}
+          {/* Hero image with swipe functionality */}
           <View style={styles.heroWrap} {...panResponder.panHandlers}>
             <Image source={toSrc(gallery[active])} style={styles.heroImg} />
 
-            {/* Left swipe area */}
+            {/* Swipe areas for touch navigation */}
             {active > 0 && (
               <TouchableOpacity
                 style={styles.swipeAreaLeft}
-                onPress={() => setActive(active - 1)}
-                activeOpacity={0.7}
+                onPress={() => {
+                  console.log("Left area tapped - going to previous");
+                  setActive(active - 1);
+                }}
+                activeOpacity={0.3}
               />
             )}
 
-            {/* Right swipe area */}
             {active < gallery.length - 1 && (
               <TouchableOpacity
                 style={styles.swipeAreaRight}
-                onPress={() => setActive(active + 1)}
-                activeOpacity={0.7}
+                onPress={() => {
+                  console.log("Right area tapped - going to next");
+                  setActive(active + 1);
+                }}
+                activeOpacity={0.3}
               />
             )}
 
@@ -654,12 +683,41 @@ function ViewProductModal({
               </TouchableOpacity>
             )}
 
+            {/* Swipe arrows - now clickable */}
+            {active > 0 && (
+              <TouchableOpacity 
+                style={styles.swipeArrowLeft}
+                onPress={() => {
+                  console.log("Left arrow tapped - going to previous");
+                  setActive(active - 1);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.8)" />
+              </TouchableOpacity>
+            )}
+            {active < gallery.length - 1 && (
+              <TouchableOpacity 
+                style={styles.swipeArrowRight}
+                onPress={() => {
+                  console.log("Right arrow tapped - going to next");
+                  setActive(active + 1);
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
+              </TouchableOpacity>
+            )}
+
             {/* Image indicators */}
             <View style={styles.imageIndicators}>
               {gallery.map((_, index) => (
                 <TouchableOpacity
                   key={index}
-                  onPress={() => setActive(index)}
+                  onPress={() => {
+                    console.log("Indicator tapped - going to index:", index);
+                    setActive(index);
+                  }}
                   style={[
                     styles.indicator,
                     {
@@ -685,7 +743,10 @@ function ViewProductModal({
             {gallery.map((g, i) => (
               <TouchableOpacity
                 key={i}
-                onPress={() => setActive(i)}
+                onPress={() => {
+                  console.log("Thumbnail tapped - going to index:", i);
+                  setActive(i);
+                }}
                 style={[
                   styles.thumb,
                   {
@@ -861,7 +922,7 @@ function ViewProductModal({
                         fontSize: 14,
                       }}
                     >
-                      {item.qty }
+                      {item.qty || item.quantity || 0}
                     </ThemedText>
 
                     <View
@@ -885,7 +946,7 @@ function ViewProductModal({
                             fontSize: 18,
                           }}
                         >
-                          {item.qty }
+                          {item.qty || item.quantity || 0}
                         </ThemedText>
                       </View>
 
@@ -926,7 +987,10 @@ function ViewProductModal({
                       style={{ width: 18, height: 20 }}
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.circleIconBtn]}>
+                  <TouchableOpacity 
+                    style={[styles.circleIconBtn]}
+                    onPress={() => setStatsModalOpen(true)}
+                  >
                     <Image
                       source={IMG_STATS}
                       style={{ width: 18, height: 18 }}
@@ -1083,6 +1147,28 @@ function ViewProductModal({
           productName={item.name || item.title || "this product"}
           C={C}
         />
+
+        {/* Stats Modal */}
+        <StatsModal
+          visible={statsModalOpen}
+          onClose={() => setStatsModalOpen(false)}
+          stats={{
+            impressions: 0,
+            views: 0,
+            profileClicks: 0,
+            inCart: 0,
+            completed: 0,
+            chats: 0,
+          }}
+          chart={{
+            labels: ["N/A"],
+            impressions: [0],
+            visitors: [0],
+            orders: [0],
+          }}
+          isLoading={false}
+          C={C}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -1211,7 +1297,6 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
     </Modal>
   );
 }
-
 
 /* ───────── Step 5a: Boost Setup ───────── */
 
@@ -1393,20 +1478,20 @@ function BoostSetupModal({
           <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.proceedBtn, { backgroundColor: C.primary }]}
-             onPress={() => {
-               if (!location || !daily || !days) {
-                 alert("Please select location, daily budget and duration");
-                 return;
-               }
-               const payload = {
-                 product_id: item?.id || productId, // item or productId available
-                 location,
-                 budget: daily, // Changed from daily_budget to budget
-                 duration: days,
-               };
-               console.log("Preview Boost Payload:", payload);
-               previewMutation.mutate(payload);
-             }}
+            onPress={() => {
+              if (!location || !daily || !days) {
+                alert("Please select location, daily budget and duration");
+                return;
+              }
+              const payload = {
+                product_id: item?.id || productId, // item or productId available
+                location,
+                budget: daily, // Changed from daily_budget to budget
+                duration: days,
+              };
+              console.log("Preview Boost Payload:", payload);
+              previewMutation.mutate(payload);
+            }}
           >
             <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
               Proceed
@@ -1704,8 +1789,11 @@ function ReviewAdModal({
               // Use preview total if available; otherwise fallback to daily * days.
               const walletBalance = Number(shoppingBalance) || 0;
               const previewTotal = Number(totalAmount) || 0;
-              const fallbackTotal = Math.round((Number(daily) || 0) * (Number(days) || 0));
-              const requiredAmount = previewTotal > 0 ? previewTotal : fallbackTotal;
+              const fallbackTotal = Math.round(
+                (Number(daily) || 0) * (Number(days) || 0)
+              );
+              const requiredAmount =
+                previewTotal > 0 ? previewTotal : fallbackTotal;
               if (walletBalance < requiredAmount) {
                 alert("Insufficient balance. Please top up your wallet.");
                 return;
@@ -1716,7 +1804,7 @@ function ReviewAdModal({
                 location: location,
                 duration: days,
                 budget: daily,
-                start_date: new Date().toISOString().split('T')[0],
+                start_date: new Date().toISOString().split("T")[0],
                 payment_method: "wallet",
               };
               console.log("Create Boost Payload:", payload);
@@ -2163,8 +2251,6 @@ function BudgetEditSheet({ visible, onClose, onSave, color = "#EF4444" }) {
 //   );
 // }
 
-
-
 function SliderRow({
   value,
   setValue,
@@ -2220,7 +2306,9 @@ function SliderRow({
         style={{ height: 28, justifyContent: "center" }}
       >
         {/* Track */}
-        <View style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }} />
+        <View
+          style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }}
+        />
 
         {/* Filled portion */}
         <View
@@ -2254,7 +2342,13 @@ function SliderRow({
         <View
           {...pan.panHandlers}
           pointerEvents="box-only"
-          style={{ position: "absolute", left: 0, right: 0, top: -12, height: 40 }}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: -12,
+            height: 40,
+          }}
         />
       </View>
 
@@ -2264,7 +2358,6 @@ function SliderRow({
     </View>
   );
 }
-
 
 /* ───────── Small comps ───────── */
 
@@ -2851,6 +2944,32 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
 
+  // Swipe arrows
+  swipeArrowLeft: {
+    position: "absolute",
+    left: 16,
+    top: "50%",
+    marginTop: -12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  swipeArrowRight: {
+    position: "absolute",
+    right: 16,
+    top: "50%",
+    marginTop: -12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   // Delete modal
   deleteModalContainer: {
     flex: 1,
@@ -2919,4 +3038,261 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
     // Animation will be handled by React Native's built-in spinner
   },
+
+  // Stats Modal Styles
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  backBtn: {
+    padding: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#000",
+  },
+  statsCard: {
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  statItem: {
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  chartCard: {
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  chartLegend: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  chartData: {
+    gap: 8,
+  },
+  chartRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  chartLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    width: 60,
+  },
+  chartBars: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 2,
+    height: 20,
+  },
+  chartBar: {
+    height: "100%",
+    borderRadius: 2,
+    minWidth: 2,
+  },
 });
+
+/* ───────── Stats Modal ───────── */
+function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={C.text} />
+          </TouchableOpacity>
+          <ThemedText style={styles.modalTitle}>Product Statistics</ThemedText>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={C.primary} />
+              <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+                Loading statistics...
+              </ThemedText>
+            </View>
+          ) : (
+            <>
+              {/* Stats Cards */}
+              <View style={{ padding: 16, gap: 12 }}>
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                        {stats.impressions?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Impressions
+                      </ThemedText>
+                    </View>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                        {stats.views?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Views
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                        {stats.profileClicks?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Profile Clicks
+                      </ThemedText>
+                    </View>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                        {stats.inCart?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Added to Cart
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.statsCard, { backgroundColor: C.card }]}>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                        {stats.completed?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Orders
+                      </ThemedText>
+                    </View>
+                    <View style={styles.statItem}>
+                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                        {stats.chats?.toLocaleString() || "0"}
+                      </ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: C.sub }]}>
+                        Chats
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Chart Section */}
+              {chart.labels.length > 0 && chart.labels[0] !== "N/A" && (
+                <View style={{ padding: 16 }}>
+                  <ThemedText style={[styles.chartTitle, { color: C.text }]}>
+                    Performance Over Time
+                  </ThemedText>
+                  <View style={[styles.chartCard, { backgroundColor: C.card }]}>
+                    <View style={styles.chartLegend}>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: C.primary }]} />
+                        <ThemedText style={[styles.legendText, { color: C.sub }]}>
+                          Impressions
+                        </ThemedText>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: "#10B981" }]} />
+                        <ThemedText style={[styles.legendText, { color: C.sub }]}>
+                          Visitors
+                        </ThemedText>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendColor, { backgroundColor: "#F59E0B" }]} />
+                        <ThemedText style={[styles.legendText, { color: C.sub }]}>
+                          Orders
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.chartData}>
+                      {chart.labels.map((label, index) => (
+                        <View key={index} style={styles.chartRow}>
+                          <ThemedText style={[styles.chartLabel, { color: C.sub }]}>
+                            Day {label}
+                          </ThemedText>
+                          <View style={styles.chartBars}>
+                            <View style={[styles.chartBar, { 
+                              backgroundColor: C.primary, 
+                              width: `${Math.min(100, (chart.impressions[index] / Math.max(...chart.impressions)) * 100)}%` 
+                            }]} />
+                            <View style={[styles.chartBar, { 
+                              backgroundColor: "#10B981", 
+                              width: `${Math.min(100, (chart.visitors[index] / Math.max(...chart.visitors)) * 100)}%` 
+                            }]} />
+                            <View style={[styles.chartBar, { 
+                              backgroundColor: "#F59E0B", 
+                              width: `${Math.min(100, (chart.orders[index] / Math.max(...chart.orders)) * 100)}%` 
+                            }]} />
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
