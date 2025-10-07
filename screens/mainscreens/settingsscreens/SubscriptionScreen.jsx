@@ -175,6 +175,7 @@ function PaymentMethodSheet({
   isLoading,
   walletAmount = 0,
   balanceLoading = false,
+  onTopUp,
 }) {
   const [selected, setSelected] = useState("wallet"); // 'flutterwave' | 'wallet' | 'card'
   const [hasCard, setHasCard] = useState(false);
@@ -221,7 +222,10 @@ function PaymentMethodSheet({
               </ThemedText>
             )}
 
-            <TouchableOpacity style={styles.topUp}>
+            <TouchableOpacity 
+              style={styles.topUp}
+              onPress={onTopUp}
+            >
               <ThemedText style={{ color: "#fff", fontSize: 12 }}>
                 Top Up
               </ThemedText>
@@ -238,12 +242,12 @@ function PaymentMethodSheet({
             }}
             showsVerticalScrollIndicator={false}
           >
-            <OptionRow
+            {/* <OptionRow
               icon="color-filter-outline"
               label="Flutterwave"
               active={selected === "flutterwave"}
               onPress={() => setSelected("flutterwave")}
-            />
+            /> */}
 
             <OptionRow
               icon="card-outline"
@@ -337,17 +341,41 @@ export default function SubscriptionScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user, token: authToken } = useAuth();
+  
+  // Debug navigation object creation
+  console.log("SubscriptionScreen - navigation object created:", navigation);
+  console.log("SubscriptionScreen - navigation type:", typeof navigation);
+  console.log("SubscriptionScreen - navigation.navigate:", navigation?.navigate);
   const [onboardingToken, setOnboardingToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showPay, setShowPay] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("wallet");
+
+  // Navigation handler for Flutterwave Top Up
+  const handleTopUpNavigation = () => {
+    console.log("handleTopUpNavigation called from SubscriptionScreen");
+    console.log("handleTopUpNavigation - navigation object:", navigation);
+    console.log("handleTopUpNavigation - navigation.navigate:", navigation?.navigate);
+    
+    if (navigation && navigation.navigate) {
+      console.log("handleTopUpNavigation - navigating to FlutterwaveWebView");
+      navigation.navigate('FlutterwaveWebView', {
+        amount: 1000,
+        order_id: `topup_${Date.now()}`,
+        isTopUp: true
+      });
+    } else {
+      console.error('Navigation not available in handleTopUpNavigation');
+      Alert.alert('Error', 'Navigation not available');
+    }
+  };
+
   // choose which balance you want to show in the sheet:
 const walletAmount =
   balanceData?.data?.escrow_balance ??
   balanceData?.data?.shopping_balance ??
   0;
-
 
   const BG = require("../../../assets/baaloon.png");
 
@@ -602,8 +630,9 @@ const walletAmount =
         onPaymentMethodSelect={handlePaymentMethodSelect}
         onSubscribe={handleSubscribe}
         isLoading={addSubscriptionMutation.isPending}
-        walletAmount={walletAmount}     // ← NEW
+        walletAmount={walletAmount}
         balanceLoading={balanceLoading}
+        onTopUp={handleTopUpNavigation}
       />
     </SafeAreaView>
   );
