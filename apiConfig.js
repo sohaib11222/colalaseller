@@ -63,16 +63,24 @@ const API_ENDPOINTS = {
       `${API_DOMAIN}/seller/products/${productId}/mark-sold`, // POST
     Product_Mark_As_Unavailable: (productId) =>
       `${API_DOMAIN}/seller/products/${productId}/mark-unavailable`, // POST
+
+
   },
 
   SERVICES: {
-    GetAll: `${API_DOMAIN}/seller/service`, // GET
+    GetAll: `${API_DOMAIN}/seller/services/my-services`, // GET
     Service_Details: (id) => `${API_DOMAIN}/seller/service/${id}`, // GET
     Get_Service_Chart_Data: (id) => `${API_DOMAIN}/seller/services/${id}/stats`, // GET
     Get_Service_Statistics: (id) => `${API_DOMAIN}/seller/services/${id}/stats/totals`, // GET
     Create: `${API_DOMAIN}/seller/service/create`, // POST
     Update: (id) => `${API_DOMAIN}/seller/service/update/${id}`, // POST
     Delete: (id) => `${API_DOMAIN}/seller/service/delete/${id}`, // DELETE
+
+    Service_Mark_As_Unavailable: (serviceId) =>
+      `${API_DOMAIN}/seller/services/${serviceId}/mark-unavailable`, // POST
+    
+    Service_Mark_As_Available: (serviceId) =>
+      `${API_DOMAIN}/seller/services/${serviceId}/mark-available`, // POST
   },
 
   POSTS: {
@@ -152,6 +160,10 @@ const API_ENDPOINTS = {
 
     My_Points: `${API_DOMAIN}/my-points`, // GET
     Analytics: `${API_DOMAIN}/seller/analytics`, // GET
+    loyaltiyPoints: `${API_DOMAIN}/seller/loyalty/customers`, // GET
+    Get_loyaltiy_Setting: `${API_DOMAIN}/seller/loyalty/settings`, // GET
+    Update_loyaltiy_Setting: `${API_DOMAIN}/seller/loyalty/settings`, // POST
+
 
   },
   GENERAL: {

@@ -840,9 +840,9 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
             </ThemedText>
           </View>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity style={styles.squareBtn} onPress={onEdit}>
+          {/* <TouchableOpacity style={styles.squareBtn} onPress={onEdit}>
             <Image source={ICON_EDIT} style={{ width: 18, height: 18 }} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity
             onPress={handleMorePress}
             hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}

@@ -63,3 +63,10 @@ export const getMyPoints = async (token) =>
 
 export const getAnalytics = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Analytics, "GET", undefined, token);
+
+export const getLoyaltiyPoints = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.loyaltiyPoints, "GET", undefined, token);
+
+export const getLoyaltiySetting = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Get_loyaltiy_Setting, "GET", undefined, token);
+

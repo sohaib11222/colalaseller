@@ -13,6 +13,7 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -45,6 +46,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { previewBoost, createBoost } from "../../../utils/mutations/settings";
 import { getBalance } from "../../../utils/queries/settings";
+import { markAsUnavailable } from "../../../utils/mutations/products";
+
 export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
   const productId = route?.params?.id || item?.id;
@@ -98,6 +101,20 @@ export default function ProductDetailsScreen({ route, navigation }) {
     },
     onError: (error) => {
       console.error("❌ Balance API call failed:", error);
+    },
+  });
+
+  // Mark as unavailable mutation
+  const markAsUnavailableMutation = useMutation({
+    mutationFn: () => markAsUnavailable(productId, token),
+    onSuccess: () => {
+      Alert.alert("Success", "Product has been marked as unavailable");
+      // Optionally refresh the product data
+      queryClient.invalidateQueries(["productDetails", productId]);
+    },
+    onError: (error) => {
+      console.error("Error marking product as unavailable:", error);
+      Alert.alert("Error", "Failed to mark product as unavailable");
     },
   });
 
@@ -450,11 +467,46 @@ export default function ProductDetailsScreen({ route, navigation }) {
             ))}
           </View>
 
-          {/* bottom action */}
-          <TouchableOpacity
-            style={[
-              styles.bottomBtn,
-              { borderColor: "#EF4444", backgroundColor: C.card },
+          {/* bottom actions */}
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
+            <TouchableOpacity
+              style={[
+                styles.bottomBtn,
+                { 
+                  borderColor: "#6B7280", 
+                  backgroundColor: C.card, 
+                  flex: 1,
+                  opacity: markAsUnavailableMutation.isPending ? 0.6 : 1
+                },
+              ]}
+              onPress={() => {
+                Alert.alert(
+                  "Mark as Unavailable",
+                  "Are you sure you want to mark this product as unavailable? This will hide it from customers.",
+                  [
+                    {
+                      text: "Cancel",
+                      style: "cancel"
+                    },
+                    {
+                      text: "Mark as Unavailable",
+                      style: "destructive",
+                      onPress: () => markAsUnavailableMutation.mutate()
+                    }
+                  ]
+                );
+              }}
+              disabled={markAsUnavailableMutation.isPending}
+            >
+              <ThemedText style={{ color: "#6B7280", fontWeight: "700" }}>
+                Mark as Unavailable
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.bottomBtn,
+                { borderColor: "#EF4444", backgroundColor: C.card, flex: 1 },
             ]}
             onPress={() => setDeleteModalOpen(true)}
           >
@@ -462,6 +514,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
               Delete Product
             </ThemedText>
           </TouchableOpacity>
+          </View>
         </ScrollView>
       )}
 
@@ -557,7 +610,10 @@ function ViewProductModal({
       },
       onPanResponderMove: (_, gestureState) => {
         // Track the gesture movement
-        console.log("Gesture moving:", { dx: gestureState.dx, dy: gestureState.dy });
+        console.log("Gesture moving:", {
+          dx: gestureState.dx,
+          dy: gestureState.dy,
+        });
       },
       onPanResponderRelease: (_, gestureState) => {
         const { dx, vx, dy } = gestureState;
@@ -575,18 +631,18 @@ function ViewProductModal({
         // Only respond to horizontal swipes (dx should be greater than dy)
         if (Math.abs(dx) > Math.abs(dy)) {
           // Check if it's a valid swipe (either distance or velocity)
-          if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
-            if (dx > 0) {
-              // Swipe right - go to previous image
-              if (active > 0) {
-                console.log("Swipe right - going to previous image");
-                setActive(active - 1);
-              }
-            } else if (dx < 0) {
-              // Swipe left - go to next image
-              if (active < gallery.length - 1) {
-                console.log("Swipe left - going to next image");
-                setActive(active + 1);
+        if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
+          if (dx > 0) {
+            // Swipe right - go to previous image
+            if (active > 0) {
+              console.log("Swipe right - going to previous image");
+              setActive(active - 1);
+            }
+          } else if (dx < 0) {
+            // Swipe left - go to next image
+            if (active < gallery.length - 1) {
+              console.log("Swipe left - going to next image");
+              setActive(active + 1);
               }
             }
           }
@@ -685,7 +741,7 @@ function ViewProductModal({
 
             {/* Swipe arrows - now clickable */}
             {active > 0 && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.swipeArrowLeft}
                 onPress={() => {
                   console.log("Left arrow tapped - going to previous");
@@ -693,11 +749,15 @@ function ViewProductModal({
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="chevron-back" size={24} color="rgba(255,255,255,0.8)" />
+                <Ionicons
+                  name="chevron-back"
+                  size={24}
+                  color="rgba(255,255,255,0.8)"
+                />
               </TouchableOpacity>
             )}
             {active < gallery.length - 1 && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.swipeArrowRight}
                 onPress={() => {
                   console.log("Right arrow tapped - going to next");
@@ -705,7 +765,11 @@ function ViewProductModal({
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
+                <Ionicons
+                  name="chevron-forward"
+                  size={24}
+                  color="rgba(255,255,255,0.8)"
+                />
               </TouchableOpacity>
             )}
 
@@ -987,7 +1051,7 @@ function ViewProductModal({
                       style={{ width: 18, height: 20 }}
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.circleIconBtn]}
                     onPress={() => setStatsModalOpen(true)}
                   >
@@ -3175,7 +3239,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                 <View style={[styles.statsCard, { backgroundColor: C.card }]}>
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
                         {stats.impressions?.toLocaleString() || "0"}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
@@ -3183,7 +3249,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                       </ThemedText>
                     </View>
                     <View style={styles.statItem}>
-                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
                         {stats.views?.toLocaleString() || "0"}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
@@ -3196,7 +3264,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                 <View style={[styles.statsCard, { backgroundColor: C.card }]}>
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
                         {stats.profileClicks?.toLocaleString() || "0"}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
@@ -3204,7 +3274,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                       </ThemedText>
                     </View>
                     <View style={styles.statItem}>
-                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
                         {stats.inCart?.toLocaleString() || "0"}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
@@ -3217,7 +3289,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                 <View style={[styles.statsCard, { backgroundColor: C.card }]}>
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
                         {stats.completed?.toLocaleString() || "0"}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
@@ -3225,7 +3299,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                       </ThemedText>
                     </View>
                     <View style={styles.statItem}>
-                      <ThemedText style={[styles.statValue, { color: C.primary }]}>
+                      <ThemedText
+                        style={[styles.statValue, { color: C.primary }]}
+                      >
                         {stats.chats?.toLocaleString() || "0"}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
@@ -3245,20 +3321,41 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                   <View style={[styles.chartCard, { backgroundColor: C.card }]}>
                     <View style={styles.chartLegend}>
                       <View style={styles.legendItem}>
-                        <View style={[styles.legendColor, { backgroundColor: C.primary }]} />
-                        <ThemedText style={[styles.legendText, { color: C.sub }]}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            { backgroundColor: C.primary },
+                          ]}
+                        />
+                        <ThemedText
+                          style={[styles.legendText, { color: C.sub }]}
+                        >
                           Impressions
                         </ThemedText>
                       </View>
                       <View style={styles.legendItem}>
-                        <View style={[styles.legendColor, { backgroundColor: "#10B981" }]} />
-                        <ThemedText style={[styles.legendText, { color: C.sub }]}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            { backgroundColor: "#10B981" },
+                          ]}
+                        />
+                        <ThemedText
+                          style={[styles.legendText, { color: C.sub }]}
+                        >
                           Visitors
                         </ThemedText>
                       </View>
                       <View style={styles.legendItem}>
-                        <View style={[styles.legendColor, { backgroundColor: "#F59E0B" }]} />
-                        <ThemedText style={[styles.legendText, { color: C.sub }]}>
+                        <View
+                          style={[
+                            styles.legendColor,
+                            { backgroundColor: "#F59E0B" },
+                          ]}
+                        />
+                        <ThemedText
+                          style={[styles.legendText, { color: C.sub }]}
+                        >
                           Orders
                         </ThemedText>
                       </View>
@@ -3266,22 +3363,54 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                     <View style={styles.chartData}>
                       {chart.labels.map((label, index) => (
                         <View key={index} style={styles.chartRow}>
-                          <ThemedText style={[styles.chartLabel, { color: C.sub }]}>
+                          <ThemedText
+                            style={[styles.chartLabel, { color: C.sub }]}
+                          >
                             Day {label}
                           </ThemedText>
                           <View style={styles.chartBars}>
-                            <View style={[styles.chartBar, { 
-                              backgroundColor: C.primary, 
-                              width: `${Math.min(100, (chart.impressions[index] / Math.max(...chart.impressions)) * 100)}%` 
-                            }]} />
-                            <View style={[styles.chartBar, { 
-                              backgroundColor: "#10B981", 
-                              width: `${Math.min(100, (chart.visitors[index] / Math.max(...chart.visitors)) * 100)}%` 
-                            }]} />
-                            <View style={[styles.chartBar, { 
-                              backgroundColor: "#F59E0B", 
-                              width: `${Math.min(100, (chart.orders[index] / Math.max(...chart.orders)) * 100)}%` 
-                            }]} />
+                            <View
+                              style={[
+                                styles.chartBar,
+                                {
+                                  backgroundColor: C.primary,
+                                  width: `${Math.min(
+                                    100,
+                                    (chart.impressions[index] /
+                                      Math.max(...chart.impressions)) *
+                                      100
+                                  )}%`,
+                                },
+                              ]}
+                            />
+                            <View
+                              style={[
+                                styles.chartBar,
+                                {
+                                  backgroundColor: "#10B981",
+                                  width: `${Math.min(
+                                    100,
+                                    (chart.visitors[index] /
+                                      Math.max(...chart.visitors)) *
+                                      100
+                                  )}%`,
+                                },
+                              ]}
+                            />
+                            <View
+                              style={[
+                                styles.chartBar,
+                                {
+                                  backgroundColor: "#F59E0B",
+                                  width: `${Math.min(
+                                    100,
+                                    (chart.orders[index] /
+                                      Math.max(...chart.orders)) *
+                                      100
+                                  )}%`,
+                                },
+                              ]}
+                            />
                           </View>
                         </View>
                       ))}
