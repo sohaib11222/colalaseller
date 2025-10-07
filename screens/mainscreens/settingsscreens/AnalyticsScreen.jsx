@@ -223,7 +223,7 @@ const CARD_W = (width - 12 * 2 - 10) / 2; // 2 columns
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 25,
+    paddingTop: 35,
     paddingBottom: 10,
     paddingHorizontal: 12,
     borderBottomWidth: 1,

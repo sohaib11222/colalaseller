@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
+import { StatusBar } from "expo-status-bar";
 
 /* ----------------------- MOCK ----------------------- */
 const AV =
@@ -51,7 +52,8 @@ export default function AccessControlScreen() {
   const removeUser = (id) => setUsers((u) => u.filter((x) => x.id !== id));
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={[""]}>
+      <StatusBar style="dark" />
       {/* Header */}
       <View
         style={[
@@ -356,7 +358,7 @@ function shadow(e = 6) {
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 20,
+    paddingTop: 35,
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,

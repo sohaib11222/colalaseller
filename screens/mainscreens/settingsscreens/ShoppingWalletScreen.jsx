@@ -670,7 +670,7 @@ function shadow(e = 6) {
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 25,
+    paddingTop: 35,
     paddingBottom: 10,
     paddingHorizontal: 16,
     borderBottomWidth: 1,

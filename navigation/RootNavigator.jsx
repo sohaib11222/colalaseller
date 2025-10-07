@@ -46,9 +46,15 @@ const Stack = createNativeStackNavigator();
 export default function RootNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log('RootNavigator render:', { isAuthenticated, isLoading });
+
   // Show loading screen while checking authentication
   if (isLoading) {
-    return null; // You can add a loading screen here if needed
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
+        <Text style={{ fontSize: 16 }}>Loading authentication...</Text>
+      </View>
+    );
   }
 
   return (

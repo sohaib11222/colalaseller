@@ -198,8 +198,8 @@ export default function ChatListScreen({ navigation }) {
     ) : null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={[""]}>
+      <StatusBar style='light' />
       {/* SOLID header (no gradient) */}
       <View style={[styles.header, { backgroundColor: C.primary }]}>
         <View style={styles.headerRow}>

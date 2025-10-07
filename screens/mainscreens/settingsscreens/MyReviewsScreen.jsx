@@ -23,6 +23,7 @@ import { useTheme } from "../../../components/ThemeProvider";
 import { useQuery } from "@tanstack/react-query";
 import { getReviews } from "../../../utils/queries/settings";
 import { useAuth } from "../../../contexts/AuthContext";
+import { StatusBar } from "expo-status-bar";
 
 
 
@@ -223,7 +224,8 @@ export default function MyReviewsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={[""]}>
+      <StatusBar style="dark" />
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: C.line }]}>
         <View style={styles.headerRow}>
@@ -400,7 +402,7 @@ const styles = StyleSheet.create({
   /* Header */
   header: {
     backgroundColor: "#fff",
-    paddingTop: 25,
+    paddingTop: 35,
     paddingBottom: 10,
     paddingHorizontal: 16,
     borderBottomWidth: 1,

@@ -831,7 +831,7 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1,
-    height: 46,
+    height: 60,
     borderRadius: 12,
     paddingHorizontal: 12,
     alignItems: "center",

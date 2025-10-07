@@ -137,7 +137,7 @@ export default function SupportScreen() {
   }, [tickets, tab, query]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg,  }} edges={[""]}>
       <StatusBar style="light" />
       {/* Header (red, rounded bottom, with search inside) */}
       <View style={[styles.header, { backgroundColor: C.primary }]}>
@@ -164,23 +164,19 @@ export default function SupportScreen() {
 
           {/* ✅ Notification button now navigates to Notification screen */}
           <TouchableOpacity
-            style={styles.circleBtn}
-            onPress={() => {
-              try {
-                console.log("Navigating to Notification screen");
-                // If Notification screen is nested (e.g., inside ChatNavigator)
-                navigation.navigate("ChatNavigator", {
-                  screen: "Notification",
-                });
-
-                // 👉 OR if it’s a direct route, just use:
-                // navigation.navigate("Notification");
-              } catch (error) {
-                console.error("Navigation error:", error);
-              }
-            }}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Notification",
+              })
+            }
+            style={[styles.iconButton, styles.iconPill]}
+            accessibilityRole="button"
+            accessibilityLabel="Open notifications"
           >
-            <Ionicons name="notifications-outline" size={18} color={C.text} />
+            <Image
+              source={require("../../../assets/bell-icon.png")}
+              style={styles.iconImg}
+            />
           </TouchableOpacity>
         </View>
 
@@ -199,7 +195,7 @@ export default function SupportScreen() {
             style={[styles.searchInput, { color: C.text }]}
           />
           <TouchableOpacity style={styles.searchIconBtn}>
-            <Ionicons name="camera-outline" size={20} color="#111" />
+            {/* <Ionicons name="camera-outline" size={20} color="#111" /> */}
           </TouchableOpacity>
         </View>
       </View>
@@ -284,10 +280,10 @@ export default function SupportScreen() {
                 {query.trim()
                   ? "No tickets found matching your search. Try a different search term."
                   : tab === "pending"
-                  ? "No pending tickets at the moment."
-                  : tab === "resolved"
-                  ? "No resolved tickets yet."
-                  : "You haven't created any support tickets yet. Tap the + button to create one."}
+                    ? "No pending tickets at the moment."
+                    : tab === "resolved"
+                      ? "No resolved tickets yet."
+                      : "You haven't created any support tickets yet. Tap the + button to create one."}
               </ThemedText>
             </View>
           }
@@ -370,9 +366,9 @@ const TabPill = ({ label, active, onPress, C }) => (
       active
         ? [styles.tabActive, { backgroundColor: C.primary }]
         : [
-            styles.tabInactive,
-            { backgroundColor: C.card, borderColor: C.line },
-          ],
+          styles.tabInactive,
+          { backgroundColor: C.card, borderColor: C.line },
+        ],
     ]}
     activeOpacity={0.9}
   >
@@ -408,7 +404,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     paddingHorizontal: 16,
     borderBottomLeftRadius: 26,
-    paddingTop: 10,
+    paddingTop: 35,
     borderBottomRightRadius: 26,
   },
   headerTopRow: {
@@ -420,7 +416,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 20,
     marginLeft: -180,
     fontWeight: "700",
     // fontStyle: "italic",
@@ -436,7 +432,7 @@ const styles = StyleSheet.create({
   },
 
   searchWrap: {
-    height: 48,
+    height: 60,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
@@ -590,6 +586,11 @@ const styles = StyleSheet.create({
   statusTextClosed: {
     color: "#059669",
   },
+  iconButton: { marginLeft: 9 },
+  iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
+
+  // If your PNGs are already colored, remove tintColor.
+  iconImg: { width: 22, height: 22, resizeMode: "contain" },
   unreadBadge: {
     borderRadius: 10,
     minWidth: 20,

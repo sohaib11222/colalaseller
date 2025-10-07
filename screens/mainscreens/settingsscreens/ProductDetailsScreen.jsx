@@ -114,7 +114,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const chart = chartData?.data || [];
   const stats = statisticsData?.data || {};
   const productImages = product?.images || [];
-
+  
   // Extract balance data from API response
   const shoppingBalance = balanceData?.data?.shopping_balance || 0;
 
@@ -169,17 +169,17 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const finalSeries =
     chart.length > 0
       ? {
-        labels: chart.map((_, i) => String(i + 1)),
-        impressions: chart.map((item) => item.impressions || 0),
-        visitors: chart.map((item) => item.visitors || 0),
-        orders: chart.map((item) => item.orders || 0),
-      }
+          labels: chart.map((_, i) => String(i + 1)),
+          impressions: chart.map((item) => item.impressions || 0),
+          visitors: chart.map((item) => item.visitors || 0),
+          orders: chart.map((item) => item.orders || 0),
+        }
       : {
-        labels: ["N/A"],
-        impressions: [0],
-        visitors: [0],
-        orders: [0],
-      };
+          labels: ["N/A"],
+          impressions: [0],
+          visitors: [0],
+          orders: [0],
+        };
 
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -298,7 +298,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 productImages[0]?.path
                   ? `https://colala.hmstech.xyz/storage/${productImages[0].path}`
                   : item.image ||
-                  "https://via.placeholder.com/118x93?text=No+Image"
+                      "https://via.placeholder.com/118x93?text=No+Image"
               )}
               style={styles.summaryImg}
             />
@@ -327,7 +327,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 </ThemedText>
               )}
               <ThemedText style={{ color: C.sub, marginTop: 6 }}>
-                Qty left: {product.qty}
+                Qty left: {product.qty }
               </ThemedText>
             </View>
           </View>
@@ -507,10 +507,10 @@ function ViewProductModal({
     images.length > 0
       ? images.map((img) => `https://colala.hmstech.xyz/storage/${img.path}`)
       : [
-        item.image,
-        "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
-        "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
-      ];
+          item.image,
+          "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
+          "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
+        ];
 
   const [active, setActive] = useState(0);
   const [tab, setTab] = useState("overview");
@@ -586,21 +586,6 @@ function ViewProductModal({
   const [dailyBudget, setDailyBudget] = useState(2000);
   const [boostDays, setBoostDays] = useState(20);
 
-  useEffect(() => {
-    const params = route?.params || {};
-    if (params.openBoostFlow) {
-      // open the full view first (so UI matches your normal path)
-      setViewOpen(true);
-      // then open the Boost flow just after that for a smooth UX
-      setTimeout(() => setBoostOpen(true), 250);
-
-      // prefill from incoming preset, if provided
-      const preset = params.boostPreset || {};
-      if (preset.location) setBoostLocation(String(preset.location));
-      if (preset.budget) setDailyBudget(Number(preset.budget));
-      if (preset.duration) setBoostDays(Number(preset.duration));
-    }
-  }, [route?.params?.openBoostFlow]);
   const openSetup = () => {
     setBoostOpen(false);
     setTimeout(() => setSetupOpen(true), 220);
@@ -876,14 +861,14 @@ function ViewProductModal({
                         fontSize: 14,
                       }}
                     >
-                      {item.qty}
+                      {item.qty }
                     </ThemedText>
 
                     <View
                       style={{ flexDirection: "row", alignItems: "center" }}
                     >
                       <TouchableOpacity
-                        onPress={() => { }}
+                        onPress={() => {}}
                         style={[
                           styles.qtySquare,
                           { backgroundColor: C.primary },
@@ -900,12 +885,12 @@ function ViewProductModal({
                             fontSize: 18,
                           }}
                         >
-                          {item.qty}
+                          {item.qty }
                         </ThemedText>
                       </View>
 
                       <TouchableOpacity
-                        onPress={() => { }}
+                        onPress={() => {}}
                         style={[
                           styles.qtySquare,
                           { backgroundColor: C.primary },
@@ -1227,6 +1212,7 @@ function BoostSheet({ visible, onClose, onProceed, C, imgLocal }) {
   );
 }
 
+
 /* ───────── Step 5a: Boost Setup ───────── */
 
 function BoostSetupModal({
@@ -1407,20 +1393,20 @@ function BoostSetupModal({
           <TouchableOpacity
             activeOpacity={0.9}
             style={[styles.proceedBtn, { backgroundColor: C.primary }]}
-            onPress={() => {
-              if (!location || !daily || !days) {
-                alert("Please select location, daily budget and duration");
-                return;
-              }
-              const payload = {
-                product_id: item?.id || productId, // item or productId available
-                location,
-                budget: daily, // Changed from daily_budget to budget
-                duration: days,
-              };
-              console.log("Preview Boost Payload:", payload);
-              previewMutation.mutate(payload);
-            }}
+             onPress={() => {
+               if (!location || !daily || !days) {
+                 alert("Please select location, daily budget and duration");
+                 return;
+               }
+               const payload = {
+                 product_id: item?.id || productId, // item or productId available
+                 location,
+                 budget: daily, // Changed from daily_budget to budget
+                 duration: days,
+               };
+               console.log("Preview Boost Payload:", payload);
+               previewMutation.mutate(payload);
+             }}
           >
             <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
               Proceed
@@ -1603,7 +1589,7 @@ function ReviewAdModal({
                   product?.images?.[0]?.url || product?.images?.[0]?.path
                     ? `https://colala.hmstech.xyz/storage/${product.images[0].path}`
                     : item.image ||
-                    "https://via.placeholder.com/300x300?text=No+Image"
+                        "https://via.placeholder.com/300x300?text=No+Image"
                 )}
                 style={{ width: "100%", height: 150 }}
                 resizeMode="cover"
@@ -1635,8 +1621,9 @@ function ReviewAdModal({
           {/* Budget row */}
           <RowTile
             icon="cash-outline"
-            text={`₦${Number(daily).toLocaleString()} for ${days} day${days > 1 ? "s" : ""
-              }`}
+            text={`₦${Number(daily).toLocaleString()} for ${days} day${
+              days > 1 ? "s" : ""
+            }`}
             trailingIcon="create-outline"
           />
 
@@ -2020,6 +2007,164 @@ function BudgetEditSheet({ visible, onClose, onSave, color = "#EF4444" }) {
 
 /* ───────── Tiny slider ───────── */
 
+// function SliderRow({
+//   value,
+//   setValue,
+//   min,
+//   max,
+//   step = 1,
+//   color = "#EF4444",
+//   format = (v) => String(v),
+// }) {
+//   const [width, setWidth] = useState(0);
+//   const [isDragging, setIsDragging] = useState(false);
+
+//   // Calculate position as percentage
+//   const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+//   const thumbPosition = width * pct;
+
+//   const clamp = (num, minN, maxN) => Math.min(Math.max(num, minN), maxN);
+//   const roundToStep = (num, stepN) => Math.round(num / stepN) * stepN;
+
+//   const responder = useRef(
+//     PanResponder.create({
+//       onStartShouldSetPanResponder: () => true,
+//       onMoveShouldSetPanResponder: () => true,
+//       onPanResponderGrant: (evt, gestureState) => {
+//         console.log("Slider: Pan started", { value, min, max, width });
+//         setIsDragging(true);
+//       },
+//       onPanResponderMove: (evt, gestureState) => {
+//         if (width === 0) {
+//           console.log("Slider: Width is 0, skipping");
+//           return;
+//         }
+
+//         // Calculate new position based on gesture
+//         const newPosition = clamp(
+//           gestureState.moveX - gestureState.x0,
+//           0,
+//           width
+//         );
+//         const newPct = newPosition / width;
+//         const rawValue = min + newPct * (max - min);
+//         const steppedValue = roundToStep(rawValue, step);
+
+//         console.log("Slider: Moving", {
+//           moveX: gestureState.moveX,
+//           x0: gestureState.x0,
+//           newPosition,
+//           newPct,
+//           rawValue,
+//           steppedValue,
+//           currentValue: value,
+//         });
+
+//         setValue(steppedValue);
+//       },
+//       onPanResponderRelease: (evt, gestureState) => {
+//         console.log("Slider: Pan released", { finalValue: value });
+//         setIsDragging(false);
+//       },
+//     })
+//   ).current;
+
+//   return (
+//     <View>
+//       <View
+//         onLayout={(e) => {
+//           const newWidth = e.nativeEvent.layout.width;
+//           setWidth(newWidth);
+//           console.log("Slider: Width set to", newWidth);
+//         }}
+//         style={{ height: 24, justifyContent: "center" }}
+//       >
+//         {/* Background track */}
+//         <View
+//           style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }}
+//         />
+
+//         {/* Progress track */}
+//         <View
+//           style={{
+//             position: "absolute",
+//             left: 0,
+//             right: 0,
+//             height: 6,
+//             borderRadius: 999,
+//           }}
+//         >
+//           <View
+//             style={{
+//               width: Math.max(10, thumbPosition),
+//               height: 6,
+//               backgroundColor: color,
+//               borderRadius: 999,
+//             }}
+//           />
+//         </View>
+
+//         {/* Thumb */}
+//         <View
+//           {...responder.panHandlers}
+//           style={{
+//             position: "absolute",
+//             left: Math.max(0, thumbPosition - 12),
+//             top: -8,
+//             width: 24,
+//             height: 24,
+//             borderRadius: 12,
+//             backgroundColor: color,
+//             elevation: 3,
+//             shadowColor: "#000",
+//             shadowOffset: { width: 0, height: 2 },
+//             shadowOpacity: 0.25,
+//             shadowRadius: 3.84,
+//             borderWidth: 2,
+//             borderColor: "#fff",
+//           }}
+//         />
+
+//         {/* Invisible touch area for easier interaction */}
+//         <TouchableOpacity
+//           style={{
+//             position: "absolute",
+//             left: 0,
+//             right: 0,
+//             top: -8,
+//             height: 40,
+//             backgroundColor: "transparent",
+//           }}
+//           activeOpacity={1}
+//           onPress={(evt) => {
+//             if (width === 0) return;
+
+//             const touchX = evt.nativeEvent.locationX;
+//             const newPct = Math.max(0, Math.min(1, touchX / width));
+//             const rawValue = min + newPct * (max - min);
+//             const steppedValue = roundToStep(rawValue, step);
+
+//             console.log("Slider: Touch pressed", {
+//               touchX,
+//               newPct,
+//               rawValue,
+//               steppedValue,
+//               currentValue: value,
+//             });
+
+//             setValue(steppedValue);
+//           }}
+//         />
+//       </View>
+//       <ThemedText style={{ color: "#111", marginTop: 6, textAlign: "center" }}>
+//         {format(value)}
+//       </ThemedText>
+//     </View>
+//   );
+// }
+
+
+
 function SliderRow({
   value,
   setValue,
@@ -2028,153 +2173,98 @@ function SliderRow({
   step = 1,
   color = "#EF4444",
   format = (v) => String(v),
+  onDragChange, // (bool) => void
 }) {
-  const [width, setWidth] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  const [width, setWidth] = React.useState(0);
 
-  // Calculate position as percentage
-  const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  const thumbPosition = width * pct;
+  // helpers
+  const clamp = (n, lo, hi) => Math.min(Math.max(n, lo), hi);
+  const stepTo = (n, s) => Math.round(n / s) * s;
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : min;
 
-  const clamp = (num, minN, maxN) => Math.min(Math.max(num, minN), maxN);
-  const roundToStep = (num, stepN) => Math.round(num / stepN) * stepN;
+  // compute thumb position
+  const pct = clamp((safeValue - min) / (max - min || 1), 0, 1);
+  const thumbLeft = width * pct;
 
-  const responder = useRef(
+  const updateFromLocationX = (locX) => {
+    if (width <= 0) return;
+    const ratio = clamp(locX / width, 0, 1);
+    const raw = min + ratio * (max - min);
+    setValue(stepTo(clamp(raw, min, max), step));
+  };
+
+  const pan = React.useRef(
     PanResponder.create({
+      // take control early so the parent ScrollView doesn’t steal the gesture
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt, gestureState) => {
-        console.log("Slider: Pan started", { value, min, max, width });
-        setIsDragging(true);
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false, // don't give it back mid-gesture
+      onPanResponderGrant: (evt) => {
+        onDragChange?.(true);
+        updateFromLocationX(evt.nativeEvent.locationX); // immediate jump to tap
       },
-      onPanResponderMove: (evt, gestureState) => {
-        if (width === 0) {
-          console.log("Slider: Width is 0, skipping");
-          return;
-        }
-
-        // Calculate new position based on gesture
-        const newPosition = clamp(
-          gestureState.moveX - gestureState.x0,
-          0,
-          width
-        );
-        const newPct = newPosition / width;
-        const rawValue = min + newPct * (max - min);
-        const steppedValue = roundToStep(rawValue, step);
-
-        console.log("Slider: Moving", {
-          moveX: gestureState.moveX,
-          x0: gestureState.x0,
-          newPosition,
-          newPct,
-          rawValue,
-          steppedValue,
-          currentValue: value,
-        });
-
-        setValue(steppedValue);
+      onPanResponderMove: (evt) => {
+        updateFromLocationX(evt.nativeEvent.locationX); // drag updates
       },
-      onPanResponderRelease: (evt, gestureState) => {
-        console.log("Slider: Pan released", { finalValue: value });
-        setIsDragging(false);
-      },
+      onPanResponderRelease: () => onDragChange?.(false),
+      onPanResponderTerminate: () => onDragChange?.(false),
     })
   ).current;
 
   return (
     <View>
       <View
-        onLayout={(e) => {
-          const newWidth = e.nativeEvent.layout.width;
-          setWidth(newWidth);
-          console.log("Slider: Width set to", newWidth);
-        }}
-        style={{ height: 24, justifyContent: "center" }}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        style={{ height: 28, justifyContent: "center" }}
       >
-        {/* Background track */}
-        <View
-          style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }}
-        />
+        {/* Track */}
+        <View style={{ height: 6, backgroundColor: "#EBEBEB", borderRadius: 999 }} />
 
-        {/* Progress track */}
+        {/* Filled portion */}
         <View
           style={{
             position: "absolute",
             left: 0,
-            right: 0,
+            width: Math.max(6, thumbLeft),
             height: 6,
+            backgroundColor: color,
             borderRadius: 999,
           }}
-        >
-          <View
-            style={{
-              width: Math.max(10, thumbPosition),
-              height: 6,
-              backgroundColor: color,
-              borderRadius: 999,
-            }}
-          />
-        </View>
+        />
 
-        {/* Thumb */}
+        {/* Thumb (visual) */}
         <View
-          {...responder.panHandlers}
           style={{
             position: "absolute",
-            left: Math.max(0, thumbPosition - 12),
+            left: Math.max(0, thumbLeft - 12),
             top: -8,
             width: 24,
             height: 24,
             borderRadius: 12,
             backgroundColor: color,
-            elevation: 3,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
             borderWidth: 2,
             borderColor: "#fff",
+            elevation: 3,
           }}
         />
 
-        {/* Invisible touch area for easier interaction */}
-        <TouchableOpacity
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: -8,
-            height: 40,
-            backgroundColor: "transparent",
-          }}
-          activeOpacity={1}
-          onPress={(evt) => {
-            if (width === 0) return;
-
-            const touchX = evt.nativeEvent.locationX;
-            const newPct = Math.max(0, Math.min(1, touchX / width));
-            const rawValue = min + newPct * (max - min);
-            const steppedValue = roundToStep(rawValue, step);
-
-            console.log("Slider: Touch pressed", {
-              touchX,
-              newPct,
-              rawValue,
-              steppedValue,
-              currentValue: value,
-            });
-
-            setValue(steppedValue);
-          }}
+        {/* Full-width touch layer (gets the PanResponder) */}
+        <View
+          {...pan.panHandlers}
+          pointerEvents="box-only"
+          style={{ position: "absolute", left: 0, right: 0, top: -12, height: 40 }}
         />
       </View>
+
       <ThemedText style={{ color: "#111", marginTop: 6, textAlign: "center" }}>
-        {format(value)}
+        {format(safeValue)}
       </ThemedText>
     </View>
   );
 }
+
 
 /* ───────── Small comps ───────── */
 

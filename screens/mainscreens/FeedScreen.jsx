@@ -10,7 +10,6 @@ import {
   Platform,
   ScrollView,
   Modal,
-  StatusBar,
   Alert,
   RefreshControl,
   ActivityIndicator,
@@ -30,6 +29,7 @@ import { getToken } from "../../utils/tokenStorage";
 
 import * as PostQueries from "../../utils/queries/posts"; // getPosts, getPostComments
 import * as PostMutations from "../../utils/mutations/posts"; // createPost, updatePost, deletePost, likePost, addComment
+import { StatusBar } from "expo-status-bar";
 
 /* -------------------- HELPERS -------------------- */
 const absUrl = (maybePath) =>
@@ -1112,7 +1112,7 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: "#fff" }]}>
-      <StatusBar barStyle="dark-content" />
+     <StatusBar style="light" />
       <FlatList
         data={listData}
         extraData={listData}

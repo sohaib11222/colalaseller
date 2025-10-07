@@ -83,7 +83,7 @@ export default function FAQsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} >
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}  edges={[""]}>
         <StatusBar style="dark"/>
       {/* Header */}
       <View
@@ -250,7 +250,7 @@ function shadow(e = 8) {
 
 const styles = StyleSheet.create({
   header: {
-    paddingTop: 20,
+    paddingTop: 38,
     paddingBottom: 13,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
