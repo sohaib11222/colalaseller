@@ -116,6 +116,15 @@ export default function MyProductsServicesScreen({ navigation }) {
     enabled: !!token,
   });
 
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading,
+  } = useQuery({
+    queryKey: ["categories", token],
+    queryFn: () => getCategories(token),
+    enabled: !!token,
+  });
+
   const [refreshing, setRefreshing] = useState(false);
 
   // Handle pull-to-refresh
@@ -151,7 +160,8 @@ export default function MyProductsServicesScreen({ navigation }) {
       compareAt: product?.discount_price
         ? parseFloat(product.discount_price)
         : 0,
-      category: "Electronics", // You might want to get this from category data
+      category: product?.category?.title || "Uncategorized",
+      categoryId: product?.category?.id || null,
       views: product?.views || 0, // Use actual API data if available
       clicks: product?.clicks || 0, // Use actual API data if available
       messages: product?.chats || 0, // Use actual API data if available
@@ -178,7 +188,8 @@ export default function MyProductsServicesScreen({ navigation }) {
       messages: service?.chats || 0, // Use actual API data (chats field)
       phoneViews: service?.phone_views || 0, // Use actual API data
       impressions: service?.impressions || 0, // Use actual API data
-      category: "Fashion", // You might want to get this from category data
+      category: service?.category?.title || "Uncategorized",
+      categoryId: service?.category?.id || null,
       status: service?.status || "active",
     }));
   };
@@ -261,11 +272,52 @@ export default function MyProductsServicesScreen({ navigation }) {
   const [category, setCategory] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all|sponsored|out_of_stock|unavailable
 
+  // Function to flatten nested categories from API response
+  const flattenCategories = (categories, level = 0) => {
+    if (!categories || !Array.isArray(categories)) return [];
+    
+    let result = [];
+    categories.forEach(cat => {
+      // Add current category with indentation based on level
+      result.push({
+        id: cat.id,
+        title: cat.title,
+        level: level,
+        displayTitle: '  '.repeat(level) + cat.title,
+        parent_id: cat.parent_id,
+        products_count: cat.products_count,
+        image_url: cat.image_url,
+        color: cat.color
+      });
+      
+      // Recursively add children
+      if (cat.children && cat.children.length > 0) {
+        result = result.concat(flattenCategories(cat.children, level + 1));
+      }
+    });
+    
+    return result;
+  };
+
   const categories = useMemo(() => {
-    if (!DATA || !Array.isArray(DATA)) return [];
-    const set = new Set(DATA.map((x) => x?.category).filter(Boolean));
-    return Array.from(set);
-  }, [DATA]);
+    if (!categoriesData?.data || !Array.isArray(categoriesData.data)) {
+      // Fallback to extracting from DATA if API data is not available
+      if (!DATA || !Array.isArray(DATA)) return [];
+      const set = new Set(DATA.map((x) => x?.category).filter(Boolean));
+      return Array.from(set);
+    }
+    
+    // Use API data and flatten the nested structure
+    return flattenCategories(categoriesData.data);
+  }, [categoriesData, DATA]);
+
+  // Function to get category name from ID
+  const getCategoryName = (categoryId) => {
+    if (!categoryId || categoryId === null) return "Categories";
+    const flatCategories = flattenCategories(categoriesData?.data || []);
+    const foundCategory = flatCategories.find(cat => cat.id === categoryId);
+    return foundCategory ? foundCategory.title : "Categories";
+  };
 
   /* ───────── filters ───────── */
   const filtered = useMemo(() => {
@@ -275,7 +327,7 @@ export default function MyProductsServicesScreen({ navigation }) {
       if (!x) return false;
       if (tab === "products" && x.type !== "product") return false;
       if (tab === "services" && x.type !== "service") return false;
-      if (category && x.category !== category) return false;
+      if (category && x.categoryId !== category) return false;
       if (statusFilter === "sponsored" && !x.sponsored) return false;
       if (statusFilter === "out_of_stock" && x.status !== "out_of_stock")
         return false;
@@ -368,7 +420,7 @@ export default function MyProductsServicesScreen({ navigation }) {
                 fontSize: 12,
               }}
             >
-              {category || "Categories"}
+              {getCategoryName(category)}
             </ThemedText>
             <Ionicons name="chevron-down" size={18} color={C.text} />
           </TouchableOpacity>
@@ -887,20 +939,34 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
 function CategorySheet({ visible, onClose, onSelect, options, C }) {
   const [q, setQ] = useState("");
   const filter = (list) =>
-    list.filter((s) => s.toLowerCase().includes(q.trim().toLowerCase()));
+    list.filter((cat) => 
+      typeof cat === 'string' 
+        ? cat.toLowerCase().includes(q.trim().toLowerCase())
+        : cat.title.toLowerCase().includes(q.trim().toLowerCase())
+    );
 
-  const Row = ({ label }) => (
-    <TouchableOpacity
-      onPress={() => onSelect(label)}
-      style={[
-        styles.sheetRow,
-        { borderColor: C.line, backgroundColor: "#EFEFF0" },
-      ]}
-      activeOpacity={0.9}
-    >
-      <ThemedText style={{ color: C.text }}>{label}</ThemedText>
-    </TouchableOpacity>
-  );
+  const Row = ({ category }) => {
+    const label = typeof category === 'string' ? category : category.displayTitle;
+    const value = typeof category === 'string' ? category : category.id;
+    
+    return (
+      <TouchableOpacity
+        onPress={() => onSelect(value)}
+        style={[
+          styles.sheetRow,
+          { borderColor: C.line, backgroundColor: "#EFEFF0" },
+        ]}
+        activeOpacity={0.9}
+      >
+        <ThemedText style={{ color: C.text }}>{label}</ThemedText>
+        {typeof category === 'object' && category.products_count > 0 && (
+          <ThemedText style={{ color: C.text, fontSize: 12, opacity: 0.7 }}>
+            ({category.products_count})
+          </ThemedText>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal
@@ -941,8 +1007,22 @@ function CategorySheet({ visible, onClose, onSelect, options, C }) {
             All Categories
           </ThemedText>
           <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Clear Filter Option */}
+            <TouchableOpacity
+              onPress={() => onSelect(null)}
+              style={[
+                styles.sheetRow,
+                { borderColor: C.line, backgroundColor: "#F3F4F6" },
+              ]}
+              activeOpacity={0.9}
+            >
+              <ThemedText style={{ color: "#6B7280", fontStyle: 'italic' }}>
+                Clear Filter
+              </ThemedText>
+            </TouchableOpacity>
+            
             {filter(options).map((x) => (
-              <Row key={x} label={x} />
+              <Row key={typeof x === 'string' ? x : x.id} category={x} />
             ))}
           </ScrollView>
         </View>

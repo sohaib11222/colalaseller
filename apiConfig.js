@@ -66,7 +66,12 @@ const API_ENDPOINTS = {
 
     Product_Mark_As_Available: (productId) =>
       `${API_DOMAIN}/seller/products/${productId}/mark-available`, // POST
+
+    Product_Quantity: (productId) =>
+      `${API_DOMAIN}/seller/products/${productId}/quantity`, // POST
   },
+
+
 
   SERVICES: {
     GetAll: `${API_DOMAIN}/seller/services/my-services`, // GET

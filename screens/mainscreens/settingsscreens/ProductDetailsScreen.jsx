@@ -46,8 +46,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { previewBoost, createBoost } from "../../../utils/mutations/settings";
 import { getBalance } from "../../../utils/queries/settings";
-import { markAsUnavailable } from "../../../utils/mutations/products";
-import { markAsAvailable } from "../../../utils/mutations/products";
+import { markAsUnavailable, markAsAvailable, quantity } from "../../../utils/mutations/products";
 export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
   const productId = route?.params?.id || item?.id;
@@ -129,6 +128,19 @@ export default function ProductDetailsScreen({ route, navigation }) {
     onError: (error) => {
       console.error("Error marking product as available:", error);
       Alert.alert("Error", "Failed to mark product as available");
+    },
+  });
+
+  // Quantity update mutation
+  const quantityMutation = useMutation({
+    mutationFn: (newQuantity) => quantity(productId, { quantity: newQuantity.toString() }, token),
+    onSuccess: () => {
+      // Refresh the product data to get updated quantity
+      queryClient.invalidateQueries(["productDetails", productId]);
+    },
+    onError: (error) => {
+      console.error("Error updating quantity:", error);
+      Alert.alert("Error", "Failed to update quantity");
     },
   });
 
@@ -486,11 +498,15 @@ export default function ProductDetailsScreen({ route, navigation }) {
             <TouchableOpacity
               style={[
                 styles.bottomBtn,
-                { 
-                  borderColor: product?.is_unavailable ? "#10B981" : "#6B7280", 
-                  backgroundColor: C.card, 
+                {
+                  borderColor: product?.is_unavailable ? "#10B981" : "#6B7280",
+                  backgroundColor: C.card,
                   flex: 1,
-                  opacity: (markAsUnavailableMutation.isPending || markAsAvailableMutation.isPending) ? 0.6 : 1
+                  opacity:
+                    markAsUnavailableMutation.isPending ||
+                    markAsAvailableMutation.isPending
+                      ? 0.6
+                      : 1,
                 },
               ]}
               onPress={() => {
@@ -502,13 +518,13 @@ export default function ProductDetailsScreen({ route, navigation }) {
                     [
                       {
                         text: "Cancel",
-                        style: "cancel"
+                        style: "cancel",
                       },
                       {
                         text: "Mark as Available",
                         style: "default",
-                        onPress: () => markAsAvailableMutation.mutate()
-                      }
+                        onPress: () => markAsAvailableMutation.mutate(),
+                      },
                     ]
                   );
                 } else {
@@ -519,24 +535,31 @@ export default function ProductDetailsScreen({ route, navigation }) {
                     [
                       {
                         text: "Cancel",
-                        style: "cancel"
+                        style: "cancel",
                       },
                       {
                         text: "Mark as Unavailable",
                         style: "destructive",
-                        onPress: () => markAsUnavailableMutation.mutate()
-                      }
+                        onPress: () => markAsUnavailableMutation.mutate(),
+                      },
                     ]
                   );
                 }
               }}
-              disabled={markAsUnavailableMutation.isPending || markAsAvailableMutation.isPending}
+              disabled={
+                markAsUnavailableMutation.isPending ||
+                markAsAvailableMutation.isPending
+              }
             >
-              <ThemedText style={{ 
-                color: product?.is_unavailable ? "#10B981" : "#6B7280", 
-                fontWeight: "700" 
-              }}>
-                {product?.is_unavailable ? "Mark as Available" : "Mark as Unavailable"}
+              <ThemedText
+                style={{
+                  color: product?.is_unavailable ? "#10B981" : "#6B7280",
+                  fontWeight: "700",
+                }}
+              >
+                {product?.is_unavailable
+                  ? "Mark as Available"
+                  : "Mark as Unavailable"}
               </ThemedText>
             </TouchableOpacity>
 
@@ -544,13 +567,13 @@ export default function ProductDetailsScreen({ route, navigation }) {
               style={[
                 styles.bottomBtn,
                 { borderColor: "#EF4444", backgroundColor: C.card, flex: 1 },
-            ]}
-            onPress={() => setDeleteModalOpen(true)}
-          >
-            <ThemedText style={{ color: "#EF4444", fontWeight: "700" }}>
-              Delete Product
-            </ThemedText>
-          </TouchableOpacity>
+              ]}
+              onPress={() => setDeleteModalOpen(true)}
+            >
+              <ThemedText style={{ color: "#EF4444", fontWeight: "700" }}>
+                Delete Product
+              </ThemedText>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       )}
@@ -566,6 +589,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
         productId={productId}
         C={C}
         shoppingBalance={shoppingBalance}
+        quantityMutation={quantityMutation}
       />
 
       {/* DELETE CONFIRMATION MODAL */}
@@ -605,6 +629,7 @@ function ViewProductModal({
   navigation,
   productId,
   shoppingBalance,
+  quantityMutation,
 }) {
   // Create gallery from API images or fallback to dummy images
   const gallery =
@@ -668,18 +693,18 @@ function ViewProductModal({
         // Only respond to horizontal swipes (dx should be greater than dy)
         if (Math.abs(dx) > Math.abs(dy)) {
           // Check if it's a valid swipe (either distance or velocity)
-        if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
-          if (dx > 0) {
-            // Swipe right - go to previous image
-            if (active > 0) {
-              console.log("Swipe right - going to previous image");
-              setActive(active - 1);
-            }
-          } else if (dx < 0) {
-            // Swipe left - go to next image
-            if (active < gallery.length - 1) {
-              console.log("Swipe left - going to next image");
-              setActive(active + 1);
+          if (Math.abs(dx) > threshold || Math.abs(vx) > velocityThreshold) {
+            if (dx > 0) {
+              // Swipe right - go to previous image
+              if (active > 0) {
+                console.log("Swipe right - going to previous image");
+                setActive(active - 1);
+              }
+            } else if (dx < 0) {
+              // Swipe left - go to next image
+              if (active < gallery.length - 1) {
+                console.log("Swipe left - going to next image");
+                setActive(active + 1);
               }
             }
           }
@@ -1016,47 +1041,71 @@ function ViewProductModal({
                       justifyContent: "space-between",
                     }}
                   >
-                    <ThemedText
-                      style={{
-                        color: C.primary,
-                        fontWeight: "700",
-                        fontSize: 14,
-                      }}
-                    >
-                      {item.qty || item.quantity || 0}
-                    </ThemedText>
+                    {quantityMutation.isPending ? (
+                      <ActivityIndicator size="small" color={C.primary} />
+                    ) : (
+                      <ThemedText
+                        style={{
+                          color: C.primary,
+                          fontWeight: "700",
+                          fontSize: 14,
+                        }}
+                      >
+                        {item.qty || item.quantity || 0}
+                      </ThemedText>
+                    )}
 
                     <View
                       style={{ flexDirection: "row", alignItems: "center" }}
                     >
                       <TouchableOpacity
-                        onPress={() => {}}
+                        onPress={() => {
+                          const currentQty = parseInt(item.qty || item.quantity || 0);
+                          if (currentQty > 0) {
+                            quantityMutation.mutate(currentQty - 1);
+                          }
+                        }}
                         style={[
                           styles.qtySquare,
-                          { backgroundColor: C.primary },
+                          { 
+                            backgroundColor: C.primary,
+                            opacity: quantityMutation.isPending ? 0.6 : 1
+                          },
                         ]}
+                        disabled={quantityMutation.isPending}
                       >
                         <Ionicons name="remove" size={18} color="#fff" />
                       </TouchableOpacity>
 
                       <View style={[styles.qtyPill]}>
-                        <ThemedText
-                          style={{
-                            color: C.primary,
-                            fontWeight: "800",
-                            fontSize: 18,
-                          }}
-                        >
-                          {item.qty || item.quantity || 0}
-                        </ThemedText>
+                        {quantityMutation.isPending ? (
+                          <ActivityIndicator size="small" color={C.primary} />
+                        ) : (
+                          <ThemedText
+                            style={{
+                              color: C.primary,
+                              fontWeight: "800",
+                              fontSize: 18,
+                            }}
+                          >
+                            {item.qty || item.quantity || 0}
+                          </ThemedText>
+                        )}
                       </View>
 
                       <TouchableOpacity
-                        onPress={() => {}}
+                        onPress={() => {
+                          const currentQty = parseInt(item.qty || item.quantity || 0);
+                          quantityMutation.mutate(currentQty + 1);
+                        }}
                         style={[
                           styles.qtySquare,
-                          { backgroundColor: C.primary },
+                          { 
+                            backgroundColor: C.primary,
+                            opacity: quantityMutation.isPending ? 0.6 : 1
+                          },
                         ]}
+                        disabled={quantityMutation.isPending}
                       >
                         <Ionicons name="add" size={18} color="#fff" />
                       </TouchableOpacity>

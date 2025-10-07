@@ -46,3 +46,7 @@ export const markAsUnavailable = async (productId, token) =>
 // Mark as Available
 export const markAsAvailable = async (productId, token) =>
   await apiCall(API_ENDPOINTS.PRODUCTS.Product_Mark_As_Available(productId), "POST", undefined, token);
+
+// Quantity
+export const quantity = async (productId, payload, token) =>
+  await apiCall(API_ENDPOINTS.PRODUCTS.Product_Quantity(productId), "PUT", payload, token);
