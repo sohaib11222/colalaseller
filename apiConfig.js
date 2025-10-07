@@ -175,6 +175,7 @@ const API_ENDPOINTS = {
   GENERAL: {
     Categories: `${API_DOMAIN}/categories`, // GET
     Brands: `${API_DOMAIN}/brands`, // GET
+    Wallet_TopUp: `${API_DOMAIN}/wallet/top-up`, // POST
   },
   ORDERS: {
     Get_All_Orders: `${API_DOMAIN}/seller/orders`, // GET
