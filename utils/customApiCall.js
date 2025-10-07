@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getToken, getOnboardingToken } from './tokenStorage';
+import { clearAuthData } from './tokenStorage';
 
 // Custom Error Class for API errors
 class ApiError extends Error {
@@ -58,6 +59,17 @@ const apiCall = async (url, method, data, token) => {
       console.log("Response data:", error.response.data);
       console.log("Response status:", error.response.status);
       console.log("Response headers:", error.response.headers);
+      
+      // Handle 401 Unauthorized - clear auth data and redirect to login
+      if (error.response.status === 401) {
+        console.log("401 Unauthorized - clearing auth data");
+        try {
+          await clearAuthData();
+        } catch (clearError) {
+          console.error("Error clearing auth data:", clearError);
+        }
+      }
+      
       // Handle Axios errors
       throw new ApiError(
         error.response.data,

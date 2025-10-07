@@ -45,9 +45,9 @@ class NavigationErrorBoundary extends React.Component {
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, token, user } = useAuth();
 
-  console.log('RootNavigator render:', { isAuthenticated, isLoading });
+  console.log('RootNavigator render:', { isAuthenticated, isLoading, hasToken: !!token, hasUser: !!user });
 
   // Show loading screen while checking authentication
   if (isLoading) {
@@ -58,10 +58,13 @@ export default function RootNavigator() {
     );
   }
 
+  // Additional check: if no token or user, force authentication
+  const shouldShowAuth = !isAuthenticated || !token || !user;
+
   return (
     <NavigationErrorBoundary>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
+        {!shouldShowAuth ? (
           // User is authenticated - show main app screens
           <>
             <Stack.Screen name="MainNavigator" component={MainNavigator} />
