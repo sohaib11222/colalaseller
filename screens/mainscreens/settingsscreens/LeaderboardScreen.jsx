@@ -391,7 +391,7 @@ export default function LeaderboardScreen() {
         <ThemedText style={styles.headerTitle}>Seller Leaderboard</ThemedText>
         <Pressable
           style={[styles.headerBtn, { right: 16, left: undefined }]}
-          onPress={() => navigation.navigate('SettingsNavigator', { screen: 'Help' })}
+          onPress={() => navigation.navigate('ChatNavigator', { screen: 'Help' })}
         >
           <Ionicons name="help" size={22} color="#E21F62" />
         </Pressable>

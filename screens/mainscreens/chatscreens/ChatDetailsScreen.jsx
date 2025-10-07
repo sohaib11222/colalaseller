@@ -9,7 +9,11 @@ import {
   Platform,
   Keyboard,
   StyleSheet,
+  Alert,
+  Modal,
+  Dimensions,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -54,6 +58,7 @@ const mapMsg = (m) => ({
   text: m?.message ?? '',                                  // API key is "message"
   sender: m?.sender_type === 'store' ? 'me' : 'store',     // store == me (seller)
   time: formatClock(m?.created_at),                        // if missing -> hardcoded
+  attachment: m?.attachment || m?.image || null,           // handle both field names
 });
 
 /* ---------- Cart summary (renders ONLY if cart prop is provided) ---------- */
@@ -123,9 +128,38 @@ export default function ChatDetailsScreen() {
   const [headerH, setHeaderH] = useState(0);
   const [messages, setMessages] = useState([]); // hydrated from API
   const [inputText, setInputText] = useState('');
+  const [imageUri, setImageUri] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const listRef = useRef(null);
   const scrollToEnd = () => setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Please grant permission to access your photo library."
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.log("Image picker error:", error);
+      Alert.alert("Error", "Failed to pick image. Please try again.");
+    }
+  };
 
   useEffect(() => {
     const a = Keyboard.addListener('keyboardDidShow', scrollToEnd);
@@ -212,16 +246,31 @@ export default function ChatDetailsScreen() {
 
   /* ---------------- Send message (FormData + optimistic + logs) ---------------- */
   const sendMut = useMutation({
-    mutationFn: async ({ text }) => {
+    mutationFn: async ({ text, imageUri: imgUri }) => {
       const token = await getToken();
       const fd = new FormData();
       fd.append('message', text);
 
+      if (imgUri) {
+        fd.append('image', {
+          uri: imgUri,
+          type: 'image/jpeg',
+          name: 'chat_attachment.jpg',
+        });
+      }
+
       D('send:request', {
         chatId,
-        fields: ['message'],
+        fields: imgUri ? ['message', 'image'] : ['message'],
         messageLen: text.length,
+        hasImage: !!imgUri,
       });
+
+      // Debug FormData contents
+      console.log('FormData contents:');
+      for (let [key, value] of fd.entries()) {
+        console.log(`${key}:`, value);
+      }
 
       const res = await ChatMutations.sendMessage(chatId, fd, token);
 
@@ -231,12 +280,13 @@ export default function ChatDetailsScreen() {
       } catch {}
       return res;
     },
-    onMutate: async ({ text }) => {
+    onMutate: async ({ text, imageUri: imgUri }) => {
       const optimistic = {
         id: `optimistic-${Date.now()}`,
         text,
         sender: 'me',
         time: formatClock(new Date().toISOString()),
+        attachment: imgUri,
       };
       D('send:onMutate -> optimistic add', optimistic);
 
@@ -246,6 +296,7 @@ export default function ChatDetailsScreen() {
         return next;
       });
       setInputText('');
+      setImageUri(null);
       scrollToEnd();
 
       // Also reflect in cache (shape similar to backend)
@@ -258,6 +309,7 @@ export default function ChatDetailsScreen() {
             message: optimistic.text,
             sender_type: 'store',
             created_at: new Date().toISOString(),
+            attachment: optimistic.attachment,
           },
         ];
         D('send:onMutate -> cache add', { cachePrev: (base.messages || []).length, cacheNext: nextMsgs.length });
@@ -318,11 +370,11 @@ export default function ChatDetailsScreen() {
 
   const handleSend = () => {
     const v = inputText.trim();
-    if (!v || !chatId) {
-      D('send:blocked', { hasText: !!v, hasChatId: !!chatId });
+    if ((!v && !imageUri) || !chatId) {
+      D('send:blocked', { hasText: !!v, hasImage: !!imageUri, hasChatId: !!chatId });
       return;
     }
-    sendMut.mutate({ text: v });
+    sendMut.mutate({ text: v || (imageUri ? '📎 Image' : ''), imageUri });
   };
 
   const KAV_OFFSET = Platform.OS === 'ios' ? insets.top + headerH : 0;
@@ -340,8 +392,29 @@ export default function ChatDetailsScreen() {
         ]}
       >
         <ThemedText style={[styles.msg, { color: mine ? '#fff' : '#000' }]}>
-          {item.text || ''}
+          {item.text || (item.attachment ? '📎 Image' : 'Message')}
         </ThemedText>
+        {item.attachment && (
+          <TouchableOpacity
+            onPress={() => {
+              const imageUrl = item.attachment.startsWith('http') 
+                ? item.attachment 
+                : `${API_DOMAIN.replace('/api', '')}/storage/${item.attachment}`;
+              setPreviewImage(imageUrl);
+            }}
+            activeOpacity={0.8}
+          >
+            <Image
+              source={{ 
+                uri: item.attachment.startsWith('http') 
+                  ? item.attachment 
+                  : `${API_DOMAIN.replace('/api', '')}/storage/${item.attachment}` 
+              }}
+              style={styles.attachmentImage}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        )}
         <ThemedText style={[styles.time, { color: mine ? '#fff' : '#000' }]}>
           {item.time || '07:22AM'}
         </ThemedText>
@@ -410,9 +483,22 @@ export default function ChatDetailsScreen() {
 
         {/* Composer */}
         <View style={[styles.composer, { marginBottom: 10 + insets.bottom, borderColor: '#ddd' }]}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={pickImage} disabled={sendMut.isPending}>
             <Ionicons name="attach" size={20} color="#777" />
           </TouchableOpacity>
+          
+          {imageUri && (
+            <View style={styles.imagePreview}>
+              <Image source={{ uri: imageUri }} style={styles.previewImage} />
+              <TouchableOpacity
+                onPress={() => setImageUri(null)}
+                style={[styles.removeImage, { backgroundColor: C.primary }]}
+              >
+                <Ionicons name="close" size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
+          
           <TextInput
             style={[styles.input, { color: C.text }]}
             placeholder="Type a message"
@@ -421,12 +507,48 @@ export default function ChatDetailsScreen() {
             onChangeText={setInputText}
             onSubmitEditing={handleSend}
             returnKeyType="send"
+            multiline
+            maxLength={500}
           />
-          <TouchableOpacity onPress={handleSend} disabled={sendMut.isPending}>
-            <Ionicons name="send" size={20} color={C.text} />
+          <TouchableOpacity onPress={handleSend} disabled={(!inputText.trim() && !imageUri) || sendMut.isPending}>
+            {sendMut.isPending ? (
+              <Ionicons name="hourglass-outline" size={20} color="#777" />
+            ) : (
+              <Ionicons name="send" size={20} color={(inputText.trim() || imageUri) ? C.primary : "#777"} />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={!!previewImage}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalCloseArea}
+            activeOpacity={1}
+            onPress={() => setPreviewImage(null)}
+          >
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setPreviewImage(null)}
+              >
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+              <Image
+                source={{ uri: previewImage }}
+                style={styles.previewModalImage}
+                resizeMode="contain"
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -467,7 +589,74 @@ const styles = StyleSheet.create({
     elevation: 1,
     borderWidth: 0.3,
   },
-  input: { flex: 1, fontSize: 14, paddingVertical: Platform.OS === 'ios' ? 8 : 10, marginHorizontal: 10 },
+  input: { flex: 1, fontSize: 14, paddingVertical: Platform.OS === 'ios' ? 8 : 10, marginHorizontal: 10, maxHeight: 100 },
+
+  /* image preview and attachment styles */
+  imagePreview: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  previewImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
+  removeImage: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#E53E3E',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+
+  /* image preview modal styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseArea: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewModalImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: Dimensions.get('window').width * 0.9,
+    maxHeight: Dimensions.get('window').height * 0.8,
+  },
 
   /* cart summary */
   cartWrap: {
