@@ -1,5 +1,5 @@
 // screens/my/ServiceDetailsScreen.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  PanResponder,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -116,6 +117,20 @@ export default function ServiceDetailsScreen({ route, navigation }) {
     },
   });
 
+  // Mark as available mutation
+  const markAsAvailableMutation = useMutation({
+    mutationFn: () => markAsAvailable(serviceId, token),
+    onSuccess: () => {
+      Alert.alert("Success", "Service has been marked as available");
+      // Refresh the service data
+      queryClient.invalidateQueries(["serviceDetails", serviceId, token]);
+    },
+    onError: (error) => {
+      console.error("Error marking service as available:", error);
+      Alert.alert("Error", "Failed to mark service as available");
+    },
+  });
+
   console.log("Service Details", serviceDetails);
   console.log("Service Stats", serviceStats);
   console.log("Service Chart Data", chartData);
@@ -143,7 +158,14 @@ export default function ServiceDetailsScreen({ route, navigation }) {
       ];
 
   // Transform chart data or use dummy data
-  const series = chartData?.data
+  // Check if chartData exists and has valid data (not empty array)
+  const hasValidChartData = chartData?.data && 
+    Array.isArray(chartData.data) && 
+    chartData.data.length > 0 && 
+    chartData.data[0] && 
+    typeof chartData.data[0] === 'object';
+
+  const series = hasValidChartData
     ? {
         labels: chartData.data.labels || ["1", "2", "3", "4", "5", "6", "7"],
         impressions: chartData.data.impressions || [65, 40, 75, 30, 90, 65, 55],
@@ -343,32 +365,47 @@ export default function ServiceDetailsScreen({ route, navigation }) {
             style={[
               styles.bottomBtn,
               { 
-                borderColor: "#6B7280", 
+                borderColor: serviceDetails?.data?.is_unavailable ? "#10B981" : "#6B7280", 
                 backgroundColor: C.card,
-                opacity: markAsUnavailableMutation.isPending ? 0.6 : 1
+                opacity: (markAsUnavailableMutation.isPending || markAsAvailableMutation.isPending) ? 0.6 : 1
               },
             ]}
             onPress={() => {
+              const isUnavailable = serviceDetails?.data?.is_unavailable;
+              const action = isUnavailable ? "available" : "unavailable";
+              const message = isUnavailable 
+                ? "Are you sure you want to mark this service as available? This will make it visible to customers."
+                : "Are you sure you want to mark this service as unavailable? This will hide it from customers.";
+              
               Alert.alert(
-                "Mark as Unavailable",
-                "Are you sure you want to mark this service as unavailable? This will hide it from customers.",
+                `Mark as ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+                message,
                 [
                   {
                     text: "Cancel",
                     style: "cancel"
                   },
                   {
-                    text: "Mark as Unavailable",
-                    style: "destructive",
-                    onPress: () => markAsUnavailableMutation.mutate()
+                    text: `Mark as ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+                    style: isUnavailable ? "default" : "destructive",
+                    onPress: () => {
+                      if (isUnavailable) {
+                        markAsAvailableMutation.mutate();
+                      } else {
+                        markAsUnavailableMutation.mutate();
+                      }
+                    }
                   }
                 ]
               );
             }}
-            disabled={markAsUnavailableMutation.isPending}
+            disabled={markAsUnavailableMutation.isPending || markAsAvailableMutation.isPending}
           >
-            <ThemedText style={{ color: "#6B7280", fontWeight: "700" }}>
-              Mark as Unavailable
+            <ThemedText style={{ 
+              color: serviceDetails?.data?.is_unavailable ? "#10B981" : "#6B7280", 
+              fontWeight: "700" 
+            }}>
+              {serviceDetails?.data?.is_unavailable ? "Mark as Available" : "Mark as Unavailable"}
             </ThemedText>
           </TouchableOpacity>
         </ScrollView>
@@ -478,6 +515,42 @@ function ViewServiceModal({
   navigation,
   onDelete,
 }) {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  
+  // Create gallery from media array
+  const gallery = store.media && store.media.length > 0
+    ? store.media.map(media => `https://colala.hmstech.xyz/storage/${media.path}`)
+    : [store.image];
+
+  // PanResponder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      },
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return (
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
+          Math.abs(gestureState.dx) > 10
+        );
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const { dx } = gestureState;
+        const threshold = 50;
+
+        if (Math.abs(dx) > threshold) {
+          if (dx > 0 && activeImageIndex > 0) {
+            // Swipe right - previous image
+            setActiveImageIndex(activeImageIndex - 1);
+          } else if (dx < 0 && activeImageIndex < gallery.length - 1) {
+            // Swipe left - next image
+            setActiveImageIndex(activeImageIndex + 1);
+          }
+        }
+      },
+    })
+  ).current;
+
   return (
     <Modal
       visible={visible}
@@ -504,13 +577,9 @@ function ViewServiceModal({
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Hero with overlay */}
-          <View style={{ position: "relative" }}>
+          <View style={{ position: "relative" }} {...panResponder.panHandlers}>
             <Image
-              source={toSrc(
-                store.media && store.media.length > 0
-                  ? `https://colala.hmstech.xyz/storage/${store.media[0].path}`
-                  : store.image
-              )}
+              source={toSrc(gallery[activeImageIndex])}
               style={{ width: "100%", height: 250 }}
             />
             {store.mediaType === "video" && (
@@ -527,6 +596,46 @@ function ViewServiceModal({
                 <Ionicons name="videocam" size={30} color="#fff" />
               </View>
             )}
+            
+            {/* Swipe arrows */}
+            {activeImageIndex > 0 && (
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "45%",
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                  borderRadius: 20,
+                  width: 40,
+                  height: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={() => setActiveImageIndex(activeImageIndex - 1)}
+              >
+                <Ionicons name="chevron-back" size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
+            
+            {activeImageIndex < gallery.length - 1 && (
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "45%",
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                  borderRadius: 20,
+                  width: 40,
+                  height: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={() => setActiveImageIndex(activeImageIndex + 1)}
+              >
+                <Ionicons name="chevron-forward" size={24} color="#fff" />
+              </TouchableOpacity>
+            )}
+
             <View
               style={{
                 position: "absolute",
@@ -566,32 +675,25 @@ function ViewServiceModal({
             showsHorizontalScrollIndicator={false}
             style={{ flexDirection: "row", padding: 10 }}
           >
-            {store.media && store.media.length > 0 ? (
-              store.media.map((media, i) => (
+            {gallery.map((imageUri, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => setActiveImageIndex(i)}
+                activeOpacity={0.7}
+              >
                 <Image
-                  key={media.id || i}
-                  source={toSrc(
-                    `https://colala.hmstech.xyz/storage/${media.path}`
-                  )}
+                  source={toSrc(imageUri)}
                   style={{
                     width: 60,
                     height: 60,
                     borderRadius: 10,
                     marginRight: 8,
+                    borderWidth: activeImageIndex === i ? 2 : 0,
+                    borderColor: "#E53E3E",
                   }}
                 />
-              ))
-            ) : (
-              <Image
-                source={toSrc(store.image)}
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 10,
-                  marginRight: 8,
-                }}
-              />
-            )}
+              </TouchableOpacity>
+            ))}
           </ScrollView>
 
           {/* Details card */}
