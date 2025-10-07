@@ -97,6 +97,8 @@ function TrackOrderModal({
   //   },
   // });
   // mark out for delivery
+  const navigation = useNavigation();
+
   const markMut = useMutation({
     mutationFn: async () => {
       const token = await getToken();
@@ -334,7 +336,12 @@ function TrackOrderModal({
 
               <TouchableOpacity
                 style={[styles.revealBtn, { backgroundColor: C.primary, marginTop: 12 }]}
-                onPress={() => { }}
+                onPress={() => { 
+                 //navigate tto EscrowWallet
+                 navigation.navigate("ChatNavigator", {
+                  screen: "EscrowWallet",
+                 });
+                }}
               >
                 <ThemedText style={{ color: "#fff", fontWeight: "600" }}>View Wallet</ThemedText>
               </TouchableOpacity>
