@@ -47,7 +47,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { previewBoost, createBoost } from "../../../utils/mutations/settings";
 import { getBalance } from "../../../utils/queries/settings";
 import { markAsUnavailable } from "../../../utils/mutations/products";
-
+import { markAsAvailable } from "../../../utils/mutations/products";
 export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
   const productId = route?.params?.id || item?.id;
@@ -115,6 +115,20 @@ export default function ProductDetailsScreen({ route, navigation }) {
     onError: (error) => {
       console.error("Error marking product as unavailable:", error);
       Alert.alert("Error", "Failed to mark product as unavailable");
+    },
+  });
+
+  // Mark as available mutation
+  const markAsAvailableMutation = useMutation({
+    mutationFn: () => markAsAvailable(productId, token),
+    onSuccess: () => {
+      Alert.alert("Success", "Product has been marked as available");
+      // Optionally refresh the product data
+      queryClient.invalidateQueries(["productDetails", productId]);
+    },
+    onError: (error) => {
+      console.error("Error marking product as available:", error);
+      Alert.alert("Error", "Failed to mark product as available");
     },
   });
 
@@ -473,33 +487,56 @@ export default function ProductDetailsScreen({ route, navigation }) {
               style={[
                 styles.bottomBtn,
                 { 
-                  borderColor: "#6B7280", 
+                  borderColor: product?.is_unavailable ? "#10B981" : "#6B7280", 
                   backgroundColor: C.card, 
                   flex: 1,
-                  opacity: markAsUnavailableMutation.isPending ? 0.6 : 1
+                  opacity: (markAsUnavailableMutation.isPending || markAsAvailableMutation.isPending) ? 0.6 : 1
                 },
               ]}
               onPress={() => {
-                Alert.alert(
-                  "Mark as Unavailable",
-                  "Are you sure you want to mark this product as unavailable? This will hide it from customers.",
-                  [
-                    {
-                      text: "Cancel",
-                      style: "cancel"
-                    },
-                    {
-                      text: "Mark as Unavailable",
-                      style: "destructive",
-                      onPress: () => markAsUnavailableMutation.mutate()
-                    }
-                  ]
-                );
+                if (product?.is_unavailable) {
+                  // Product is currently unavailable, show "Mark as Available" dialog
+                  Alert.alert(
+                    "Mark as Available",
+                    "Are you sure you want to mark this product as available? This will make it visible to customers.",
+                    [
+                      {
+                        text: "Cancel",
+                        style: "cancel"
+                      },
+                      {
+                        text: "Mark as Available",
+                        style: "default",
+                        onPress: () => markAsAvailableMutation.mutate()
+                      }
+                    ]
+                  );
+                } else {
+                  // Product is currently available, show "Mark as Unavailable" dialog
+                  Alert.alert(
+                    "Mark as Unavailable",
+                    "Are you sure you want to mark this product as unavailable? This will hide it from customers.",
+                    [
+                      {
+                        text: "Cancel",
+                        style: "cancel"
+                      },
+                      {
+                        text: "Mark as Unavailable",
+                        style: "destructive",
+                        onPress: () => markAsUnavailableMutation.mutate()
+                      }
+                    ]
+                  );
+                }
               }}
-              disabled={markAsUnavailableMutation.isPending}
+              disabled={markAsUnavailableMutation.isPending || markAsAvailableMutation.isPending}
             >
-              <ThemedText style={{ color: "#6B7280", fontWeight: "700" }}>
-                Mark as Unavailable
+              <ThemedText style={{ 
+                color: product?.is_unavailable ? "#10B981" : "#6B7280", 
+                fontWeight: "700" 
+              }}>
+                {product?.is_unavailable ? "Mark as Available" : "Mark as Unavailable"}
               </ThemedText>
             </TouchableOpacity>
 

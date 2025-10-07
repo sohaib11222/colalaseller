@@ -42,3 +42,7 @@ export const markAsSold = async (productId, token) =>
 // Mark as Unavailable
 export const markAsUnavailable = async (productId, token) =>
   await apiCall(API_ENDPOINTS.PRODUCTS.Product_Mark_As_Unavailable(productId), "POST", undefined, token);
+
+// Mark as Available
+export const markAsAvailable = async (productId, token) =>
+  await apiCall(API_ENDPOINTS.PRODUCTS.Product_Mark_As_Available(productId), "POST", undefined, token);

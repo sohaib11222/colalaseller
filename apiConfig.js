@@ -64,7 +64,8 @@ const API_ENDPOINTS = {
     Product_Mark_As_Unavailable: (productId) =>
       `${API_DOMAIN}/seller/products/${productId}/mark-unavailable`, // POST
 
-
+    Product_Mark_As_Available: (productId) =>
+      `${API_DOMAIN}/seller/products/${productId}/mark-available`, // POST
   },
 
   SERVICES: {
@@ -78,7 +79,7 @@ const API_ENDPOINTS = {
 
     Service_Mark_As_Unavailable: (serviceId) =>
       `${API_DOMAIN}/seller/services/${serviceId}/mark-unavailable`, // POST
-    
+
     Service_Mark_As_Available: (serviceId) =>
       `${API_DOMAIN}/seller/services/${serviceId}/mark-available`, // POST
   },

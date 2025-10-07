@@ -76,3 +76,4 @@ export const markAsUnavailable = async (serviceId, token) =>
 
 export const markAsAvailable = async (serviceId, token) =>
   await apiCall(API_ENDPOINTS.SERVICES.Service_Mark_As_Available(serviceId), "POST", undefined, token);
+

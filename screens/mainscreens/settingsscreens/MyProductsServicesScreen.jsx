@@ -31,7 +31,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getProducts } from "../../../utils/queries/products";
 import { getServices } from "../../../utils/queries/services";
 import { useAuth } from "../../../contexts/AuthContext";
-
+import { getCategories } from "../../../utils/queries/general";
 export default function MyProductsServicesScreen({ navigation }) {
   const { theme } = useTheme();
   const { token } = useAuth();
