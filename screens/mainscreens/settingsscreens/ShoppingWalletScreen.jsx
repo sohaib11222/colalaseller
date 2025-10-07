@@ -24,7 +24,7 @@ import { StatusBar } from "expo-status-bar";
 //Code Related to the integration
 import { getTransactionHistory } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
-import { getOnboardingToken } from "../../../utils/tokenStorage";
+import { getToken } from "../../../utils/tokenStorage";
 import { useAuth } from "../../../contexts/AuthContext";
 
 /* ---------- Local icons (swap paths if different) ---------- */
@@ -172,7 +172,7 @@ const RowCard = ({ item, tab, C }) => {
 export default function ShoppingWalletScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const [onboardingToken, setOnboardingToken] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
@@ -199,21 +199,21 @@ export default function ShoppingWalletScreen() {
   const [wAccName, setWAccName] = useState("");
   const [saveDetails, setSaveDetails] = useState(false);
 
-  // Get onboarding token
+  // Get authentication token
   useEffect(() => {
-    const getToken = async () => {
+    const fetchToken = async () => {
       try {
-        console.log("🔍 Fetching onboarding token for transaction history...");
-        const token = await getOnboardingToken();
+        console.log("🔍 Fetching authentication token for transaction history...");
+        const token = await getToken();
         console.log("🔑 Transaction token retrieved:", token ? "Token present" : "No token");
         console.log("🔑 Transaction token value:", token);
-        setOnboardingToken(token);
+        setAuthToken(token);
       } catch (error) {
-        console.error("❌ Error getting onboarding token for transactions:", error);
-        setOnboardingToken(null);
+        console.error("❌ Error getting authentication token for transactions:", error);
+        setAuthToken(null);
       }
     };
-    getToken();
+    fetchToken();
   }, []);
 
   // Fetch transaction history data
@@ -223,12 +223,12 @@ export default function ShoppingWalletScreen() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["transactionHistory", onboardingToken],
+    queryKey: ["transactionHistory", authToken],
     queryFn: () => {
-      console.log("🚀 Executing getTransactionHistory API call with token:", onboardingToken);
-      return getTransactionHistory(onboardingToken);
+      console.log("🚀 Executing getTransactionHistory API call with token:", authToken);
+      return getTransactionHistory(authToken);
     },
-    enabled: !!onboardingToken,
+    enabled: !!authToken,
     onSuccess: (data) => {
       console.log("✅ Transaction history API call successful:", data);
     },

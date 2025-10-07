@@ -24,7 +24,7 @@ import {
   getEscrowHistory,
 } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
-import { getOnboardingToken } from "../../../utils/tokenStorage";
+import { getToken } from "../../../utils/tokenStorage";
 import { useAuth } from "../../../contexts/AuthContext";
 
 /* ---- MOCK DATA ---- */
@@ -125,7 +125,7 @@ function LockRow({ C, item, onPressLink }) {
 export default function EscrowWalletScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const [onboardingToken, setOnboardingToken] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
@@ -140,21 +140,21 @@ export default function EscrowWalletScreen() {
     [theme]
   );
 
-  // Get onboarding token
+  // Get authentication token
   useEffect(() => {
-    const getToken = async () => {
+    const fetchToken = async () => {
       try {
-        console.log("🔍 Fetching onboarding token for escrow wallet...");
-        const token = await getOnboardingToken();
+        console.log("🔍 Fetching authentication token for escrow wallet...");
+        const token = await getToken();
         console.log("🔑 Escrow token retrieved:", token ? "Token present" : "No token");
         console.log("🔑 Escrow token value:", token);
-        setOnboardingToken(token);
+        setAuthToken(token);
       } catch (error) {
-        console.error("❌ Error getting onboarding token for escrow:", error);
-        setOnboardingToken(null);
+        console.error("❌ Error getting authentication token for escrow:", error);
+        setAuthToken(null);
       }
     };
-    getToken();
+    fetchToken();
   }, []);
 
   // Fetch escrow wallet data
@@ -164,12 +164,12 @@ export default function EscrowWalletScreen() {
     error: walletError, 
     refetch: refetchWallet 
   } = useQuery({
-    queryKey: ['escrowWallet', onboardingToken],
+    queryKey: ['escrowWallet', authToken],
     queryFn: () => {
-      console.log("🚀 Executing getEscrowWallet API call with token:", onboardingToken);
-      return getEscrowWallet(onboardingToken);
+      console.log("🚀 Executing getEscrowWallet API call with token:", authToken);
+      return getEscrowWallet(authToken);
     },
-    enabled: !!onboardingToken,
+    enabled: !!authToken,
     onSuccess: (data) => {
       console.log("✅ Escrow wallet API call successful:", data);
     },
@@ -185,12 +185,12 @@ export default function EscrowWalletScreen() {
     error: historyError, 
     refetch: refetchHistory 
   } = useQuery({
-    queryKey: ['escrowHistory', onboardingToken],
+    queryKey: ['escrowHistory', authToken],
     queryFn: () => {
-      console.log("🚀 Executing getEscrowHistory API call with token:", onboardingToken);
-      return getEscrowHistory(onboardingToken);
+      console.log("🚀 Executing getEscrowHistory API call with token:", authToken);
+      return getEscrowHistory(authToken);
     },
-    enabled: !!onboardingToken,
+    enabled: !!authToken,
     onSuccess: (data) => {
       console.log("✅ Escrow history API call successful:", data);
     },

@@ -39,6 +39,20 @@ const shadow = (e = 10) =>
     },
   });
 
+// Get the current status from order_tracking array (most recent entry)
+const getCurrentStatus = (orderTracking) => {
+  if (!orderTracking || !Array.isArray(orderTracking) || orderTracking.length === 0) {
+    return "placed"; // default status
+  }
+  
+  // Sort by created_at to get the most recent status
+  const sortedTracking = [...orderTracking].sort((a, b) => 
+    new Date(b.created_at) - new Date(a.created_at)
+  );
+  
+  return sortedTracking[0].status;
+};
+
 const statusIndex = (s) => {
   if (s === "out_for_delivery") return 1;
   if (s === "delivered") return 2;
@@ -640,9 +654,12 @@ export default function SingleOrderDetailsScreen() {
   };
 
   const STATUS = ["Order placed", "Out for delivery", "Delivered", "Completed"];
-  const [statusIdx, setStatusIdx] = useState(statusIndex(detail?.status || "placed"));
-
+  const [activeFilter, setActiveFilter] = useState("all"); // "all", "placed", "out_for_delivery", "delivered", "completed"
   const [trackOpen, setTrackOpen] = useState(false);
+
+  // Get current status from order_tracking
+  const currentStatus = getCurrentStatus(detail?.order_tracking);
+  const currentStatusIndex = statusIndex(currentStatus);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -667,34 +684,63 @@ export default function SingleOrderDetailsScreen() {
         </View>
       </View>
 
-      {/* Tabs (visual only) */}
+      {/* Tabs (functional filters) */}
       <View style={styles.tabsWrap}>
         {STATUS.map((label, i) => {
-          const active = i === statusIdx;
+          const statusKey = i === 0 ? "placed" : 
+                           i === 1 ? "out_for_delivery" : 
+                           i === 2 ? "delivered" : "completed";
+          const isCurrentStatus = currentStatusIndex === i;
+          const isActiveFilter = activeFilter === statusKey;
+          
           return (
             <TouchableOpacity
               key={label}
               style={[
                 styles.tabBtn,
-                active
+                isActiveFilter
                   ? { backgroundColor: C.primary }
                   : { backgroundColor: "#ECEFF3", borderWidth: 1, borderColor: C.line },
               ]}
-              onPress={() => setStatusIdx(i)}
+              onPress={() => setActiveFilter(statusKey)}
               activeOpacity={0.9}
             >
-              <ThemedText style={[styles.tabTxt, { color: active ? "#fff" : C.text }]}>{label}</ThemedText>
+              <ThemedText style={[styles.tabTxt, { color: isActiveFilter ? "#fff" : C.text }]}>
+                {label}
+                {isCurrentStatus && " ✓"}
+              </ThemedText>
             </TouchableOpacity>
           );
         })}
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
-        <StoreBlock
-          C={C}
-          detail={detail}
-          onOpenTracker={() => setTrackOpen(true)}
-        />
+        {/* Show order content only if active filter matches current status */}
+        {(() => {
+          const statusKey = activeFilter === "all" ? null : activeFilter;
+          const shouldShowOrder = !statusKey || currentStatus === statusKey;
+          
+          if (!shouldShowOrder) {
+            return (
+              <View style={[styles.emptyState, { backgroundColor: C.card, borderColor: C.line }]}>
+                <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+                  No orders in this status
+                </ThemedText>
+                <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+                  This order is currently in "{currentStatus}" status
+                </ThemedText>
+              </View>
+            );
+          }
+          
+          return (
+            <StoreBlock
+              C={C}
+              detail={detail}
+              onOpenTracker={() => setTrackOpen(true)}
+            />
+          );
+        })()}
       </ScrollView>
 
       {/* Tracker modal bound to this order */}
@@ -702,7 +748,7 @@ export default function SingleOrderDetailsScreen() {
         visible={trackOpen}
         onClose={() => setTrackOpen(false)}
         C={C}
-        statusStr={detail?.status || "placed"}
+        statusStr={currentStatus}
         items={detail?.items || []}
         orderId={selectedId}
         onOpenChat={openChat}
@@ -962,6 +1008,27 @@ function makeStyles(C) {
       borderRadius: 22,
       padding: 18,
       ...shadow(12),
+    },
+
+    /* Empty state styles */
+    emptyState: {
+      padding: 32,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 20,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    emptyMessage: {
+      fontSize: 14,
+      textAlign: "center",
+      lineHeight: 20,
     },
   });
 }
