@@ -12,6 +12,7 @@ const API_ENDPOINTS = {
   SELLER: {
     // Level 1
     ProfileMedia: `${API_DOMAIN}/seller/onboarding/level1/profile-media`, // POST
+    AddUser: `${API_DOMAIN}/seller/store/users/add`,
     CategoriesSocial: `${API_DOMAIN}/seller/onboarding/level1/categories-social`, // POST
     // Level 2
     BusinessDetails: `${API_DOMAIN}/seller/onboarding/level2/business-details`, // POST
@@ -69,6 +70,9 @@ const API_ENDPOINTS = {
 
     Product_Quantity: (productId) =>
       `${API_DOMAIN}/seller/products/${productId}/quantity`, // POST
+    
+    BulkTemplate: `${API_DOMAIN}/seller/products/bulk-upload/template`, // GET
+    BulkUpload: `${API_DOMAIN}/seller/products/bulk-upload/file`, // POST
   },
 
 
@@ -192,6 +196,10 @@ const API_ENDPOINTS = {
     // GET -> fetch current store + all_categories
     // POST -> create/update store builder payload
     Builder: `${API_DOMAIN}/seller/store/builder`,
+    
+    // Access Control
+    Users: `${API_DOMAIN}/seller/store/users`, // GET
+    AddUser: `${API_DOMAIN}/seller/store/users/add`, // POST
   },
   LEADERBOARD: {
     Sellers: `${API_DOMAIN}/leaderboard/sellers`, // GET

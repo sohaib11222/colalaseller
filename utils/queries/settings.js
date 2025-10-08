@@ -70,3 +70,13 @@ export const getLoyaltiyPoints = async (token) =>
 export const getLoyaltiySetting = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Get_loyaltiy_Setting, "GET", undefined, token);
 
+export const addUserToStore = async (payload, token) => {
+  try {
+    const response = await apiCall(API_ENDPOINTS.SELLER.AddUser, "POST", payload, token);
+    return response;  // Return the response object
+  } catch (error) {
+    console.error("Error in adding user to store:", error);
+    throw error;  // Re-throw error for the calling function to handle
+  }
+};
+

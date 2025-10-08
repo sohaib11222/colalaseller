@@ -12,3 +12,17 @@ import { API_ENDPOINTS } from "../../apiConfig";
  */
 export const getStoreBuilder = async (token) =>
   await apiCall(API_ENDPOINTS.STORES.Builder, "GET", undefined, token);
+
+// Get Store Users
+export const getStoreUsers = async (token) => {
+  console.log("getStoreUsers called with token:", token ? "Token exists" : "No token");
+  console.log("API endpoint:", API_ENDPOINTS.STORES.Users);
+  try {
+    const result = await apiCall(API_ENDPOINTS.STORES.Users, "GET", undefined, token);
+    console.log("getStoreUsers API result:", result);
+    return result;
+  } catch (error) {
+    console.error("getStoreUsers API error:", error);
+    throw error;
+  }
+};

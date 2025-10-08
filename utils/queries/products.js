@@ -12,3 +12,6 @@ export const getProductChartData = async (id, token) =>
 
 export const getProductStatistics = async (id, token) =>
   await apiCall(API_ENDPOINTS.PRODUCTS.Get_Product_Statistics(id), "GET", undefined, token);
+
+export const getBulkTemplate = async (token) =>
+  await apiCall(API_ENDPOINTS.PRODUCTS.BulkTemplate, "GET", undefined, token);

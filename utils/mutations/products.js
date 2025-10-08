@@ -50,3 +50,8 @@ export const markAsAvailable = async (productId, token) =>
 // Quantity
 export const quantity = async (productId, payload, token) =>
   await apiCall(API_ENDPOINTS.PRODUCTS.Product_Quantity(productId), "PUT", payload, token);
+
+// Bulk Upload
+// payload = FormData with csv file
+export const bulkUploadProducts = async (payload, token) =>
+  await apiCall(API_ENDPOINTS.PRODUCTS.BulkUpload, "POST", payload, token);

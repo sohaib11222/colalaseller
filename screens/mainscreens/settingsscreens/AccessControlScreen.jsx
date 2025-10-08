@@ -10,7 +10,8 @@ import {
   Platform,
   TextInput,
   ScrollView,
-  
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,12 @@ import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
+
+// API Integration
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../../contexts/AuthContext";
+import { addStoreUser } from "../../../utils/mutations/stores";
+import { getStoreUsers } from "../../../utils/queries/stores";
 
 /* ----------------------- MOCK ----------------------- */
 const AV =
@@ -33,6 +40,8 @@ const INITIAL = [
 export default function AccessControlScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
 
   const C = useMemo(
     () => ({
@@ -46,10 +55,73 @@ export default function AccessControlScreen() {
     [theme]
   );
 
-  const [users, setUsers] = useState(INITIAL);
   const [showAdd, setShowAdd] = useState(false);
 
-  const removeUser = (id) => setUsers((u) => u.filter((x) => x.id !== id));
+  // Fetch store users
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    error: usersError,
+  } = useQuery({
+    queryKey: ["storeUsers", token],
+    queryFn: async () => {
+      console.log("Fetching store users with token:", token ? "Token exists" : "No token");
+      try {
+        const result = await getStoreUsers(token);
+        console.log("Store users API response:", result);
+        return result;
+      } catch (error) {
+        console.error("Error fetching store users:", error);
+        throw error;
+      }
+    },
+    enabled: !!token,
+    retry: 1,
+  });
+
+  // Add user mutation
+  const addUserMutation = useMutation({
+    mutationFn: (payload) => addStoreUser(payload, token),
+    onSuccess: (data) => {
+      console.log("User added successfully:", data);
+      if (data.status === "success") {
+        Alert.alert("Success", "User added to store successfully!");
+        // Invalidate and refetch users list
+        queryClient.invalidateQueries({ queryKey: ["storeUsers"] });
+        setShowAdd(false);
+      }
+    },
+    onError: (error) => {
+      console.error("Add user error:", error);
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to add user. Please try again.";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
+  // Get users from API or fallback to empty array
+  const users = usersData?.data || [];
+  
+  // Check if error is specifically about no store association
+  const isNoStoreError = usersError && (
+    usersError?.response?.data?.message?.includes("not associated with any store") ||
+    usersError?.message?.includes("not associated with any store")
+  );
+  
+  // Debug logging
+  console.log("AccessControlScreen Debug:");
+  console.log("- usersLoading:", usersLoading);
+  console.log("- usersError:", usersError);
+  console.log("- usersData:", usersData);
+  console.log("- users array:", users);
+  console.log("- isNoStoreError:", isNoStoreError);
+
+  const removeUser = (id) => {
+    // Note: This is a placeholder - you'll need to implement delete user API
+    Alert.alert("Delete User", "Delete user functionality not implemented yet.");
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={[""]}>
@@ -80,84 +152,155 @@ export default function AccessControlScreen() {
       </View>
 
       {/* Body */}
-      <FlatList
-        data={users}
-        keyExtractor={(i) => i.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-        ListHeaderComponent={
-          <View style={[styles.infoWrap, { backgroundColor: "#EEF1F6" }]}>
-            <ThemedText style={{ color: C.sub, fontSize: 12 }}>
-              Grant users access to manage parts of your account. Input the
-              user’s email and you can add a unique password for each user.
-            </ThemedText>
-
-            <ThemedText style={[styles.sectionTitle, { color: C.text, marginTop: 14 }]}>
-              Users
-            </ThemedText>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.userRow,
-              { backgroundColor: C.card, borderColor: C.line },
-            ]}
+      {usersLoading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <ThemedText style={{ color: C.sub, marginTop: 10 }}>
+            Loading users...
+          </ThemedText>
+        </View>
+      ) : isNoStoreError ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <Ionicons name="storefront-outline" size={48} color={C.sub} />
+          <ThemedText style={{ color: C.text, marginTop: 10, textAlign: "center", fontSize: 18, fontWeight: "600" }}>
+            No Store Associated
+          </ThemedText>
+          <ThemedText style={{ color: C.sub, marginTop: 8, textAlign: "center", fontSize: 14 }}>
+            You need to create or be associated with a store to manage users.
+          </ThemedText>
+          <TouchableOpacity
+            onPress={() => {
+              navigation.navigate("StoreBuilder");
+            }}
+            style={{
+              marginTop: 20,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              backgroundColor: C.primary,
+              borderRadius: 8,
+            }}
           >
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            <View style={{ flex: 1 }}>
-              <ThemedText style={{ color: C.text }}>{item.email}</ThemedText>
-              <ThemedText style={{ color: C.primary, fontSize: 12, marginTop: 4 }}>
-                {item.role}
+            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>Create Store</ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : usersError ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+          <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
+          <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+            Failed to load users. Please try again.
+          </ThemedText>
+          <ThemedText style={{ color: C.sub, marginTop: 5, textAlign: "center", fontSize: 12 }}>
+            Error: {usersError?.message || "Unknown error"}
+          </ThemedText>
+          <TouchableOpacity
+            onPress={() => {
+              queryClient.invalidateQueries({ queryKey: ["storeUsers"] });
+            }}
+            style={{
+              marginTop: 10,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              backgroundColor: C.primary,
+              borderRadius: 8,
+            }}
+          >
+            <ThemedText style={{ color: "#fff" }}>Retry</ThemedText>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(i) => i.id.toString()}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          ListHeaderComponent={
+            <View style={[styles.infoWrap, { backgroundColor: "#EEF1F6" }]}>
+              <ThemedText style={{ color: C.sub, fontSize: 12 }}>
+                Grant users access to manage parts of your account. Input the
+                user's email and you can add a unique password for each user.
+              </ThemedText>
+
+              <ThemedText style={[styles.sectionTitle, { color: C.text, marginTop: 14 }]}>
+                Users ({users.length})
               </ThemedText>
             </View>
-
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <SquareBtn
-                C={C}
-                onPress={() => {
-                  setShowAdd(true);
-                }}
-              >
-                <Ionicons name="create-outline" size={16} color={C.text} />
-              </SquareBtn>
-              <SquareBtn C={C} onPress={() => removeUser(item.id)}>
-                <Ionicons name="trash-outline" size={16} color={C.text} />
-              </SquareBtn>
+          }
+          ListEmptyComponent={
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 40 }}>
+              <Ionicons name="people-outline" size={48} color={C.sub} />
+              <ThemedText style={{ color: C.sub, marginTop: 10, textAlign: "center" }}>
+                No users found
+              </ThemedText>
             </View>
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        showsVerticalScrollIndicator={false}
-      />
+          }
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.userRow,
+                { backgroundColor: C.card, borderColor: C.line },
+              ]}
+            >
+              <Image 
+                source={{ uri: item.profile_picture || AV }} 
+                style={styles.avatar} 
+              />
+              <View style={{ flex: 1 }}>
+                <ThemedText style={{ color: C.text }}>{item.name || item.email}</ThemedText>
+                <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+                  {item.email}
+                </ThemedText>
+                <ThemedText style={{ color: C.primary, fontSize: 12, marginTop: 2 }}>
+                  {item.is_owner ? "Owner" : "User"}
+                </ThemedText>
+              </View>
 
-      {/* Add user CTA */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => setShowAdd(true)}
-        style={[styles.primaryBtn, { backgroundColor: C.primary }]}
-      >
-        <ThemedText style={styles.primaryBtnTxt}>Add new User</ThemedText>
-      </TouchableOpacity>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <SquareBtn
+                  C={C}
+                  onPress={() => {
+                    setShowAdd(true);
+                  }}
+                >
+                  <Ionicons name="create-outline" size={16} color={C.text} />
+                </SquareBtn>
+                <SquareBtn C={C} onPress={() => removeUser(item.id)}>
+                  <Ionicons name="trash-outline" size={16} color={C.text} />
+                </SquareBtn>
+              </View>
+            </View>
+          )}
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Add user CTA - Only show when we have successful data and not in error states */}
+      {!isNoStoreError && !usersError && usersData && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setShowAdd(true)}
+          style={[styles.primaryBtn, { backgroundColor: C.primary }]}
+        >
+          <ThemedText style={styles.primaryBtnTxt}>Add new User</ThemedText>
+        </TouchableOpacity>
+      )}
 
       {/* --------------- Full-screen ADD USER modal --------------- */}
       <AddUserModal
         visible={showAdd}
         onClose={() => setShowAdd(false)}
         onSave={(payload) => {
-          setUsers((u) => [
-            { id: String(Date.now()), email: payload.email, role: payload.role, avatar: AV },
-            ...u,
-          ]);
-          setShowAdd(false);
+          addUserMutation.mutate(payload);
         }}
         C={C}
+        isLoading={addUserMutation.isPending}
       />
     </SafeAreaView>
   );
 }
 
 /* ----------------------- MODAL ----------------------- */
-function AddUserModal({ visible, onClose, onSave, C }) {
+function AddUserModal({ visible, onClose, onSave, C, isLoading }) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [role, setRole] = useState("");
@@ -190,6 +333,12 @@ function AddUserModal({ visible, onClose, onSave, C }) {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
+          <Input
+            placeholder="User Name"
+            value={name}
+            onChangeText={setName}
+            C={C}
+          />
           <Input
             placeholder="User Email Address"
             keyboardType="email-address"
@@ -236,15 +385,35 @@ function AddUserModal({ visible, onClose, onSave, C }) {
 
         <TouchableOpacity
           activeOpacity={0.9}
-          style={[styles.primaryBtn, { backgroundColor: C.primary }]}
-          onPress={() => onSave({ email, role })}
+          disabled={!name || !email || !pwd || !role || isLoading}
+          style={[
+            styles.primaryBtn, 
+            { 
+              backgroundColor: (!name || !email || !pwd || !role || isLoading) ? "#6B7280" : C.primary,
+              opacity: isLoading ? 0.7 : 1
+            }
+          ]}
+          onPress={() => {
+            if (!name || !email || !pwd || !role) {
+              Alert.alert("Error", "Please fill in all fields");
+              return;
+            }
+            onSave({ name, email, password: pwd, role });
+          }}
         >
-          <ThemedText style={styles.primaryBtnTxt}>Save User</ThemedText>
+          {isLoading ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color="#fff" />
+              <ThemedText style={styles.primaryBtnTxt}>Adding User...</ThemedText>
+            </View>
+          ) : (
+            <ThemedText style={styles.primaryBtnTxt}>Save User</ThemedText>
+          )}
         </TouchableOpacity>
 
         {/* Role picker sheet */}
         <BottomSheet visible={roleSheet} onClose={() => setRoleSheet(false)} C={C} title="Select Role">
-          {["Admin", "Role 2"].map((r) => (
+          {["admin", "user"].map((r) => (
             <TouchableOpacity
               key={r}
               style={[styles.sheetItem, { backgroundColor: "#EDEFF3" }]}
@@ -253,7 +422,7 @@ function AddUserModal({ visible, onClose, onSave, C }) {
                 setRoleSheet(false);
               }}
             >
-              <ThemedText style={{ color: C.text }}>{r}</ThemedText>
+              <ThemedText style={{ color: C.text }}>{r.charAt(0).toUpperCase() + r.slice(1)}</ThemedText>
             </TouchableOpacity>
           ))}
         </BottomSheet>

@@ -16,3 +16,8 @@ import { API_ENDPOINTS } from "../../apiConfig";
  */
 export const submitStoreBuilder = async (payload, token) =>
   await apiCall(API_ENDPOINTS.STORES.Builder, "POST", payload, token);
+
+// Add User to Store
+// payload = { name, email, password, role }
+export const addStoreUser = async (payload, token) =>
+  await apiCall(API_ENDPOINTS.STORES.AddUser, "POST", payload, token);

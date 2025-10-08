@@ -10,9 +10,13 @@ import {
   SafeAreaView,
   Modal,
   Platform,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
@@ -26,6 +30,7 @@ import {
   createProduct,
   setBulkPrices,
   attachDeliveryOptions,
+  bulkUploadProducts,
 } from "../../utils/mutations/products";
 import { Alert, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +38,7 @@ import { getCategories, getBrands } from "../../utils/queries/general";
 import { updateProduct } from "../../utils/mutations/products";
 import { getCoupons } from "../../utils/queries/settings";
 import { getAddresses, getDeliveries } from "../../utils/queries/seller";
+import { getBulkTemplate } from "../../utils/queries/products";
 
 // handles: require(number) | string uri | { uri }
 const toSrc = (v) => {
@@ -326,6 +332,9 @@ export default function AddProductScreen({ navigation, route }) {
   //   size:  { [size]:{ price:'', compare:'', colors:[], images:[uri...] } } }
   const [variantDetailData, setVariantDetailData] = useState(null);
 
+  // CSV file state for preview
+  const [selectedCSVFile, setSelectedCSVFile] = useState(null);
+
   // summary for screen (under Add Variant)
   const screenVariantSummary = useMemo(() => {
     console.log("Building screen variant summary with:", {
@@ -501,12 +510,36 @@ export default function AddProductScreen({ navigation, route }) {
     },
   });
 
+  // Bulk Upload Mutation
+  const bulkUploadMutation = useMutation({
+    mutationFn: (payload) => bulkUploadProducts(payload, token),
+    onSuccess: (data) => {
+      console.log("Bulk upload successful:", data);
+      if (data.status === "success") {
+        Alert.alert(
+          "Success",
+          "Your template is successfully uploaded and Processing on background",
+          [{ text: "OK" }]
+        );
+      }
+    },
+    onError: (error) => {
+      console.error("Bulk upload error:", error);
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to upload bulk template";
+      Alert.alert("Error", errorMessage);
+    },
+  });
+
   // Combined loading state
   const isSubmitting =
     createProductMutation.isPending ||
     updateProductMutation.isPending ||
     setBulkPricesMutation.isPending ||
-    attachDeliveryMutation.isPending;
+    attachDeliveryMutation.isPending ||
+    bulkUploadMutation.isPending;
 
   /* ───────────────────────── API queries ───────────────────────── */
 
@@ -562,6 +595,17 @@ export default function AddProductScreen({ navigation, route }) {
   } = useQuery({
     queryKey: ["deliveries", token],
     queryFn: () => getDeliveries(token),
+    enabled: !!token,
+  });
+
+  // Fetch bulk template
+  const {
+    data: bulkTemplateData,
+    isLoading: bulkTemplateLoading,
+    error: bulkTemplateError,
+  } = useQuery({
+    queryKey: ["bulkTemplate", token],
+    queryFn: () => getBulkTemplate(token),
     enabled: !!token,
   });
 
@@ -998,6 +1042,157 @@ export default function AddProductScreen({ navigation, route }) {
             isEditMode ? "update" : "create"
           } product. Please try again.`
       );
+    }
+  };
+
+  /* ────────────────────── CSV download function ───────────────────── */
+  const downloadCSVTemplate = async () => {
+    try {
+      if (!bulkTemplateData?.data) {
+        Alert.alert("Error", "Template data not available. Please try again.");
+        return;
+      }
+
+      const templateData = bulkTemplateData.data;
+      const headers = templateData.headers;
+      const sampleRow = templateData.sample_row;
+      
+      // Create CSV content
+      let csvContent = headers.join(',') + '\n';
+      csvContent += headers.map(header => {
+        const value = sampleRow[header];
+        // Escape commas and quotes in CSV
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value || '';
+      }).join(',') + '\n';
+
+      // Create instructions row
+      const instructions = templateData.instructions;
+      csvContent += '\n# Instructions:\n';
+      Object.entries(instructions).forEach(([key, instruction]) => {
+        csvContent += `# ${key}: ${instruction}\n`;
+      });
+
+      // Create file path
+      const fileName = `bulk_upload_template_${new Date().getTime()}.csv`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      // Write file to device storage
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      
+      if (isAvailable) {
+        // Share the file (this will open the native share dialog)
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Download CSV Template',
+        });
+        
+        Alert.alert(
+          "Success",
+          "CSV template has been generated and is ready to share/download!",
+          [{ text: "OK" }]
+        );
+      } else {
+        // Fallback: show file location
+        Alert.alert(
+          "CSV Template Generated",
+          `CSV template has been saved to:\n${fileUri}\n\nYou can find it in your device's document directory.`,
+          [{ text: "OK" }]
+        );
+      }
+      
+    } catch (error) {
+      console.error("Error downloading CSV template:", error);
+      Alert.alert("Error", "Failed to download CSV template. Please try again.");
+    }
+  };
+
+  /* ────────────────────── CSV file selection function ───────────────────── */
+  const selectCSVFile = async () => {
+    try {
+      // Launch document picker for CSV files
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*', // Allow all file types initially
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      console.log("Document picker result:", result);
+
+      if (result.canceled) {
+        console.log("Document picker was canceled");
+        return;
+      }
+
+      if (!result.assets || result.assets.length === 0) {
+        console.log("No assets selected");
+        Alert.alert("No File Selected", "Please select a CSV file to upload.");
+        return;
+      }
+
+      const file = result.assets[0];
+      console.log("Selected file:", file);
+
+      // Check if it's a CSV file
+      const fileName = file.name || '';
+      const isCSV = fileName.toLowerCase().endsWith('.csv') || 
+                   file.mimeType === 'text/csv' || 
+                   file.mimeType === 'application/csv';
+
+      if (!isCSV) {
+        Alert.alert(
+          "Invalid File Type", 
+          "Please select a CSV file. The selected file is not a CSV format."
+        );
+        return;
+      }
+
+      // Store the selected file for preview
+      setSelectedCSVFile(file);
+      console.log("CSV file selected for preview:", file);
+      
+    } catch (error) {
+      console.error("Error selecting CSV file:", error);
+      Alert.alert("Error", "Failed to select CSV file. Please try again.");
+    }
+  };
+
+  /* ────────────────────── bulk upload function ───────────────────── */
+  const uploadBulkTemplate = async () => {
+    try {
+      if (!selectedCSVFile) {
+        Alert.alert("No File Selected", "Please select a CSV file first.");
+        return;
+      }
+
+      console.log("Starting upload with file:", selectedCSVFile);
+      
+      // Create FormData for the upload
+      const formData = new FormData();
+      formData.append("csv_file", {
+        uri: selectedCSVFile.uri,
+        type: selectedCSVFile.mimeType || "text/csv",
+        name: selectedCSVFile.name || "bulk_upload_template.csv",
+      });
+
+      console.log("FormData created, starting upload...");
+      
+      // Upload the file
+      await bulkUploadMutation.mutateAsync(formData);
+      
+      // Clear the selected file after successful upload
+      setSelectedCSVFile(null);
+      
+    } catch (error) {
+      console.error("Error uploading bulk template:", error);
+      Alert.alert("Error", "Failed to upload bulk template. Please try again.");
     }
   };
 
@@ -1478,7 +1673,9 @@ export default function AddProductScreen({ navigation, route }) {
             </View>
           ))}
 
-          <View
+          <TouchableOpacity
+            onPress={downloadCSVTemplate}
+            activeOpacity={0.8}
             style={[
               styles.downloadRow,
               { borderColor: C.line, backgroundColor: C.card },
@@ -1493,23 +1690,71 @@ export default function AddProductScreen({ navigation, route }) {
             <ThemedText style={{ color: C.text, flex: 1 }}>
               Download CSV bulk template
             </ThemedText>
-            <Ionicons name="download-outline" size={20} color={C.text} />
-          </View>
+            {bulkTemplateLoading ? (
+              <ActivityIndicator size="small" color={C.primary} />
+            ) : (
+              <Ionicons name="download-outline" size={20} color={C.text} />
+            )}
+          </TouchableOpacity>
 
-          <View style={[styles.uploadBox, { borderColor: C.line }]}>
-            <Ionicons name="cloud-upload-outline" size={22} color={C.sub} />
-            <ThemedText style={{ color: C.sub, marginTop: 6 }}>
-              Upload Filled template
-            </ThemedText>
-          </View>
+          {selectedCSVFile ? (
+            // Show CSV file preview
+            <View style={[styles.uploadBox, { borderColor: C.primary, backgroundColor: "#F0F9FF" }]}>
+              <Ionicons name="document-text-outline" size={22} color={C.primary} />
+              <ThemedText style={{ color: C.primary, marginTop: 6, fontWeight: "600" }}>
+                {selectedCSVFile.name}
+              </ThemedText>
+              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
+                CSV file selected
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setSelectedCSVFile(null)}
+                style={{ marginTop: 8 }}
+                activeOpacity={0.7}
+              >
+                <ThemedText style={{ color: C.primary, fontSize: 12 }}>
+                  Remove
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Show upload button
+            <TouchableOpacity
+              onPress={selectCSVFile}
+              activeOpacity={0.8}
+              style={[styles.uploadBox, { borderColor: C.line }]}
+            >
+              <Ionicons name="cloud-upload-outline" size={22} color={C.sub} />
+              <ThemedText style={{ color: C.sub, marginTop: 6 }}>
+                Upload Filled template
+              </ThemedText>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
+            onPress={uploadBulkTemplate}
             activeOpacity={0.9}
-            style={[styles.bulkBtn, { backgroundColor: "#6B7280" }]}
+            disabled={!selectedCSVFile || bulkUploadMutation.isPending}
+            style={[
+              styles.bulkBtn, 
+              { 
+                backgroundColor: selectedCSVFile && !bulkUploadMutation.isPending ? C.primary : "#6B7280",
+                opacity: (!selectedCSVFile || bulkUploadMutation.isPending) ? 0.6 : 1
+              }
+            ]}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-              Upload bulk Products
-            </ThemedText>
+            {bulkUploadMutation.isPending ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <ActivityIndicator size="small" color="#fff" />
+                <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                  Uploading...
+                </ThemedText>
+              </View>
+            ) : (
+              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                Upload bulk Products
+              </ThemedText>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
