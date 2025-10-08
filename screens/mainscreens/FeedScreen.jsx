@@ -56,8 +56,13 @@ const timeAgo = (iso) => {
 };
 
 const FALLBACK_AVATAR = require("../../assets/Ellipse 18.png");
-const src = (v) =>
-  typeof v === "number" ? v : v ? { uri: String(v) } : FALLBACK_AVATAR;
+const src = (v) => {
+  if (typeof v === "number") return v;
+  if (v && v !== null && v !== undefined) {
+    return { uri: String(v) };
+  }
+  return FALLBACK_AVATAR;
+};
 
 const extFromUri = (uri = "") => {
   const path = uri.split("?")[0];
@@ -79,15 +84,16 @@ const addQuery = (url, kv) => {
 
 const mapPost = (p) => {
   const storeName = p?.user?.store?.store_name || p?.user?.full_name || "Store";
-  // const avatar =
-  //   absUrl(p?.user?.profile_picture) || "https://via.placeholder.com/80";
   const avatar = absUrl(p?.user?.profile_picture) || null;
   const ver = p?.updated_at ? new Date(p.updated_at).getTime() : Date.now();
 
-  const images = (p?.media_urls || [])
+  // Handle both old and new API response structures
+  const mediaUrls = p?.media_urls || p?.media || [];
+  const images = mediaUrls
     .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
     .map((m) => {
-      const u = absUrl(m.url);
+      const url = m.url || m.path; // Handle both url and path fields
+      const u = absUrl(url);
       return u ? addQuery(u, { v: ver }) : null;
     })
     .filter(Boolean);
@@ -98,8 +104,8 @@ const mapPost = (p) => {
     avatar,
     location: "Lagos, Nigeria", // not in API → hardcoded
     timeAgo: timeAgo(p.created_at),
-    images: images.length ? images : undefined,
-    image: images.length ? undefined : null,
+    images: images.length ? images : [],
+    image: null, // Always null to avoid confusion
     caption: p.body,
     likes: p.likes_count ?? 0,
     comments: p.comments_count ?? 0,
@@ -207,7 +213,6 @@ function CreatePostModal({
       body: text || "Shared a new post",
       newFiles, // files to upload
       keptUrls: existingUrls, // URLs the user kept
-      // If your API supports removing media explicitly, we could also pass:
       removedUrls: (initialImageUrls || []).filter(
         (u) => !existingUrls.includes(u)
       ),
@@ -358,9 +363,7 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownloa
   const likeCount = liked
     ? (item.likes || 0) + (item.is_liked ? 0 : 1)
     : item.likes || 0;
-  const images = item.images?.length
-    ? item.images
-    : [item.image].filter(Boolean);
+  const images = item.images || [];
   const [activeIdx, setActiveIdx] = useState(0);
   const [carouselW, setCarouselW] = useState(0);
 
@@ -897,13 +900,21 @@ function useUpdatePost() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, body, files = [], visibility = "public" }) => {
+    mutationFn: async ({ id, body, files = [], visibility = "public", keptUrls = [], removedUrls = [] }) => {
       const token = await getToken();
       const fd = new FormData();
       if (body != null) fd.append("body", String(body));
       fd.append("visibility", String(visibility));
-      // Only uploading new images; if backend needs explicit replace/remove flags, tell me.
+      
+      // Add new files
       files.forEach((f) => fd.append("media[]", f));
+      
+      // Add kept URLs (existing media to keep)
+      keptUrls.forEach((url) => fd.append("kept_media[]", url));
+      
+      // Add removed URLs (existing media to remove)
+      removedUrls.forEach((url) => fd.append("removed_media[]", url));
+      
       return PostMutations.updatePost(id, fd, token);
     },
     onSuccess: (res, vars) => {
@@ -1165,8 +1176,7 @@ export default function FeedScreen() {
   }
 
   // helper to extract current server images from a post for edit modal
-  const getPostImageUrls = (p) =>
-    p?.images?.length ? p.images : p?.image ? [p.image] : [];
+  const getPostImageUrls = (p) => p?.images || [];
 
   return (
     <View style={[styles.screen, { backgroundColor: "#fff" }]}>
@@ -1321,13 +1331,13 @@ export default function FeedScreen() {
         initialCaption={activePost?.caption}
         initialImageUrls={getPostImageUrls(activePost)}
         headerAvatar={activePost?.avatar}
-        onSubmit={async ({ body, newFiles /* keptUrls, removedUrls */ }) => {
-          // NOTE: backend delete/replace behavior is unknown.
-          // We upload new files with caption update. Tell me if it needs "replace_media" or "remove_media_ids[]".
+        onSubmit={async ({ body, newFiles, keptUrls, removedUrls }) => {
           const res = await update.mutateAsync({
             id: activePost.id,
             body,
             files: newFiles,
+            keptUrls: keptUrls || [],
+            removedUrls: removedUrls || [],
           });
           const updated = res?.data?.data ? mapPost(res.data.data) : null;
           if (updated) {

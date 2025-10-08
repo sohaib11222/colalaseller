@@ -343,7 +343,7 @@ export default function AddProductScreen({ navigation, route }) {
       return true;
     }
 
-    const requiredStrings = [name, shortDesc, fullDesc, price, discountPrice];
+    const requiredStrings = [name, shortDesc, fullDesc, price];
     const allStringsFilled = requiredStrings.every(
       (v) => String(v ?? "").trim().length > 0
     );
@@ -588,7 +588,7 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("brand", brand); // Brand name (not brand_id)
     formData.append("description", fullDesc.trim());
     formData.append("price", price.toString());
-    formData.append("discount_price", discountPrice.toString());
+    formData.append("discount_price", discountPrice ? discountPrice.toString() : "");
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
 
@@ -738,7 +738,7 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("brand", brand); // Brand name (not brand_id)
     formData.append("description", fullDesc.trim());
     formData.append("price", price.toString());
-    formData.append("discount_price", discountPrice.toString());
+    formData.append("discount_price", discountPrice ? discountPrice.toString() : "");
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
 
@@ -879,8 +879,7 @@ export default function AddProductScreen({ navigation, route }) {
         !category ||
         !brand ||
         !fullDesc ||
-        !price ||
-        !discountPrice
+        !price
       ) {
         Alert.alert("Error", "Please fill in all required fields");
         return;

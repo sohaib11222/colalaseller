@@ -116,10 +116,10 @@ const mapChatItem = (it) => ({
   id: String(it.chat_id),
   name: it.user || "User",
   avatar: it.avatar || "https://i.pravatar.cc/100?img=65",
-  lastMessage: it.last_message ?? "How will i get my goods delivered ?",
+  lastMessage: it.last_message || null, // No dummy message - show null if no message
   time: it.last_message_at
     ? formatTime(it.last_message_at)
-    : "Today | 07:22 AM",
+    : null, // No dummy time - show null if no message
   unread: Number(it.unread_count || 0),
   chatType: it.chat_type || "general", // Include chat type from API
   _raw: it,
@@ -195,7 +195,7 @@ export default function ChatListScreen({ navigation }) {
       filteredList = filteredList.filter(
         (c) =>
           c.name.toLowerCase().includes(searchTerm) ||
-          (c.lastMessage || "").toLowerCase().includes(searchTerm)
+          (c.lastMessage ? c.lastMessage.toLowerCase().includes(searchTerm) : false)
       );
     }
     
@@ -258,17 +258,30 @@ export default function ChatListScreen({ navigation }) {
           >
             {item.name}
           </ThemedText>
-          <ThemedText
-            style={[styles.preview, { color: C.sub }]}
-            numberOfLines={1}
-          >
-            {item.lastMessage}
-          </ThemedText>
+          {item.lastMessage ? (
+            <ThemedText
+              style={[styles.preview, { color: C.sub }]}
+              numberOfLines={1}
+            >
+              {item.lastMessage}
+            </ThemedText>
+          ) : (
+            <ThemedText
+              style={[styles.preview, { color: C.sub, fontStyle: 'italic' }]}
+              numberOfLines={1}
+            >
+              No messages yet
+            </ThemedText>
+          )}
         </View>
         <View style={styles.rightCol}>
-          <ThemedText style={{ fontSize: 10, color: "#9BA0A6" }}>
-            {item.time}
-          </ThemedText>
+          {item.time ? (
+            <ThemedText style={{ fontSize: 10, color: "#9BA0A6" }}>
+              {item.time}
+            </ThemedText>
+          ) : (
+            <View style={{ height: 12 }} />
+          )}
           {unreadToShow ? (
             <View style={[styles.badge, { backgroundColor: C.primary }]}>
               <ThemedText style={styles.badgeText}>{unreadToShow}</ThemedText>

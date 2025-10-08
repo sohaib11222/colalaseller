@@ -401,7 +401,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
               <ThemedText
                 style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}
               >
-                ₦{Number(product.price || item.price || 0).toLocaleString()}
+                ₦{Number(product.discount_price || product.price || item.price || 0).toLocaleString()}
               </ThemedText>
               {product.discount_price && (
                 <ThemedText
@@ -412,7 +412,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                     marginTop: 2,
                   }}
                 >
-                  ₦{Number(product.discount_price).toLocaleString()}
+                  ₦{Number(product.price || item.price || 0).toLocaleString()}
                 </ThemedText>
               )}
               <ThemedText style={{ color: C.sub, marginTop: 6 }}>
@@ -725,10 +725,13 @@ function ViewProductModal(props) {
   const [tab, setTab] = useState("overview");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
-  const priceNow = `₦${Number(item.price || 0).toLocaleString()}`;
-  const oldPrice = item.discount_price
+  // Fix price display: discount_price should be the main price (red), price should be strikethrough
+  const priceNow = item.discount_price 
     ? `₦${Number(item.discount_price).toLocaleString()}`
-    : "₦3,000,000";
+    : `₦${Number(item.price || 0).toLocaleString()}`;
+  const oldPrice = item.discount_price 
+    ? `₦${Number(item.price || 0).toLocaleString()}`
+    : null;
 
   // Debug gallery info
   console.log("Gallery images:", gallery);
@@ -1062,7 +1065,7 @@ function ViewProductModal(props) {
                       >
                         {priceNow}
                       </ThemedText>
-                      {item.discount_price && (
+                      {oldPrice && (
                         <ThemedText
                           style={{
                             color: C.sub,
@@ -1906,10 +1909,10 @@ function ReviewAdModal({
               />
               <View style={{ padding: 10, gap: 4 }}>
                 <ThemedText style={{ fontWeight: "700", color: "#111" }}>
-                  {item.title || "Dell Inspiron Laptop"}
+                  {product?.name || item?.name || item?.title || "Product Name"}
                 </ThemedText>
                 <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
-                  ₦{Number(item.price || 2000000).toLocaleString()}
+                  ₦{Number(product?.discount_price || product?.price || item?.price || 0).toLocaleString()}
                 </ThemedText>
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 6 }}

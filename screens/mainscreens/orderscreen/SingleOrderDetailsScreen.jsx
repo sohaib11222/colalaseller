@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -77,6 +78,7 @@ function TrackOrderModal({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [inputCode, setInputCode] = useState("");
+  const [codeVerified, setCodeVerified] = useState(false);
   const isOutForDelivery = statusIndex(statusStr) >= 1;
   const isDelivered = statusIndex(statusStr) >= 2;
 
@@ -129,13 +131,34 @@ function TrackOrderModal({
   // verify delivery code
   const verifyMut = useMutation({
     mutationFn: async (code) => {
-      const token = await getToken();
-      return verifyCode(orderId, code, token); // POST with { code }
+      try {
+        console.log("=== VERIFY CODE DEBUG ===");
+        console.log("Order ID:", orderId);
+        console.log("Code:", code);
+        const token = await getToken();
+        console.log("Token:", token ? "Present" : "Missing");
+        const result = await verifyCode(orderId, code, token);
+        console.log("API Response:", result);
+        return result;
+      } catch (error) {
+        console.log("=== VERIFY CODE ERROR ===");
+        console.log("Error details:", error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("=== VERIFY SUCCESS ===");
+      console.log("Success data:", data);
       qc.invalidateQueries({ queryKey: ["orders", "detail", String(orderId)] });
       setCodeOpen(false);
       setInputCode("");
+      setCodeVerified(true); // Mark code as verified
+    },
+    onError: (error) => {
+      console.log("=== VERIFY ERROR ===");
+      console.log("Error:", error);
+      // You can add an alert here to show the error to the user
+      Alert.alert("Verification Failed", error.message || "Please check your code and try again.");
     },
   });
 
@@ -268,104 +291,110 @@ function TrackOrderModal({
             <StepCard title="Order Placed" highlight />
           </View>
 
-          {/* 2 - Out for delivery */}
-          <View style={{ flexDirection: "row", marginBottom: 20 }}>
-            <View style={{ width: 46, alignItems: "center" }}>
-              <View
-                style={[
-                  styles.dot,
-                  statusIndex(statusStr) >= 1
-                    ? { backgroundColor: C.primary, borderColor: C.primary }
-                    : { backgroundColor: "#fff", borderColor: C.primary },
-                ]}
-              >
-                <ThemedText style={{ color: statusIndex(statusStr) >= 1 ? "#fff" : C.primary, fontWeight: "700" }}>
-                  2
-                </ThemedText>
-              </View>
-              <View style={[styles.vLine, { backgroundColor: C.primary }]} />
-            </View>
-            <StepCard
-              title="Out for Delivery"
-              highlight
-              showAction
-              disabledAction={statusIndex(statusStr) >= 1}
-              actionLabel={statusIndex(statusStr) >= 1 ? "Out for delivery" : "Mark as out for delivery"}
-              onActionPress={() => setConfirmOpen(true)}
-            />
-          </View>
-
-          {/* 3 - Delivered */}
-          <View style={{ flexDirection: "row", marginBottom: 20 }}>
-            <View style={{ width: 46, alignItems: "center" }}>
-              <View
-                style={[
-                  styles.dot,
-                  statusIndex(statusStr) >= 2
-                    ? { backgroundColor: C.primary, borderColor: C.primary }
-                    : { backgroundColor: "#fff", borderColor: C.primary },
-                ]}
-              >
-                <ThemedText style={{ color: statusIndex(statusStr) >= 2 ? "#fff" : C.primary, fontWeight: "700" }}>
-                  3
-                </ThemedText>
-              </View>
-              <View style={[styles.vLine, { backgroundColor: C.primary }]} />
-            </View>
-            <StepCard
-              title="Delivered"
-              highlight
-              warning
-              showRequest
-              onRequestCode={() => setCodeOpen(true)}
-              disabledRequest={isDelivered}
-              onDisputePress={onOpenChat}
-            />
-          </View>
-
-          {/* 4 - Funds Released (not in API → keep hardcoded) */}
-          <View style={{ flexDirection: "row", marginBottom: 20 }}>
-            <View style={{ width: 46, alignItems: "center" }}>
-              <View
-                style={[
-                  styles.dot,
-                  statusIndex(statusStr) >= 3
-                    ? { backgroundColor: C.primary, borderColor: C.primary }
-                    : { backgroundColor: "#fff", borderColor: C.primary },
-                ]}
-              >
-                <ThemedText style={{ color: statusIndex(statusStr) >= 3 ? "#fff" : C.primary, fontWeight: "700" }}>
-                  4
-                </ThemedText>
-              </View>
-            </View>
-            <View style={styles.stepCard}>
-              <View style={{ flexDirection: "row" }}>
-                <Image source={productImg} style={styles.stepImg} />
-                <View style={{ flex: 1, paddingLeft: 12 }}>
-                  <ThemedText style={[styles.stepTitle, { color: C.text }]}>Funds Released</ThemedText>
-                  <ThemedText style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}>
-                    {firstTitle}
+          {/* 2 - Out for delivery - Show only if order is placed or out for delivery */}
+          {statusIndex(statusStr) >= 0 && (
+            <View style={{ flexDirection: "row", marginBottom: 20 }}>
+              <View style={{ width: 46, alignItems: "center" }}>
+                <View
+                  style={[
+                    styles.dot,
+                    statusIndex(statusStr) >= 1
+                      ? { backgroundColor: C.primary, borderColor: C.primary }
+                      : { backgroundColor: "#fff", borderColor: C.primary },
+                  ]}
+                >
+                  <ThemedText style={{ color: statusIndex(statusStr) >= 1 ? "#fff" : C.primary, fontWeight: "700" }}>
+                    2
                   </ThemedText>
-                  <ThemedText style={[styles.stepPrice, { color: C.primary }]}>
-                    {currency(detail?.subtotal_with_shipping || 0)}
+                </View>
+                <View style={[styles.vLine, { backgroundColor: C.primary }]} />
+              </View>
+              <StepCard
+                title="Out for Delivery"
+                highlight
+                showAction
+                disabledAction={statusIndex(statusStr) >= 1}
+                actionLabel={statusIndex(statusStr) >= 1 ? "Out for delivery" : "Mark as out for delivery"}
+                onActionPress={() => setConfirmOpen(true)}
+              />
+            </View>
+          )}
+
+          {/* 3 - Delivered - Show only if order is out for delivery or delivered */}
+          {statusIndex(statusStr) >= 1 && (
+            <View style={{ flexDirection: "row", marginBottom: 20 }}>
+              <View style={{ width: 46, alignItems: "center" }}>
+                <View
+                  style={[
+                    styles.dot,
+                    statusIndex(statusStr) >= 2
+                      ? { backgroundColor: C.primary, borderColor: C.primary }
+                      : { backgroundColor: "#fff", borderColor: C.primary },
+                  ]}
+                >
+                  <ThemedText style={{ color: statusIndex(statusStr) >= 2 ? "#fff" : C.primary, fontWeight: "700" }}>
+                    3
+                  </ThemedText>
+                </View>
+                <View style={[styles.vLine, { backgroundColor: C.primary }]} />
+              </View>
+              <StepCard
+                title="Delivered"
+                highlight
+                warning
+                showRequest
+                onRequestCode={() => setCodeOpen(true)}
+                disabledRequest={isDelivered || codeVerified}
+                onDisputePress={onOpenChat}
+              />
+            </View>
+          )}
+
+          {/* 4 - Funds Released - Show only if order is delivered or completed */}
+          {statusIndex(statusStr) >= 2 && (
+            <View style={{ flexDirection: "row", marginBottom: 20 }}>
+              <View style={{ width: 46, alignItems: "center" }}>
+                <View
+                  style={[
+                    styles.dot,
+                    statusIndex(statusStr) >= 3
+                      ? { backgroundColor: C.primary, borderColor: C.primary }
+                      : { backgroundColor: "#fff", borderColor: C.primary },
+                  ]}
+                >
+                  <ThemedText style={{ color: statusIndex(statusStr) >= 3 ? "#fff" : C.primary, fontWeight: "700" }}>
+                    4
                   </ThemedText>
                 </View>
               </View>
+              <View style={styles.stepCard}>
+                <View style={{ flexDirection: "row" }}>
+                  <Image source={productImg} style={styles.stepImg} />
+                  <View style={{ flex: 1, paddingLeft: 12 }}>
+                    <ThemedText style={[styles.stepTitle, { color: C.text }]}>Funds Released</ThemedText>
+                    <ThemedText style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}>
+                      {firstTitle}
+                    </ThemedText>
+                    <ThemedText style={[styles.stepPrice, { color: C.primary }]}>
+                      {currency(detail?.subtotal_with_shipping || 0)}
+                    </ThemedText>
+                  </View>
+                </View>
 
-              <TouchableOpacity
-                style={[styles.revealBtn, { backgroundColor: C.primary, marginTop: 12 }]}
-                onPress={() => { 
-                 //navigate tto EscrowWallet
-                 navigation.navigate("ChatNavigator", {
-                  screen: "EscrowWallet",
-                 });
-                }}
-              >
-                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>View Wallet</ThemedText>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.revealBtn, { backgroundColor: C.primary, marginTop: 12 }]}
+                  onPress={() => { 
+                   //navigate tto EscrowWallet
+                   navigation.navigate("ChatNavigator", {
+                    screen: "EscrowWallet",
+                   });
+                  }}
+                >
+                  <ThemedText style={{ color: "#fff", fontWeight: "600" }}>View Wallet</ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
         </ScrollView>
 
         {/* Confirm Out for Delivery */}
@@ -478,7 +507,7 @@ function StoreBlock({ C, detail, onOpenTracker }) {
   // Use actual API values, show 0 if not available
   const coupon = detail?.discount ? Number(detail.discount) : 0;
   const points = 0; // Not available in API, show 0
-  const fee = detail?.shipping_fee != null ? Number(detail.shipping_fee) : 0;
+  const fee = 10000; // Hardcoded delivery fee of 10,000
   const totalPay = detail?.subtotal_with_shipping != null ? Number(detail.subtotal_with_shipping) : itemsCost;
   const onOpenChat = () => {
     console.log("=== STORE BLOCK CHAT NAVIGATION DEBUG ===");

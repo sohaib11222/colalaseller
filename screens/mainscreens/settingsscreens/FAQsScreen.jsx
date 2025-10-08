@@ -10,10 +10,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { Video } from "expo-av";
+import { WebView } from "react-native-webview";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
@@ -57,6 +61,8 @@ export default function FAQsScreen() {
   });
 
   const [openId, setOpenId] = useState(null);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState(null);
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
@@ -170,8 +176,8 @@ export default function FAQsScreen() {
                 <TouchableOpacity
                   style={styles.videoTouchable}
                   onPress={() => {
-                    // Handle video play - you can implement video player here
-                    Alert.alert("Video", "Video playback would open here");
+                    setCurrentVideoUrl(categoryData.video);
+                    setVideoModalVisible(true);
                   }}
                 />
               </View>
@@ -231,6 +237,40 @@ export default function FAQsScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Video Modal */}
+      <Modal
+        visible={videoModalVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setVideoModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={styles.videoModalHeader}>
+            <TouchableOpacity
+              onPress={() => setVideoModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          {currentVideoUrl && (
+            <View style={styles.videoContainer}>
+              <WebView
+                source={{ uri: currentVideoUrl }}
+                style={styles.webView}
+                allowsFullscreenVideo={true}
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                startInLoadingState={true}
+                scalesPageToFit={true}
+              />
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -374,6 +414,27 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  // Video modal styles
+  videoModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#000',
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  videoContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  webView: {
+    flex: 1,
   },
 
   // Empty state styles

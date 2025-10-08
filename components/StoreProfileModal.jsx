@@ -2132,7 +2132,7 @@ export default function StoreProfileModal({
               <ThemedText
                 style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}
               >
-                New arrivals coming tomorrow
+                {storeApi?.announcements?.[0]?.message || "New arrivals coming tomorrow"}
               </ThemedText>
             </View>
           </View>

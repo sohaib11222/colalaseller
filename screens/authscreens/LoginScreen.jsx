@@ -11,6 +11,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -85,15 +87,24 @@ const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        {/* Top Image Banner */}
-        <Image
-          source={require("../../assets/mainimage.png")} // Replace with your combined top image
-          style={styles.topImage}
-        />
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Top Image Banner */}
+          <Image
+            source={require("../../assets/mainimage.png")} // Replace with your combined top image
+            style={styles.topImage}
+          />
 
-        {/* White Card Container */}
-        <View style={styles.card}>
+          {/* White Card Container */}
+          <View style={styles.card}>
           <ThemedText style={styles.title}>Login</ThemedText>
           <ThemedText style={styles.subtitle}>Login to your account</ThemedText>
 
@@ -190,20 +201,21 @@ const LoginScreen = () => {
             <View style={styles.storeButtons}>
               <TouchableOpacity style={{ marginLeft: -100 }}>
                 <Image
-                  source={require("../../assets/image 58.png")} // Replace with actual App Store badge
+                  source={require("../../assets/Frame 2337 (1).png")} // Replace with actual App Store badge
                   style={styles.storeImage}
                 />
               </TouchableOpacity>
               <TouchableOpacity style={{ marginRight: 10 }}>
                 <Image
-                  source={require("../../assets/image 57.png")} // Replace with actual Play Store badge
+                  source={require("../../assets/Frame 2338 (2).png")} // Replace with actual Play Store badge
                   style={styles.storeImage}
                 />
               </TouchableOpacity>
             </View>
           </LinearGradient>
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -314,11 +326,12 @@ const styles = StyleSheet.create({
   storeButtons: {
     flexDirection: "row",
     justifyContent: "flex-start",
+    gap: 10,
   },
   storeImage: {
-    width: 100,
-    height: 30,
-    borderRadius: 15,
+    width: 73,
+    height: 25,
+    borderRadius: 5,
     resizeMode: "contain",
   },
 });
