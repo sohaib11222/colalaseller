@@ -1,0 +1,18 @@
+0 verbose cli /usr/local/Cellar/node/24.4.0/bin/node /usr/local/bin/npm
+1 info using npm@11.4.2
+2 info using node@v24.4.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/macbookpro/colalaseller/.npmrc
+5 silly config load:file:/Users/macbookpro/.npmrc
+6 silly config load:file:/usr/local/etc/npmrc
+7 verbose title npm start
+8 verbose argv "start" "--cache" "clear"
+9 verbose logfile logs-max:10 dir:/Users/macbookpro/colalaseller/clear/_logs/2025-10-07T23_45_35_577Z-
+10 verbose logfile /Users/macbookpro/colalaseller/clear/_logs/2025-10-07T23_45_35_577Z-debug-0.log
+11 silly logfile done cleaning log files
+12 verbose cwd /Users/macbookpro/colalaseller
+13 verbose os Darwin 22.6.0
+14 verbose node v24.4.0
+15 verbose npm  v11.4.2
+16 verbose exit 0
+17 info ok

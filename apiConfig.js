@@ -107,7 +107,7 @@ const API_ENDPOINTS = {
   SETTINGS: {
     Balance: `${API_DOMAIN}/buyer/getBalance`, // GET
     FAQs: `${API_DOMAIN}/faqs/category/name/general`, // GET
-    Escrow_Wallet: `${API_DOMAIN}/faqs/escrow`, // GET
+    Escrow_Wallet: `${API_DOMAIN}/seller/escrow`, // GET
     Escrow_History: `${API_DOMAIN}/faqs/escrow/history`, // GET
     Transaction_History: `${API_DOMAIN}/user/transactions`, // GET
     Notifications: `${API_DOMAIN}/notifications`, // GET

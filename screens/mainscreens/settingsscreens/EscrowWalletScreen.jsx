@@ -21,7 +21,6 @@ import { StatusBar } from "expo-status-bar";
 //Code Related to the integration
 import {
   getEscrowWallet,
-  getEscrowHistory,
 } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
@@ -157,7 +156,7 @@ export default function EscrowWalletScreen() {
     fetchToken();
   }, []);
 
-  // Fetch escrow wallet data
+  // Fetch escrow wallet data (includes both balance and history)
   const { 
     data: walletData, 
     isLoading: walletLoading, 
@@ -178,34 +177,13 @@ export default function EscrowWalletScreen() {
     },
   });
 
-  // Fetch escrow history data
-  const { 
-    data: historyData, 
-    isLoading: historyLoading, 
-    error: historyError, 
-    refetch: refetchHistory 
-  } = useQuery({
-    queryKey: ['escrowHistory', authToken],
-    queryFn: () => {
-      console.log("🚀 Executing getEscrowHistory API call with token:", authToken);
-      return getEscrowHistory(authToken);
-    },
-    enabled: !!authToken,
-    onSuccess: (data) => {
-      console.log("✅ Escrow history API call successful:", data);
-    },
-    onError: (error) => {
-      console.error("❌ Escrow history API call failed:", error);
-    },
-  });
-
   // Handle pull-to-refresh
   const onRefresh = async () => {
     console.log("🔄 Starting escrow pull-to-refresh...");
     setRefreshing(true);
     try {
-      console.log("🔄 Refreshing escrow wallet and history data...");
-      await Promise.all([refetchWallet(), refetchHistory()]);
+      console.log("🔄 Refreshing escrow wallet data...");
+      await refetchWallet();
       console.log("✅ Escrow data refreshed successfully");
     } catch (error) {
       console.error("❌ Error refreshing escrow data:", error);
@@ -217,13 +195,12 @@ export default function EscrowWalletScreen() {
 
   // Extract data from API responses
   const lockedBalance = walletData?.data?.locked_balance || "0.00";
-  const historyList = historyData?.data?.data || [];
-  const isLoading = walletLoading || historyLoading;
-  const hasError = walletError || historyError;
+  const historyList = walletData?.data?.history || [];
+  const isLoading = walletLoading;
+  const hasError = walletError;
 
   // Debug logging for data extraction
   console.log("📊 Escrow wallet data:", walletData);
-  console.log("📊 Escrow history data:", historyData);
   console.log("💰 Locked balance:", lockedBalance);
   console.log("📋 History list length:", historyList.length);
   console.log("⏳ Is loading:", isLoading);
@@ -343,13 +320,12 @@ export default function EscrowWalletScreen() {
             Failed to load escrow data
           </ThemedText>
           <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
-            {walletError?.message || historyError?.message || "Unable to fetch escrow wallet data. Please check your connection and try again."}
+            {walletError?.message || "Unable to fetch escrow wallet data. Please check your connection and try again."}
           </ThemedText>
           <TouchableOpacity
             onPress={() => {
               console.log("🔄 Retrying escrow data fetch...");
               refetchWallet();
-              refetchHistory();
             }}
             style={[styles.retryButton, { backgroundColor: C.primary }]}
           >

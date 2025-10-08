@@ -33,84 +33,7 @@ const ICONS = {
   payments: require("../../../assets/Money.png"),
 };
 
-/* ---------- Mock data ---------- */
-const whenText = "07/10/25 - 06:22 AM";
-
-const WITHDRAWALS = [
-  {
-    id: "w1",
-    title: "Funds Deposit",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-  {
-    id: "w2",
-    title: "Funds Deposit",
-    amount: 20000,
-    status: "pending",
-    when: whenText,
-  },
-  {
-    id: "w3",
-    title: "Funds Deposit",
-    amount: 20000,
-    status: "failed",
-    when: whenText,
-  },
-  {
-    id: "w4",
-    title: "Funds Deposit",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-  {
-    id: "w5",
-    title: "Funds Deposit",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-];
-
-const PAYMENTS = [
-  {
-    id: "p1",
-    title: "Order Payment - Wallet",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-  {
-    id: "p2",
-    title: "Order Payment - Flutterwave",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-  {
-    id: "p3",
-    title: "Order Payment",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-  {
-    id: "p4",
-    title: "Order Payment",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-  {
-    id: "p5",
-    title: "Order Payment",
-    amount: 20000,
-    status: "successful",
-    when: whenText,
-  },
-];
+/* ---------- No dummy data - using real API data only ---------- */
 
 /* ---------- Small helpers ---------- */
 const StatusLabel = ({ status, C }) => {
@@ -137,7 +60,7 @@ const TxIcon = ({ type }) => (
   </View>
 );
 
-const RowCard = ({ item, tab, C }) => {
+const RowCard = ({ item, tab, C, onPress }) => {
   const amountColor =
     item.status === "failed"
       ? "#E11D48"
@@ -146,8 +69,10 @@ const RowCard = ({ item, tab, C }) => {
       : "#18A957";
 
   return (
-    <View
+    <TouchableOpacity
       style={[styles.rowCard, { borderColor: C.line, backgroundColor: C.card }]}
+      onPress={() => onPress(item)}
+      activeOpacity={0.7}
     >
       <TxIcon type={tab} />
 
@@ -164,7 +89,7 @@ const RowCard = ({ item, tab, C }) => {
           {item.when}
         </ThemedText>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -253,8 +178,9 @@ export default function ShoppingWalletScreen() {
     }
   };
 
-  // Extract data from API response
+  // Extract data from API response - using actual API structure
   const balance = transactionData?.data?.balance || 0;
+  const transactions = transactionData?.data?.transactions || [];
   const withdrawals = transactionData?.data?.withdrawals || [];
   const deposits = transactionData?.data?.deposits || [];
   const orderPayments = transactionData?.data?.orderPayments || [];
@@ -262,6 +188,7 @@ export default function ShoppingWalletScreen() {
   // Debug logging for transaction data
   console.log("📊 Transaction data:", transactionData);
   console.log("💰 Balance:", balance);
+  console.log("📋 All transactions count:", transactions.length);
   console.log("📤 Withdrawals count:", withdrawals.length);
   console.log("📥 Deposits count:", deposits.length);
   console.log("💳 Order payments count:", orderPayments.length);
@@ -294,16 +221,45 @@ export default function ShoppingWalletScreen() {
     
     let baseData = [];
     if (tab === "withdrawals") {
-      // Combine withdrawals and deposits for withdrawals tab
-      baseData = [...mapTransactionData(withdrawals, "withdrawal"), ...mapTransactionData(deposits, "deposit")];
+      // Use withdrawals and deposits from API, or fallback to all transactions if specific arrays are empty
+      if (withdrawals.length > 0 || deposits.length > 0) {
+        baseData = [...mapTransactionData(withdrawals, "withdrawal"), ...mapTransactionData(deposits, "deposit")];
+      } else if (transactions.length > 0) {
+        // Filter transactions by type if specific withdrawal/deposit arrays are not available
+        baseData = mapTransactionData(transactions.filter(tx => 
+          tx.type === 'withdrawal' || tx.type === 'deposit' || tx.type === 'transfer'
+        ), "transaction");
+      } else {
+        // No data available
+        baseData = [];
+      }
     } else {
-      // Use order payments for payments tab
-      baseData = mapTransactionData(orderPayments, "order_payment");
+      // Use order payments from API, or fallback to all transactions if specific array is empty
+      if (orderPayments.length > 0) {
+        baseData = mapTransactionData(orderPayments, "order_payment");
+      } else if (transactions.length > 0) {
+        // Filter transactions by type if specific order payments array is not available
+        baseData = mapTransactionData(transactions.filter(tx => 
+          tx.type === 'payment' || tx.type === 'order_payment' || tx.type === 'purchase'
+        ), "transaction");
+      } else {
+        // No data available
+        baseData = [];
+      }
     }
     
     if (filter === "all") return baseData;
     return baseData.filter((r) => r.status === filter);
-  }, [tab, filter, withdrawals, deposits, orderPayments, isLoading, error]);
+  }, [tab, filter, transactions, withdrawals, deposits, orderPayments, isLoading, error]);
+
+  // Handle transaction press - navigate to detail screen
+  const handleTransactionPress = (item) => {
+    console.log("Transaction pressed:", item);
+    navigation.navigate("ChatNavigator", {
+      screen: "TransactionDetail",
+      params: { transaction: item }
+    });
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -467,7 +423,7 @@ export default function ShoppingWalletScreen() {
             </View>
           </View>
         }
-        renderItem={({ item }) => <RowCard item={item} tab={tab} C={C} />}
+        renderItem={({ item }) => <RowCard item={item} tab={tab} C={C} onPress={handleTransactionPress} />}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={

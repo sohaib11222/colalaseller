@@ -69,6 +69,7 @@ function TrackOrderModal({
   items = [],
   onOpenChat,
   orderId,
+  detail,
 }) {
   const styles = useMemo(() => makeStyles(C), [C]);
   const qc = useQueryClient();
@@ -81,8 +82,8 @@ function TrackOrderModal({
 
   const idx = statusIndex(statusStr);
   const firstItem = items?.[0];
-  const firstTitle = firstItem?.name ?? "Iphone 16 pro max - Black"; // not provided → hardcoded
-  const firstPrice = firstItem?.unit_price ?? 2500000;
+  const firstTitle = firstItem?.name || "Product";
+  const firstPrice = firstItem?.unit_price || 0;
 
   // const markMut = useMutation({
   //   mutationFn: async () => {
@@ -158,7 +159,9 @@ function TrackOrderModal({
           <ThemedText style={[styles.stepTitle, { color: highlight ? C.primary : C.text }]}>{title}</ThemedText>
           <ThemedText style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}>{firstTitle}</ThemedText>
           <ThemedText style={[styles.stepPrice, { color: C.primary }]}>{currency(firstPrice)}</ThemedText>
-          <ThemedText style={[styles.stepTime, { color: C.sub }]}>5th Aug 2025 - 07:22 AM</ThemedText>
+          <ThemedText style={[styles.stepTime, { color: C.sub }]}>
+            {firstItem?.created_at ? new Date(firstItem.created_at).toLocaleDateString() : "N/A"}
+          </ThemedText>
         </View>
       </View>
 
@@ -344,7 +347,9 @@ function TrackOrderModal({
                   <ThemedText style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}>
                     {firstTitle}
                   </ThemedText>
-                  <ThemedText style={[styles.stepPrice, { color: C.primary }]}>{currency(firstPrice)}</ThemedText>
+                  <ThemedText style={[styles.stepPrice, { color: C.primary }]}>
+                    {currency(detail?.subtotal_with_shipping || 0)}
+                  </ThemedText>
                 </View>
               </View>
 
@@ -462,23 +467,34 @@ function StoreBlock({ C, detail, onOpenTracker }) {
 
   const items = detail?.items || [];
   console.log("detail", detail);
-  const showItems = items.length ? items : [{ id: "x", name: "Iphone 16 pro max - Black", unit_price: 2500000, qty: 1 }];
+  
+  // Use actual items from API, no fallback to hardcoded data
+  const showItems = items;
 
-  // Use API numbers if present; otherwise keep hardcoded examples
-  const itemsCount = items.reduce((a, b) => a + (Number(b.qty) || 0), 0) || 2;
-  const itemsCost =
-    items.reduce((a, b) => a + (Number(b.unit_price) || 0) * (Number(b.qty) || 0), 0) ||
-    2_500_000 * 2;
+  // Calculate from actual API data
+  const itemsCount = items.reduce((a, b) => a + (Number(b.qty) || 0), 0);
+  const itemsCost = items.reduce((a, b) => a + (Number(b.unit_price) || 0) * (Number(b.qty) || 0), 0);
 
-  const coupon = detail?.discount ? Number(detail.discount) : 5_000; // API has `discount` as string
-  const points = 10_000; // not in API → hardcoded
-  const fee =
-    detail?.shipping_fee != null ? Number(detail.shipping_fee) : 10_000; // API has shipping_fee
-  const totalPay =
-    detail?.subtotal_with_shipping != null
-      ? Number(detail.subtotal_with_shipping)
-      : itemsCost - coupon - points + fee;
+  // Use actual API values, show 0 if not available
+  const coupon = detail?.discount ? Number(detail.discount) : 0;
+  const points = 0; // Not available in API, show 0
+  const fee = detail?.shipping_fee != null ? Number(detail.shipping_fee) : 0;
+  const totalPay = detail?.subtotal_with_shipping != null ? Number(detail.subtotal_with_shipping) : itemsCost;
   const onOpenChat = () => {
+    console.log("=== STORE BLOCK CHAT NAVIGATION DEBUG ===");
+    console.log("Opening chat with chat_id:", detail?.chat?.id);
+    console.log("Full chat object:", detail?.chat);
+    console.log("Full detail object keys:", detail ? Object.keys(detail) : "No detail");
+    console.log("Navigation params being passed:", { chat_id: detail?.chat?.id });
+    
+    if (!detail?.chat?.id) {
+      console.warn("⚠️ WARNING: No chat_id found in detail.chat");
+      console.log("Available detail keys:", detail ? Object.keys(detail) : "No detail");
+      if (detail?.chat) {
+        console.log("Chat object keys:", Object.keys(detail.chat));
+      }
+    }
+    
     navigation.navigate("ChatNavigator", {
       screen: "ChatDetails",
       params: {
@@ -530,13 +546,24 @@ function StoreBlock({ C, detail, onOpenTracker }) {
               idx > 0 && { borderTopWidth: 1, borderTopColor: C.line },
             ]}
           >
-            <Image source={productImg} style={styles.itemImg} />
+            <Image 
+              source={
+                it.product?.images?.[0]?.path 
+                  ? { uri: `https://colala.hmstech.xyz/storage/${it.product.images[0].path}` }
+                  : productImg
+              } 
+              style={styles.itemImg} 
+            />
             <View style={{ flex: 1, paddingRight: 8 }}>
               <ThemedText style={[styles.itemTitle, { color: C.text }]} numberOfLines={2}>
-                {it.name ?? "Iphone 16 pro max - Black"}
+                {it.name || "Product"}
               </ThemedText>
-              <ThemedText style={[styles.price, { color: C.primary }]}>{currency(it.unit_price ?? 2500000)}</ThemedText>
-              <ThemedText style={[styles.qtyTxt, { color: C.sub }]}>{`Qty : ${it.qty ?? 1}`}</ThemedText>
+              <ThemedText style={[styles.price, { color: C.primary }]}>
+                {currency(it.unit_price || 0)}
+              </ThemedText>
+              <ThemedText style={[styles.qtyTxt, { color: C.sub }]}>
+                {`Qty : ${it.qty || 0}`}
+              </ThemedText>
             </View>
 
             <TouchableOpacity
@@ -562,18 +589,22 @@ function StoreBlock({ C, detail, onOpenTracker }) {
           <>
             <ThemedText style={[styles.sectionTitle, { color: C.sub }]}>Delivery Address</ThemedText>
             <View style={[styles.addressCard, { borderColor: C.line }]}>
-              {/* Address not in API response → keep hardcoded */}
+              {/* Use actual delivery address from API */}
               <View style={styles.addrRow}>
                 <ThemedText style={[styles.addrLabel, { color: C.sub }]}>Name</ThemedText>
                 <View style={styles.addrRight}>
-                  <ThemedText style={[styles.addrValue, { color: C.text }]}>Adewale Faizah</ThemedText>
+                  <ThemedText style={[styles.addrValue, { color: C.text }]}>
+                    {detail?.order?.delivery_address?.label || "N/A"}
+                  </ThemedText>
                   <Ionicons name="copy-outline" size={14} color={C.sub} />
                 </View>
               </View>
               <View style={[styles.addrRow, { marginTop: 8 }]}>
                 <ThemedText style={[styles.addrLabel, { color: C.sub }]}>Phone number</ThemedText>
                 <View style={styles.addrRight}>
-                  <ThemedText style={[styles.addrValue, { color: C.text }]}>0703123456789</ThemedText>
+                  <ThemedText style={[styles.addrValue, { color: C.text }]}>
+                    {detail?.order?.delivery_address?.phone || "N/A"}
+                  </ThemedText>
                   <Ionicons name="copy-outline" size={14} color={C.sub} />
                 </View>
               </View>
@@ -581,7 +612,10 @@ function StoreBlock({ C, detail, onOpenTracker }) {
                 <ThemedText style={[styles.addrLabel, { color: C.sub }]}>Address</ThemedText>
                 <View style={styles.addrRight}>
                   <ThemedText style={[styles.addrValue, { color: C.text }]}>
-                    No 7 , abcd street , ikeja , Lagos
+                    {detail?.order?.delivery_address ? 
+                      `${detail.order.delivery_address.line1 || ""} ${detail.order.delivery_address.line2 || ""} ${detail.order.delivery_address.city || ""} ${detail.order.delivery_address.state || ""}`.trim() || "N/A"
+                      : "N/A"
+                    }
                   </ThemedText>
                   <Ionicons name="location-outline" size={14} color={C.sub} />
                 </View>
@@ -589,7 +623,7 @@ function StoreBlock({ C, detail, onOpenTracker }) {
             </View>
 
             <View style={[styles.summaryWrap, { borderColor: C.line }]}>
-              <InfoRow left="Ord id" right={String(detail?.id ?? "—")} />
+              <InfoRow left="Order ID" right={detail?.order?.order_no || String(detail?.id || "—")} />
               <InfoRow left="No it items" right={String(itemsCount)} topBorder />
               <InfoRow left="Items Cost" right={currency(itemsCost)} topBorder />
               <InfoRow left="Coupon Discount" right={`-${currency(coupon)}`} topBorder />
@@ -634,6 +668,21 @@ export default function SingleOrderDetailsScreen() {
 
   const selectedId = String(route.params?.orderId ?? "");
 
+  // Debug function to validate chat_id extraction
+  const validateChatId = (detail) => {
+    console.log("=== CHAT ID VALIDATION ===");
+    console.log("Detail exists:", !!detail);
+    if (detail) {
+      console.log("Detail keys:", Object.keys(detail));
+      console.log("Chat object exists:", !!detail.chat);
+      if (detail.chat) {
+        console.log("Chat object keys:", Object.keys(detail.chat));
+        console.log("Chat ID:", detail.chat.id);
+        console.log("Chat ID type:", typeof detail.chat.id);
+      }
+    }
+    return detail?.chat?.id;
+  };
 
   const { data: detail } = useQuery({
     queryKey: ["orders", "detail", selectedId],
@@ -646,7 +695,29 @@ export default function SingleOrderDetailsScreen() {
     staleTime: 15_000,
   });
 
+  // Validate chat_id when detail is loaded
+  React.useEffect(() => {
+    if (detail) {
+      const chatId = validateChatId(detail);
+      console.log("Final chat_id for navigation:", chatId);
+    }
+  }, [detail]);
+
   const openChat = () => {
+    console.log("=== CHAT NAVIGATION DEBUG ===");
+    console.log("Opening chat with chat_id:", detail?.chat?.id);
+    console.log("Full chat object:", detail?.chat);
+    console.log("Full detail object keys:", detail ? Object.keys(detail) : "No detail");
+    console.log("Navigation params being passed:", { chat_id: detail?.chat?.id });
+    
+    if (!detail?.chat?.id) {
+      console.warn("⚠️ WARNING: No chat_id found in detail.chat");
+      console.log("Available detail keys:", detail ? Object.keys(detail) : "No detail");
+      if (detail?.chat) {
+        console.log("Chat object keys:", Object.keys(detail.chat));
+      }
+    }
+    
     navigation.navigate("ChatNavigator", {
       screen: "ChatDetails",
       params: { chat_id: detail?.chat?.id },
@@ -752,6 +823,7 @@ export default function SingleOrderDetailsScreen() {
         items={detail?.items || []}
         orderId={selectedId}
         onOpenChat={openChat}
+        detail={detail}
       />
     </SafeAreaView>
   );
