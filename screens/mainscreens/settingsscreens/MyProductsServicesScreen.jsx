@@ -149,16 +149,25 @@ export default function MyProductsServicesScreen({ navigation }) {
   const transformProductData = (products) => {
     if (!products || !Array.isArray(products)) return [];
 
-    return products.map((product) => ({
+    return products
+      .sort((a, b) => {
+        // Sort by created_at or updated_at in descending order (latest first)
+        const dateA = new Date(a.created_at || a.updated_at || 0);
+        const dateB = new Date(b.created_at || b.updated_at || 0);
+        return dateB - dateA;
+      })
+      .map((product) => ({
       id: product?.id?.toString() || Math.random().toString(),
       type: "product",
       title: product?.name || "Untitled Product",
       image: product?.images?.[0]?.path
         ? `https://colala.hmstech.xyz/storage/${product.images[0].path}`
         : "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
-      price: parseFloat(product?.price || 0),
-      compareAt: product?.discount_price
+      price: product?.discount_price
         ? parseFloat(product.discount_price)
+        : parseFloat(product?.price || 0),
+      compareAt: product?.discount_price
+        ? parseFloat(product?.price || 0)
         : 0,
       category: product?.category?.title || "Uncategorized",
       categoryId: product?.category?.id || null,
@@ -174,7 +183,14 @@ export default function MyProductsServicesScreen({ navigation }) {
   const transformServiceData = (services) => {
     if (!services || !Array.isArray(services)) return [];
 
-    return services.map((service) => ({
+    return services
+      .sort((a, b) => {
+        // Sort by created_at or updated_at in descending order (latest first)
+        const dateA = new Date(a.created_at || a.updated_at || 0);
+        const dateB = new Date(b.created_at || b.updated_at || 0);
+        return dateB - dateA;
+      })
+      .map((service) => ({
       id: service?.id?.toString() || Math.random().toString(),
       type: "service",
       title: service?.name || "Untitled Service",

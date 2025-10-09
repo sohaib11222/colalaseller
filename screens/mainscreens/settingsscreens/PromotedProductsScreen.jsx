@@ -2025,7 +2025,9 @@ function UpdateReviewModal({
                 </ThemedText>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Ionicons name="star" size={14} color={C.primary} />
-                  <ThemedText style={{ color: "#555" }}>4.5</ThemedText>
+                  <ThemedText style={{ color: "#555" }}>
+                    {item?.average_rating || 0}
+                  </ThemedText>
                 </View>
               </View>
             </View>

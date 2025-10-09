@@ -358,6 +358,7 @@ function FeedHeader({ C, onNotificationPress, searchQuery, onChangeSearch }) {
 /* -------------------- POST CARD -------------------- */
 function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownload, C }) {
   const [liked, setLiked] = useState(!!item.is_liked);
+  const [showFullCaption, setShowFullCaption] = useState(false);
   useEffect(() => setLiked(!!item.is_liked), [item.is_liked]);
 
   const likeCount = liked
@@ -366,6 +367,11 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownloa
   const images = item.images || [];
   const [activeIdx, setActiveIdx] = useState(0);
   const [carouselW, setCarouselW] = useState(0);
+  
+  // Caption handling
+  const caption = item.caption || "";
+  const shouldTruncate = caption.length > 100;
+  const displayCaption = showFullCaption || !shouldTruncate ? caption : caption.substring(0, 100) + "...";
 
   const onCarouselScroll = (e) => {
     if (!carouselW) return;
@@ -422,9 +428,19 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownloa
         </View>
       )}
 
-      {item.caption ? (
+      {caption ? (
         <View style={styles.captionPill}>
-          <ThemedText style={styles.captionText}>{item.caption}</ThemedText>
+          <ThemedText style={styles.captionText}>{displayCaption}</ThemedText>
+          {shouldTruncate && (
+            <TouchableOpacity
+              onPress={() => setShowFullCaption(!showFullCaption)}
+              style={{ marginTop: 4 }}
+            >
+              <ThemedText style={[styles.captionText, { color: C.primary, fontWeight: "600" }]}>
+                {showFullCaption ? "Read less" : "Read more"}
+              </ThemedText>
+            </TouchableOpacity>
+          )}
         </View>
       ) : null}
 

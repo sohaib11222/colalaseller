@@ -1087,7 +1087,7 @@ function ViewProductModal(props) {
                   >
                     <Ionicons name="star" size={18} color={C.primary} />
                     <ThemedText style={{ color: C.text, fontWeight: "700" }}>
-                      4.5
+                      {item.average_rating || 0}
                     </ThemedText>
                   </View>
                 </View>
@@ -1918,7 +1918,9 @@ function ReviewAdModal({
                   style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
                 >
                   <Ionicons name="star" size={14} color={C.primary} />
-                  <ThemedText style={{ color: "#555" }}>4.5</ThemedText>
+                  <ThemedText style={{ color: "#555" }}>
+                    {product?.average_rating || item?.average_rating || 0}
+                  </ThemedText>
                 </View>
               </View>
             </View>
