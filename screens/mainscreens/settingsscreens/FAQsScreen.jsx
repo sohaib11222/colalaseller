@@ -16,8 +16,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Video } from "expo-av";
-import { WebView } from "react-native-webview";
+import { Video, ResizeMode } from "expo-av";
+import { Linking } from "react-native";
 import ThemedText from "../../../components/ThemedText";
 import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
@@ -63,6 +63,8 @@ export default function FAQsScreen() {
   const [openId, setOpenId] = useState(null);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [currentVideoUrl, setCurrentVideoUrl] = useState(null);
+  const [videoStatus, setVideoStatus] = useState({});
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
@@ -86,6 +88,62 @@ export default function FAQsScreen() {
     if (!url) return null;
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
     return match ? match[1] : null;
+  };
+
+  // Check if URL is a YouTube video
+  const isYouTubeVideo = (url) => {
+    return extractYouTubeId(url) !== null;
+  };
+
+  // Open YouTube video in YouTube app
+  const openYouTubeVideo = async (url) => {
+    const videoId = extractYouTubeId(url);
+    if (!videoId) {
+      Alert.alert('Error', 'Invalid YouTube URL');
+      return;
+    }
+
+    // Try to open in YouTube app first
+    const youtubeAppUrl = `youtube://watch?v=${videoId}`;
+    const youtubeWebUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    try {
+      const canOpen = await Linking.canOpenURL(youtubeAppUrl);
+      if (canOpen) {
+        await Linking.openURL(youtubeAppUrl);
+      } else {
+        // Fallback to web browser
+        await Linking.openURL(youtubeWebUrl);
+      }
+    } catch (error) {
+      console.error('Error opening YouTube video:', error);
+      Alert.alert('Error', 'Could not open YouTube video');
+    }
+  };
+
+  // Check if URL is a direct video file
+  const isDirectVideoFile = (url) => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  };
+
+  // Handle video status updates
+  const onVideoStatusUpdate = (status) => {
+    setVideoStatus(status);
+    setIsVideoLoading(false);
+  };
+
+  // Handle video loading
+  const onVideoLoadStart = () => {
+    setIsVideoLoading(true);
+  };
+
+  // Handle video error
+  const onVideoError = (error) => {
+    console.error('Video playback error:', error);
+    setIsVideoLoading(false);
+    Alert.alert('Video Error', 'Failed to load video. Please try again.');
   };
 
   return (
@@ -176,8 +234,12 @@ export default function FAQsScreen() {
                 <TouchableOpacity
                   style={styles.videoTouchable}
                   onPress={() => {
-                    setCurrentVideoUrl(categoryData.video);
-                    setVideoModalVisible(true);
+                    if (isYouTubeVideo(categoryData.video)) {
+                      openYouTubeVideo(categoryData.video);
+                    } else {
+                      setCurrentVideoUrl(categoryData.video);
+                      setVideoModalVisible(true);
+                    }
                   }}
                 />
               </View>
@@ -257,15 +319,25 @@ export default function FAQsScreen() {
           
           {currentVideoUrl && (
             <View style={styles.videoContainer}>
-              <WebView
+              {isVideoLoading && (
+                <View style={styles.videoLoadingContainer}>
+                  <ActivityIndicator size="large" color="#fff" />
+                  <ThemedText style={styles.videoLoadingText}>Loading video...</ThemedText>
+                </View>
+              )}
+              
+              <Video
                 source={{ uri: currentVideoUrl }}
-                style={styles.webView}
-                allowsFullscreenVideo={true}
-                mediaPlaybackRequiresUserAction={false}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                startInLoadingState={true}
-                scalesPageToFit={true}
+                style={styles.videoPlayer}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={true}
+                isLooping={false}
+                onPlaybackStatusUpdate={onVideoStatusUpdate}
+                onLoadStart={onVideoLoadStart}
+                onError={onVideoError}
+                useNativeControls={true}
+                allowsFullscreen={true}
+                allowsExternalPlayback={true}
               />
             </View>
           )}
@@ -432,9 +504,28 @@ const styles = StyleSheet.create({
   videoContainer: {
     flex: 1,
     backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  webView: {
-    flex: 1,
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+  videoLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    zIndex: 1,
+  },
+  videoLoadingText: {
+    color: '#fff',
+    marginTop: 12,
+    fontSize: 16,
   },
 
   // Empty state styles

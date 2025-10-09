@@ -63,7 +63,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
     if (navigation && navigation.navigate) {
       console.log("handleTopUpNavigation - navigating to FlutterwaveWebView");
       navigation.navigate('FlutterwaveWebView', {
-        amount: 1000,
+        amount: topUpAmount,
         order_id: `topup_${Date.now()}`,
         isTopUp: true
       });
@@ -272,6 +272,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState(1000);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -639,6 +640,8 @@ export default function ProductDetailsScreen({ route, navigation }) {
         stats={finalStats}
         chart={finalSeries}
         statsLoading={statsLoading}
+        topUpAmount={topUpAmount}
+        setTopUpAmount={setTopUpAmount}
       />
 
       {/* DELETE CONFIRMATION MODAL */}
@@ -684,6 +687,8 @@ function ViewProductModal(props) {
     stats,
     chart,
     statsLoading,
+    topUpAmount,
+    setTopUpAmount,
   } = props;
   
   // Debug props
@@ -803,6 +808,7 @@ function ViewProductModal(props) {
   const [boostOpen, setBoostOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [topUpModalOpen, setTopUpModalOpen] = useState(false);
 
   // Values shared across modals:
   const [boostLocation, setBoostLocation] = useState("");
@@ -1370,6 +1376,7 @@ function ViewProductModal(props) {
           onTopUp={onTopUp}
           onEditLocation={handleEditLocation}
           onEditBudget={handleEditBudget}
+          onTopUpModalOpen={() => setTopUpModalOpen(true)}
         />
 
         {/* Delete Confirmation Modal */}
@@ -1393,6 +1400,16 @@ function ViewProductModal(props) {
           chart={chart}
           isLoading={statsLoading}
           C={C}
+        />
+
+        {/* Top Up Modal */}
+        <TopUpModal
+          visible={topUpModalOpen}
+          onClose={() => setTopUpModalOpen(false)}
+          onTopUp={onTopUp}
+          C={C}
+          topUpAmount={topUpAmount}
+          setTopUpAmount={setTopUpAmount}
         />
       </SafeAreaView>
     </Modal>
@@ -1766,14 +1783,21 @@ function ReviewAdModal({
   onTopUp,
   onEditLocation,
   onEditBudget,
+  onTopUpModalOpen,
 }) {
-  const totalApprox = Math.round((daily / 1000) * days * 35); // arbitrary demo math
+  // Real calculations based on the provided formula
+  // We charge 500 per thousand impressions, so if daily budget is 1000 and 10 days duration:
+  // Estimated reach = (daily / 500) * 2000 * days = (1000 / 500) * 2000 * 10 = 2 * 2000 * 10 = 40,000
+  // But based on user's example: 1000 daily budget, 10 days = 20,000 reach
+  // So the formula should be: (daily / 500) * 1000 * days = (1000 / 500) * 1000 * 10 = 2 * 1000 * 10 = 20,000
+  const estimatedReach = Math.round((daily / 500) * 1000 * days);
+  const estimatedClicks = Math.round(estimatedReach * 0.1); // 10% of reach
+  const totalAmount = daily * days;
+  
   const { token } = useAuth();
 
   const data = previewData || {};
   const product = data.product || item || {};
-  const stats = data.estimated || {};
-  const totalAmount = data.total || 0;
 
   const createBoostMutation = useMutation({
     mutationFn: (payload) => createBoost({ payload, token }),
@@ -1992,11 +2016,11 @@ function ReviewAdModal({
                 borderRadius: 999,
               }}
               onPress={() => {
-                console.log("Top Up button pressed in ReviewAdModal, onTopUp exists:", !!onTopUp);
-                if (onTopUp) {
-                  onTopUp();
+                console.log("Top Up button pressed in ReviewAdModal");
+                if (onTopUpModalOpen) {
+                  onTopUpModalOpen();
                 } else {
-                  console.error("onTopUp function not available in ReviewAdModal");
+                  console.error("onTopUpModalOpen function not available in ReviewAdModal");
                   Alert.alert('Error', 'Top Up functionality not available');
                 }
               }}
@@ -2010,12 +2034,12 @@ function ReviewAdModal({
           {/* Estimated reach / clicks */}
           <PillStat
             label="Estimated Reach"
-            value={`${stats?.reach?.toLocaleString?.() || 0} Accounts`}
+            value={`${estimatedReach.toLocaleString()} Accounts`}
             color={C.primary}
           />
           <PillStat
             label="Estimated Product Clicks"
-            value={`${stats?.clicks?.toLocaleString?.() || 0}`}
+            value={`${estimatedClicks.toLocaleString()}`}
             color={C.primary}
           />
 
@@ -3265,6 +3289,81 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
   },
 
+  // Top Up Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  topUpModal: {
+    borderRadius: 20,
+    padding: 24,
+    margin: 20,
+    alignItems: "center",
+    minWidth: 320,
+    maxWidth: 400,
+  },
+  topUpModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  topUpModalText: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  topUpInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 24,
+    width: "100%",
+  },
+  topUpCurrency: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginRight: 8,
+  },
+  topUpInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  topUpModalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  topUpModalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topUpModalCancel: {
+    borderWidth: 1,
+  },
+  topUpModalConfirm: {
+    // backgroundColor set dynamically
+  },
+  topUpModalButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  topUpModalButtonTextWhite: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
   // Loading styles
   loadingContainer: {
     flex: 1,
@@ -3387,6 +3486,69 @@ const styles = StyleSheet.create({
     minWidth: 2,
   },
 });
+
+/* ───────── Top Up Modal ───────── */
+function TopUpModal({ visible, onClose, onTopUp, C, topUpAmount, setTopUpAmount }) {
+  const [amount, setAmount] = useState(topUpAmount.toString());
+
+  const handleTopUp = () => {
+    const numAmount = parseInt(amount) || 0;
+    if (numAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid top-up amount');
+      return;
+    }
+    setTopUpAmount(numAmount);
+    onTopUp();
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.topUpModal, { backgroundColor: C.card }]}>
+          <ThemedText style={[styles.topUpModalTitle, { color: C.text }]}>
+            Top Up Wallet
+          </ThemedText>
+          <ThemedText style={[styles.topUpModalText, { color: C.sub }]}>
+            Enter the amount you want to add to your wallet
+          </ThemedText>
+          
+          <View style={[styles.topUpInputContainer, { borderColor: C.line }]}>
+            <ThemedText style={[styles.topUpCurrency, { color: C.text }]}>₦</ThemedText>
+            <TextInput
+              style={[styles.topUpInput, { color: C.text }]}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+              placeholder="Enter amount"
+              placeholderTextColor={C.sub}
+            />
+          </View>
+
+          <View style={styles.topUpModalButtons}>
+            <TouchableOpacity
+              style={[styles.topUpModalButton, styles.topUpModalCancel, { borderColor: C.line }]}
+              onPress={onClose}
+            >
+              <ThemedText style={[styles.topUpModalButtonText, { color: C.text }]}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.topUpModalButton, styles.topUpModalConfirm, { backgroundColor: C.primary }]}
+              onPress={handleTopUp}
+            >
+              <ThemedText style={styles.topUpModalButtonTextWhite}>Top Up</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 /* ───────── Stats Modal ───────── */
 function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {

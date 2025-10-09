@@ -38,7 +38,7 @@ const HARDCODE_FALLBACK = [
     id: "2",
     name: "Adam Wande",
     avatar: "https://i.pravatar.cc/100?img=47",
-    lastMessage: "I need help with my order",
+    lastMessage: "📎 Image",
     time: "Today | 07:22 AM",
     unread: 1,
     chatType: "order",
@@ -57,7 +57,7 @@ const HARDCODE_FALLBACK = [
     name: "Scent Villa Stores",
     avatar:
       "https://images.unsplash.com/photo-1541643600914-78b084683601?q=80&w=200&auto=format&fit=crop",
-    lastMessage: "General inquiry about products",
+    lastMessage: "📎 Image",
     time: "Today | 07:22 AM",
     unread: 0,
     chatType: "general",
@@ -111,12 +111,48 @@ const formatTime = (iso) => {
   }
 };
 
+// Helper function to detect if message is an image
+const isImageMessage = (message) => {
+  if (!message) return false;
+  
+  // Check for common image indicators in message content
+  const imageIndicators = [
+    '📎 image',
+    'sent an image',
+    'sent a photo',
+    'sent a picture',
+    '[image]',
+    '[photo]',
+    '[picture]',
+    'image_',
+    'photo_',
+    'picture_'
+  ];
+  
+  // Check if message contains image indicators
+  const lowerMessage = message.toLowerCase();
+  return imageIndicators.some(indicator => lowerMessage.includes(indicator));
+};
+
+// Helper function to format image message preview
+const formatImageMessagePreview = (message, userName) => {
+  if (!message) return null;
+  
+  if (isImageMessage(message)) {
+    return `${userName} sent an image`;
+  }
+  
+  return message;
+};
+
 // Map API -> UI model (keep missing fields hardcoded)
 const mapChatItem = (it) => ({
   id: String(it.chat_id),
   name: it.user || "User",
   avatar: it.avatar || "https://i.pravatar.cc/100?img=65",
-  lastMessage: it.last_message || null, // No dummy message - show null if no message
+  lastMessage: it.last_message 
+    ? formatImageMessagePreview(it.last_message, it.user || "User")
+    : null, // No dummy message - show null if no message
   time: it.last_message_at
     ? formatTime(it.last_message_at)
     : null, // No dummy time - show null if no message
@@ -170,7 +206,14 @@ export default function ChatListScreen({ navigation }) {
   // Determine base list: fallback only while loading or when the API errored.
   const listFromApi = Array.isArray(apiData) ? apiData : [];
   const usingFallback = isError;
-  const baseList = usingFallback ? HARDCODE_FALLBACK : listFromApi;
+  
+  // Process hardcoded fallback data through the same formatting
+  const processedFallback = HARDCODE_FALLBACK.map(item => ({
+    ...item,
+    lastMessage: item.lastMessage ? formatImageMessagePreview(item.lastMessage, item.name) : null
+  }));
+  
+  const baseList = usingFallback ? processedFallback : listFromApi;
 
   // Search and Filter
   const data = useMemo(() => {

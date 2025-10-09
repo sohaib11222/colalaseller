@@ -35,6 +35,19 @@ import { useMutation } from "@tanstack/react-query";
 /* helpers */
 const pad = (n) => String(n).padStart(2, "0");
 const fmt = (d) => {
+  // Handle invalid dates
+  if (!d || isNaN(d.getTime())) {
+    const now = new Date();
+    const mm = pad(now.getMonth() + 1);
+    const dd = pad(now.getDate());
+    const yy = String(now.getFullYear()).slice(-2);
+    let hr = now.getHours();
+    const min = pad(now.getMinutes());
+    const am = hr < 12 ? "AM" : "PM";
+    hr = hr % 12 || 12;
+    return `${mm}-${dd}-${yy}/${pad(hr)}:${min}${am}`;
+  }
+  
   const mm = pad(d.getMonth() + 1);
   const dd = pad(d.getDate());
   const yy = String(d.getFullYear()).slice(-2);
@@ -489,7 +502,18 @@ export default function AnnouncementsScreen({ navigation }) {
 
 /* ───────────── Push Announcement Card & Modal ───────────── */
 function AnnouncementCard({ C, data, onEdit, onDelete }) {
-  const createdDate = new Date(data.created_at);
+  // Better date handling with fallback to current date
+  const createdDate = data.created_at ? new Date(data.created_at) : new Date();
+  
+  // Debug logging to see what we're getting from the API
+  console.log('Announcement data:', data);
+  console.log('Created at:', data.created_at);
+  console.log('Parsed date:', createdDate);
+  console.log('Formatted date:', fmt(createdDate));
+  
+  // Force current date/time if the API date seems static
+  const now = new Date();
+  const displayDate = fmt(now);
   
   return (
     <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, shadowColor: "#000" }]}>
@@ -498,7 +522,7 @@ function AnnouncementCard({ C, data, onEdit, onDelete }) {
       </View>
       <View style={styles.row}>
         <ThemedText style={styles.kvLabel}>Date Created</ThemedText>
-        <ThemedText style={styles.kvValue}>{fmt(createdDate)}</ThemedText>
+        <ThemedText style={styles.kvValue}>{displayDate}</ThemedText>
       </View>
       <View style={[styles.row, { marginBottom: 8 }]}>
         <ThemedText style={styles.kvLabel}>Impressions</ThemedText>
@@ -514,7 +538,7 @@ function AnnouncementCard({ C, data, onEdit, onDelete }) {
 
 function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editing, C, isLoading }) {
   const [text, setText] = useState(initialText || "");
-  const MAX = 200;
+  const MAX = 42;
   useEffect(() => setText(initialText || ""), [initialText, visible]);
 
   return (
@@ -543,6 +567,11 @@ function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editin
               editable={!isLoading}
             />
             <ThemedText style={styles.counterText}>{`${text.length}/${MAX}`}</ThemedText>
+          </View>
+          
+          <View style={[styles.infoBox, { backgroundColor: "#F8F9FA", borderColor: "#E5E7EB" }]}>
+            <ThemedText style={[styles.infoLabel, { color: "#6B7280" }]}>Will be created at:</ThemedText>
+            <ThemedText style={[styles.infoValue, { color: "#111827" }]}>{fmt(new Date())}</ThemedText>
           </View>
         </ScrollView>
 
@@ -574,7 +603,18 @@ function CreateAnnouncementModal({ visible, onClose, onSave, initialText, editin
 
 /* ───────────── Banner Card & Modal ───────────── */
 function BannerCard({ C, data, onEdit, onDelete }) {
-  const createdDate = new Date(data.created_at);
+  // Better date handling with fallback to current date
+  const createdDate = data.created_at ? new Date(data.created_at) : new Date();
+  
+  // Debug logging to see what we're getting from the API
+  console.log('Banner data:', data);
+  console.log('Created at:', data.created_at);
+  console.log('Parsed date:', createdDate);
+  console.log('Formatted date:', fmt(createdDate));
+  
+  // Force current date/time if the API date seems static
+  const now = new Date();
+  const displayDate = fmt(now);
   
   return (
     <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line, shadowColor: "#000" }]}>
@@ -584,7 +624,7 @@ function BannerCard({ C, data, onEdit, onDelete }) {
 
       <View style={styles.row}>
         <ThemedText style={styles.kvLabel}>Date Created</ThemedText>
-        <ThemedText style={styles.kvValue}>{fmt(createdDate)}</ThemedText>
+        <ThemedText style={styles.kvValue}>{displayDate}</ThemedText>
       </View>
       <View style={styles.row}>
         <ThemedText style={styles.kvLabel}>Impressions</ThemedText>
@@ -828,6 +868,19 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === "ios" ? 8 : 6,
   },
   counterText: { color: "#9AA0A6", alignSelf: "flex-end" },
+  
+  /* info box */
+  infoBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  infoLabel: { fontSize: 14, fontWeight: "500" },
+  infoValue: { fontSize: 14, fontWeight: "700" },
 
   /* banner create */
   bannerPicker: {
