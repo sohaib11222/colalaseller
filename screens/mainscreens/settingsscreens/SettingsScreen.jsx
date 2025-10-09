@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import ThemedText from '../../../components/ThemedText';
 import { useTheme } from '../../../components/ThemeProvider';
+import { STATIC_COLORS } from '../../../components/ThemeProvider';
 
 //Code Related to the integration
 import { getBalance } from '../../../utils/queries/settings';
@@ -30,7 +31,7 @@ const SettingsScreen = () => {
 
   const C = useMemo(
     () => ({
-      primary: theme?.colors?.primary || '#E53E3E',
+      primary: STATIC_COLORS.primary,
       bg: theme?.colors?.background || '#F5F6F8',
       white: theme?.colors?.card || '#FFFFFF',
       text: theme?.colors?.text || '#101318',

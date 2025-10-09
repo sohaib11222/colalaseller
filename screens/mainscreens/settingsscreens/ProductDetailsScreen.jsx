@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import { PanResponder } from "react-native";
@@ -52,7 +52,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const productId = route?.params?.id || item?.id;
   console.log("The Product Id is", productId);
   console.log("Navigation object in main component:", navigation);
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
 
   // Navigation handler for ViewProductModal
   const handleTopUpNavigation = () => {
@@ -226,17 +226,26 @@ export default function ProductDetailsScreen({ route, navigation }) {
     statsLoading?.statusCode === 401;
   const hasError = productError || chartLoading || statsLoading;
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#EF4444",
-      bg: theme.colors?.background || "#F6F7FB",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#111827",
-      sub: theme.colors?.muted || "#6B7280",
-      line: theme.colors?.line || "#ECEEF2",
-    }),
-    [theme]
-  );
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#EF4444",
+  //     bg: theme.colors?.background || "#F6F7FB",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#111827",
+  //     sub: theme.colors?.muted || "#6B7280",
+  //     line: theme.colors?.line || "#ECEEF2",
+  //   }),
+  //   [theme]
+  // );
+
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   // Use real API data with N/A fallbacks
   const finalStats = {

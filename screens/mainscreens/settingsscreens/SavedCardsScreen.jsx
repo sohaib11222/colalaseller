@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 const MASTERCARD = require("../../../assets/image 55.png");
@@ -209,21 +209,29 @@ const WalletCardPanel = ({
 
 export default function SavedCardsScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
   console.log("Token", token);
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#E53E3E",
-      bg: theme.colors?.background || "#F5F6F8",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#101318",
-      sub: theme.colors?.muted || "#6C727A",
-      line: theme.colors?.line || "#ECEDEF",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#E53E3E",
+  //     bg: theme.colors?.background || "#F5F6F8",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#101318",
+  //     sub: theme.colors?.muted || "#6C727A",
+  //     line: theme.colors?.line || "#ECEDEF",
+  //   }),
+  //   [theme]
+  // );
 
   // Fetch cards using React Query
   const { 

@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 import { getSupportList } from "../../../utils/queries/settings";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -25,7 +25,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 
 export default function SupportScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState("all"); // 'all' | 'pending' | 'resolved'
   const { token } = useAuth();
@@ -34,18 +34,25 @@ export default function SupportScreen() {
 
   // Refresh state
   const [refreshing, setRefreshing] = useState(false);
-
-  const C = useMemo(
-    () => ({
-      primary: theme?.colors?.primary || "#E53E3E",
-      bg: theme?.colors?.background || "#F5F6F8",
-      card: theme?.colors?.card || "#FFFFFF",
-      text: theme?.colors?.text || "#101318",
-      sub: theme?.colors?.muted || "#6C727A",
-      line: "#ECEDEF",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme?.colors?.primary || "#E53E3E",
+  //     bg: theme?.colors?.background || "#F5F6F8",
+  //     card: theme?.colors?.card || "#FFFFFF",
+  //     text: theme?.colors?.text || "#101318",
+  //     sub: theme?.colors?.muted || "#6C727A",
+  //     line: "#ECEDEF",
+  //   }),
+  //   [theme]
+  // );
 
   // Fetch support tickets
   const {

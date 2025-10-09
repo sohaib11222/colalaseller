@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
 import ThemedText from "../../components/ThemedText";
-import { useTheme } from "../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../components/ThemeProvider";
 
 //Code Related to the integration
 import { getStoreCategories } from "../../utils/queries/seller";
@@ -32,24 +32,31 @@ const toSrc = (v) =>
   typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
 
 export default function AddServiceScreen({ navigation, route }) {
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
   
   // Get route params for edit mode
   const { mode, serviceId, serviceData, isEdit } = route?.params || {};
-
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#EF4444",
-      bg: theme.colors?.background || "#F6F7FB",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#111827",
-      sub: theme.colors?.muted || "#6B7280",
-      line: theme.colors?.line || "#ECEEF2",
-      chip: theme.colors?.chip || "#F1F2F5",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#EF4444",
+  //     bg: theme.colors?.background || "#F6F7FB",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#111827",
+  //     sub: theme.colors?.muted || "#6B7280",
+  //     line: theme.colors?.line || "#ECEEF2",
+  //     chip: theme.colors?.chip || "#F1F2F5",
+  //   }),
+  //   [theme]
+  // );
 
   // media
   const [video, setVideo] = useState(null); // { uri }

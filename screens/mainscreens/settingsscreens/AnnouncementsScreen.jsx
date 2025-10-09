@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 
 
@@ -60,25 +60,32 @@ const fmt = (d) => {
 
 /* ───────────────────────── Main Screen ───────────────────────── */
 export default function AnnouncementsScreen({ navigation }) {
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { user, token: authToken } = useAuth();
   const [onboardingToken, setOnboardingToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#EF4444",
-      bg: theme.colors?.background || "#F6F7FB",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#111827",
-      sub: theme.colors?.muted || "#6B7280",
-      line: theme.colors?.line || "#E5E7EB",
-    }),
-    [theme]
-  );
-
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#EF4444",
+  //     bg: theme.colors?.background || "#F6F7FB",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#111827",
+  //     sub: theme.colors?.muted || "#6B7280",
+  //     line: theme.colors?.line || "#E5E7EB",
+  //   }),
+  //   [theme]
+  // );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
   const [tab, setTab] = useState("push"); // 'push' | 'banners'
 
   // Get token for API calls

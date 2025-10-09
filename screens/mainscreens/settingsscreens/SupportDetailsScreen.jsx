@@ -21,7 +21,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 import { getSupportDetail } from "../../../utils/queries/settings";
 import { sendMessage } from "../../../utils/mutations/settings";
@@ -46,26 +46,33 @@ const fmtTime = (iso) => {
 export default function SupportDetailsScreen() {
   const navigation = useNavigation();
   const { params } = useRoute();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const ticketId = params?.ticketId;
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const queryClient = useQueryClient();
 
-  const C = useMemo(
-    () => ({
-      primary: theme?.colors?.primary || "#E53E3E",
-      bg: theme?.colors?.background || "#F8F9FA",
-      card: theme?.colors?.card || "#FFFFFF",
-      text: theme?.colors?.text || "#2D3748",
-      sub: theme?.colors?.muted || "#718096",
-      line: "#E2E8F0",
-      lightGray: "#F7FAFC",
-      lightPink: "#FCDCDC",
-    }),
-    [theme]
-  );
-
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme?.colors?.primary || "#E53E3E",
+  //     bg: theme?.colors?.background || "#F8F9FA",
+  //     card: theme?.colors?.card || "#FFFFFF",
+  //     text: theme?.colors?.text || "#2D3748",
+  //     sub: theme?.colors?.muted || "#718096",
+  //     line: "#E2E8F0",
+  //     lightGray: "#F7FAFC",
+  //     lightPink: "#FCDCDC",
+  //   }),
+  //   [theme]
+  // );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   // Handle case where ticketId is not provided
   if (!ticketId) {

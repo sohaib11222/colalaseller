@@ -23,6 +23,19 @@ const darken = (hex, t = 0.2) => rgbToHex(mix(hexToRgb(hex), { r: 0, g: 0, b: 0 
 const STORAGE_KEY = "@theme_primary";
 const DEFAULT_PRIMARY = "#E53E3E";
 
+// Files that should use dynamic theme (all others will use static #E53E3E)
+const THEME_ENABLED_FILES = [
+  'HomeScreen.jsx',
+  'StoreProfileModal.jsx'
+];
+
+// Helper function to check if current file should use dynamic theme
+const shouldUseDynamicTheme = () => {
+  // This will be called from components that want to use dynamic theme
+  // For now, we'll allow it for the specified files
+  return true;
+};
+
 export const createTheme = (primary) => {
   const onPrimary = "#ffffff";
   return {
@@ -70,3 +83,17 @@ export const ThemeProvider = ({ children }) => {
 };
 
 export const useTheme = () => useContext(ThemeContext);
+
+// Static colors for files that don't use dynamic theme
+export const STATIC_COLORS = {
+  primary: "#E53E3E",
+  primary700: "#B91C1C",
+  primary500: "#E53E3E", 
+  primary200: "#FECACA",
+  primary100: "#FEE2E2",
+  onPrimary: "#ffffff",
+  surface: "#ffffff",
+  surfaceAlt: "#F6F6F6",
+  text: "#1A1A1A",
+  muted: "#7C7C7C",
+};

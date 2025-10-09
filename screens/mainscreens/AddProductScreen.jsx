@@ -18,7 +18,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import ThemedText from "../../components/ThemedText";
-import { useTheme } from "../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 /* ───────────────────────── utils ───────────────────────── */
@@ -214,7 +214,7 @@ const FREE_DELIVERY_ICON = require("../../assets/Frame 269.png");
 /* ───────────────────────── screen ───────────────────────── */
 
 export default function AddProductScreen({ navigation, route }) {
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
   const queryClient = useQueryClient();
 
@@ -243,19 +243,26 @@ export default function AddProductScreen({ navigation, route }) {
     finalProductIdTruthy: !!finalProductId,
   });
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#EF4444",
-      bg: theme.colors?.background || "#F5F6F8",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#101318",
-      sub: theme.colors?.muted || "#6C727A",
-      line: theme.colors?.line || "#ECEEF2",
-      chip: theme.colors?.chip || "#F1F2F5",
-    }),
-    [theme]
-  );
-
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#EF4444",
+  //     bg: theme.colors?.background || "#F5F6F8",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#101318",
+  //     sub: theme.colors?.muted || "#6C727A",
+  //     line: theme.colors?.line || "#ECEEF2",
+  //     chip: theme.colors?.chip || "#F1F2F5",
+  //   }),
+  //   [theme]
+  // );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
   /* ───────────────────────── state ───────────────────────── */
   const [video, setVideo] = useState(null); // { uri }
   const [images, setImages] = useState([]); // [{uri},...]

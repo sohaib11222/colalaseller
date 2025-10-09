@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 //Code Related to the integration
@@ -123,21 +123,31 @@ function LockRow({ C, item, onPressLink }) {
 /* ---- Screen ---- */
 export default function EscrowWalletScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const [authToken, setAuthToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#E53E3E",
-      bg: theme.colors?.background || "#F5F6F8",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#101318",
-      sub: theme.colors?.muted || "#6C727A",
-      line: theme.colors?.line || "#ECEDEF",
-    }),
-    [theme]
-  );
+  // const C = useMemo(
+
+  //   () => ({
+  //     primary: theme.colors?.primary || "#E53E3E",
+  //     bg: theme.colors?.background || "#F5F6F8",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#101318",
+  //     sub: theme.colors?.muted || "#6C727A",
+  //     line: theme.colors?.line || "#ECEDEF",
+  //   }),
+  //   [theme]
+  // );
+
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   // Get authentication token
   useEffect(() => {

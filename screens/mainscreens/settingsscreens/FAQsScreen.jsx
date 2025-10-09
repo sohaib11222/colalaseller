@@ -19,7 +19,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Video, ResizeMode } from "expo-av";
 import { Linking } from "react-native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 //Code Related to the integration
@@ -31,21 +31,30 @@ import { useAuth } from "../../../contexts/AuthContext";
 
 export default function FAQsScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#E53E3E",
-      bg: theme.colors?.background || "#F5F6F8",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#101318",
-      sub: theme.colors?.muted || "#6C727A",
-      line: theme.colors?.line || "#ECEDEF",
-    }),
-    [theme]
-  );
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#E53E3E",
+  //     bg: theme.colors?.background || "#F5F6F8",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#101318",
+  //     sub: theme.colors?.muted || "#6C727A",
+  //     line: theme.colors?.line || "#ECEDEF",
+  //   }),
+  //   [theme]
+  // );
+
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
 
   // Fetch FAQs using React Query

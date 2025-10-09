@@ -18,8 +18,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ThemedText from '../../../components/ThemedText';
-import { useTheme } from '../../../components/ThemeProvider';
-
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getToken } from '../../../utils/tokenStorage';
 import * as ChatQueries from '../../../utils/queries/chats';      // getChatDetails(chatId, token)
@@ -107,20 +106,29 @@ export default function ChatDetailsScreen() {
   const navigation = useNavigation();
   const { params } = useRoute();
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const qc = useQueryClient();
 
-  const C = useMemo(
-    () => ({
-      primary: theme?.colors?.primary || '#E53E3E',
-      bg: theme?.colors?.background || '#F5F6F8',
-      card: '#FFFFFF',
-      text: theme?.colors?.text || '#101318',
-      sub: '#6C727A',
-      lightPink: '#FCDCDC',
-    }),
-    [theme]
-  );
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme?.colors?.primary || '#E53E3E',
+  //     bg: theme?.colors?.background || '#F5F6F8',
+  //     card: '#FFFFFF',
+  //     text: theme?.colors?.text || '#101318',
+  //     sub: '#6C727A',
+  //     lightPink: '#FCDCDC',
+  //   }),
+  //   [theme]
+  // );
+
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   const chatId = params?.chat_id;
   const routeStore = params?.store || {};

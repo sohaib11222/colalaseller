@@ -20,7 +20,7 @@ import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../components/ThemedText";
-import { useTheme } from "../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../components/ThemeProvider";
 
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -125,17 +125,24 @@ function CreatePostModal({
   initialImageUrls = [], // array of absolute URLs
   headerAvatar = null, // optional avatar/url to display in modal header
 }) {
-  const { theme } = useTheme();
-  const C = useMemo(
-    () => ({
-      primary: theme.colors.primary || "#EF534E",
-      text: "#101318",
-      sub: "#6C727A",
-      line: "#E9EBEF",
-    }),
-    [theme]
-  );
-
+  // const { theme } = useTheme();
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors.primary || "#EF534E",
+  //     text: "#101318",
+  //     sub: "#6C727A",
+  //     line: "#E9EBEF",
+  //   }),
+  //   [theme]
+  // );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
   // existing images from server (URLs)
   const [existingUrls, setExistingUrls] = useState(initialImageUrls);
   // newly picked files
@@ -1011,7 +1018,7 @@ function useToggleLikeMutation() {
 /* -------------------- MAIN SCREEN -------------------- */
 export default function FeedScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
 
   // Handle navigation safely
   const handleNotificationPress = () => {
@@ -1033,18 +1040,26 @@ export default function FeedScreen() {
   // Debug logging
   console.log("FeedScreen - navigation object:", navigation);
   console.log("FeedScreen - navigation type:", typeof navigation);
-  const C = useMemo(
-    () => ({
-      primary: theme.colors.primary || "#EF534E",
-      bg: "#F5F6F8",
-      card: "#FFFFFF",
-      text: "#101318",
-      sub: "#6C727A",
-      line: "#E9EBEF",
-      pill: "#F1F2F5",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors.primary || "#EF534E",
+  //     bg: "#F5F6F8",
+  //     card: "#FFFFFF",
+  //     text: "#101318",
+  //     sub: "#6C727A",
+  //     line: "#E9EBEF",
+  //     pill: "#F1F2F5",
+  //   }),
+  //   [theme]
+  // );
   const [isDownloading, setIsDownloading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 

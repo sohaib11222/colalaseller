@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 const toSrc = (v) =>
   typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
@@ -32,7 +32,7 @@ import { markAsAvailable } from "../../../utils/mutations/services";
 export default function ServiceDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? {};
   const serviceId = route?.params?.id || item?.id;
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [viewOpen, setViewOpen] = useState(false); // ⬅️ modal state
@@ -40,17 +40,25 @@ export default function ServiceDetailsScreen({ route, navigation }) {
   const [statsModalOpen, setStatsModalOpen] = useState(false); // ⬅️ stats modal state
 
   console.log("The Service Id is", serviceId);
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#EF4444",
-      bg: theme.colors?.background || "#F6F7FB",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#111827",
-      sub: theme.colors?.muted || "#6B7280",
-      line: theme.colors?.line || "#ECEEF2",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#EF4444",
+  //     bg: theme.colors?.background || "#F6F7FB",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#111827",
+  //     sub: theme.colors?.muted || "#6B7280",
+  //     line: theme.colors?.line || "#ECEEF2",
+  //   }),
+  //   [theme]
+  // );
 
   // Fetch service details, statistics, and chart data
   const {

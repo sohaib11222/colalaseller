@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 const toSrc = (v) =>
   typeof v === "number" ? v : v ? { uri: String(v) } : undefined;
@@ -33,7 +33,7 @@ import { getServices } from "../../../utils/queries/services";
 import { useAuth } from "../../../contexts/AuthContext";
 import { getCategories } from "../../../utils/queries/general";
 export default function MyProductsServicesScreen({ navigation }) {
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
 
   // inside MyProductsServicesScreen component
@@ -80,18 +80,28 @@ export default function MyProductsServicesScreen({ navigation }) {
     [navigation]
   );
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#EF4444",
-      bg: theme.colors?.background || "#F6F7FB",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#111827",
-      sub: theme.colors?.muted || "#6B7280",
-      line: theme.colors?.line || "#ECEEF2",
-      chip: theme.colors?.chip || "#F1F2F5",
-    }),
-    [theme]
-  );
+  // const C = useMemo(
+
+  //   () => ({
+  //     primary: theme.colors?.primary || "#EF4444",
+  //     bg: theme.colors?.background || "#F6F7FB",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#111827",
+  //     sub: theme.colors?.muted || "#6B7280",
+  //     line: theme.colors?.line || "#ECEEF2",
+  //     chip: theme.colors?.chip || "#F1F2F5",
+  //   }),
+  //   [theme]
+  // );
+
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   // Fetch products and services using React Query
   const {

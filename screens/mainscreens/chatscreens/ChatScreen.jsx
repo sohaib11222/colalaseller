@@ -12,10 +12,11 @@ import {
   Modal,
   RefreshControl,
   ActivityIndicator,
+  Text,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import ThemedText from '../../../components/ThemedText';
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import * as ChatQueries from "../../../utils/queries/chats"; // getChatList
@@ -162,19 +163,15 @@ const mapChatItem = (it) => ({
 });
 
 export default function ChatListScreen({ navigation }) {
-  const { theme } = useTheme();
   const qc = useQueryClient();
-  const C = useMemo(
-    () => ({
-      primary: theme?.colors?.primary || "#EF534E",
-      bg: theme?.colors?.bg || "#F5F6F8",
-      text: theme?.colors?.text || "#101318",
-      sub: theme?.colors?.sub || "#6C727A",
-      line: theme?.colors?.line || "#ECEEF2",
-      card: "#fff",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");

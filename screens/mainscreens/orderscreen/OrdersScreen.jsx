@@ -14,27 +14,21 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 import { useQuery } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import * as OrderQueries from "../../../utils/queries/orders"; // getOrders
 
 const OrdersScreen = ({ navigation }) => {
-  const { theme } = useTheme();
-  const C = useMemo(
-    () => ({
-      primary: theme?.colors?.primary || "#E53E3E",
-      primaryDark: "#E2443F",
-      bg: theme?.colors?.background || "#F5F6F8",
-      card: theme?.colors?.card || "#FFFFFF",
-      text: theme?.colors?.text || "#101318",
-      sub: "#6C727A",
-      line: "#ECEDEF",
-      pill: "#F1F2F5",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   const [tab, setTab] = useState("new"); // 'new' | 'completed'
   const [q, setQ] = useState("");

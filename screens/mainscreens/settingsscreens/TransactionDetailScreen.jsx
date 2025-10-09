@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 /* ---------- Helpers ---------- */
@@ -84,21 +84,29 @@ const DetailRow = ({ label, value, C }) => (
 export default function TransactionDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   
   const transaction = route.params?.transaction;
   
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#E53E3E",
-      bg: theme.colors?.background || "#F5F6F8",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#101318",
-      sub: theme.colors?.muted || "#6C727A",
-      line: theme.colors?.line || "#ECEDEF",
-    }),
-    [theme]
-  );
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#E53E3E",
+  //     bg: theme.colors?.background || "#F5F6F8",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#101318",
+  //     sub: theme.colors?.muted || "#6C727A",
+  //     line: theme.colors?.line || "#ECEDEF",
+  //   }),
+  //   [theme]
+  // );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
 
   if (!transaction) {
     return (

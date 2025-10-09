@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useMutation } from "@tanstack/react-query";
 
@@ -34,26 +34,33 @@ const CATEGORIES = [
 
 export default function SupportFormScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const { token } = useAuth();
   const [category, setCategory] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [imageUri, setImageUri] = useState(null);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-
-  const C = useMemo(
-    () => ({
-      primary: theme?.colors?.primary || "#E53E3E",
-      bg: theme?.colors?.background || "#F8F9FA",
-      card: theme?.colors?.card || "#FFFFFF",
-      text: theme?.colors?.text || "#2D3748",
-      sub: theme?.colors?.muted || "#718096",
-      line: "#E2E8F0",
-      lightGray: "#F7FAFC",
-    }),
-    [theme]
-  );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme?.colors?.primary || "#E53E3E",
+  //     bg: theme?.colors?.background || "#F8F9FA",
+  //     card: theme?.colors?.card || "#FFFFFF",
+  //     text: theme?.colors?.text || "#2D3748",
+  //     sub: theme?.colors?.muted || "#718096",
+  //     line: "#E2E8F0",
+  //     lightGray: "#F7FAFC",
+  //   }),
+  //   [theme]
+  // );
 
   // Create support ticket mutation
   const { mutate: createTicket, isLoading: isCreating } = useMutation({

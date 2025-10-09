@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 //Code Related to the integration
@@ -96,22 +96,29 @@ const RowCard = ({ item, tab, C, onPress }) => {
 /* ================== Screen ================== */
 export default function ShoppingWalletScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
+  // const { theme } = useTheme();
   const [authToken, setAuthToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const C = useMemo(
-    () => ({
-      primary: theme.colors?.primary || "#E53E3E",
-      bg: theme.colors?.background || "#F6F7FB",
-      card: theme.colors?.card || "#FFFFFF",
-      text: theme.colors?.text || "#101318",
-      sub: theme.colors?.muted || "#6C727A",
-      line: theme.colors?.line || "#ECEDEF",
-    }),
-    [theme]
-  );
-
+  // const C = useMemo(
+  //   () => ({
+  //     primary: theme.colors?.primary || "#E53E3E",
+  //     bg: theme.colors?.background || "#F6F7FB",
+  //     card: theme.colors?.card || "#FFFFFF",
+  //     text: theme.colors?.text || "#101318",
+  //     sub: theme.colors?.muted || "#6C727A",
+  //     line: theme.colors?.line || "#ECEDEF",
+  //   }),
+  //   [theme]
+  // );
+  const C = {
+    primary: STATIC_COLORS.primary,
+    bg: "#F5F6F8",
+    text: STATIC_COLORS.text,
+    sub: STATIC_COLORS.muted,
+    line: "#ECEEF2",
+    card: "#fff",
+  };
   const [tab, setTab] = useState("withdrawals"); // 'withdrawals' | 'payments'
   const [filter, setFilter] = useState("all");
   const [filterOpen, setFilterOpen] = useState(false);
