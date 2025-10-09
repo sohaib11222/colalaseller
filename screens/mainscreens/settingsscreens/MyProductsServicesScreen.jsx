@@ -126,6 +126,9 @@ export default function MyProductsServicesScreen({ navigation }) {
   });
 
   const [refreshing, setRefreshing] = useState(false);
+  
+  /* ───────── UI state ───────── */
+  const [tab, setTab] = useState("products"); // products | services
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
@@ -261,9 +264,6 @@ export default function MyProductsServicesScreen({ navigation }) {
   console.log("Category:", category);
   console.log("Status Filter:", statusFilter);
   console.log("=== END DEBUG ===");
-
-  /* ───────── UI state ───────── */
-  const [tab, setTab] = useState("products"); // products | services
 
   // Combine data based on current tab
   const DATA = tab === "products" ? products : services;
