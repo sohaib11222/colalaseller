@@ -141,7 +141,7 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
       {/* footer action */}
       {isActive ? (
         <View style={styles.activePill}>
-          <Ionicons name="checkmark-circle" size={16} color="#111" />
+          <Ionicons name="checkmark-circle" size={16} color="#7A263A" />
           <ThemedText style={styles.activeTxt}>Subscription Active</ThemedText>
           {onCancel && (
             <TouchableOpacity
@@ -242,12 +242,12 @@ function PaymentMethodSheet({
             }}
             showsVerticalScrollIndicator={false}
           >
-            {/* <OptionRow
+             <OptionRow
               icon="color-filter-outline"
               label="Flutterwave"
               active={selected === "flutterwave"}
               onPress={() => setSelected("flutterwave")}
-            /> */}
+            />
 
             <OptionRow
               icon="card-outline"
@@ -259,11 +259,11 @@ function PaymentMethodSheet({
             {hasCard ? (
               <OptionRow
                 icon="card-outline"
-                label="**** **** **** 1234"
-                subLabel="Auto debit active"
+                label="Paystack"
+                subLabel="Pay with card via Paystack"
                 subColor="#18A957"
-                active={selected === "card"}
-                onPress={() => setSelected("card")}
+                active={selected === "paystack"}
+                onPress={() => setSelected("paystack")}
               />
             ) : (
               <View style={styles.bindBox}>
@@ -709,15 +709,18 @@ const styles = StyleSheet.create({
 
   activePill: {
     height: 48,
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    borderRadius: 16,
+    backgroundColor: "#FAD2DA",
+    borderWidth: 1,
+    borderColor: "#F2A8B7",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     marginTop: 70,
+    paddingHorizontal: 14,
   },
-  activeTxt: { color: "#111", fontWeight: "600" },
+  activeTxt: { color: "#7A263A", fontWeight: "600" },
 
   upgradeBtn: {
     height: 48,

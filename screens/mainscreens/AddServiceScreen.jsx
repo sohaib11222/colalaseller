@@ -108,8 +108,14 @@ export default function AddServiceScreen({ navigation, route }) {
           .filter(media => media.type === "image")
           .map(media => ({ uri: `https://colala.hmstech.xyz/storage/${media.path}` }));
         setImages(mediaImages);
+      }
 
-        const videoMedia = serviceData.media.find(media => media.type === "video");
+      // Handle main video field (separate from media array)
+      if (serviceData.video) {
+        setVideo({ uri: `https://colala.hmstech.xyz/storage/${serviceData.video}` });
+      } else {
+        // Fallback: look for video in media array
+        const videoMedia = serviceData.media?.find(media => media.type === "video");
         if (videoMedia) {
           setVideo({ uri: `https://colala.hmstech.xyz/storage/${videoMedia.path}` });
         }
@@ -382,15 +388,25 @@ export default function AddServiceScreen({ navigation, route }) {
         console.log("Video URI type:", typeof video.uri);
         console.log("Video URI length:", video.uri?.length);
         console.log("Raw video object:", video);
-        // Create proper file object with all required properties
-        const videoFile = {
-          uri: video.uri,
-          type: "video/mp4",
-          name: "service_video.mp4",
-        };
-        console.log("Video file object being sent:", videoFile);
-        formData.append("video", videoFile);
-        console.log(`✅ Video added to FormData as 'video' field`);
+        
+        // Check if this is a local file URI (for new uploads) or remote URL (for edit mode)
+        const isLocalFile = video.uri.startsWith('file://') || video.uri.startsWith('content://') || video.uri.startsWith('/');
+        
+        if (isLocalFile) {
+          // This is a new local file - add it to FormData
+          const videoFile = {
+            uri: video.uri,
+            type: "video/mp4",
+            name: "service_video.mp4",
+          };
+          console.log("Video file object being sent:", videoFile);
+          formData.append("video", videoFile);
+          console.log(`✅ Video added to FormData as 'video' field`);
+        } else {
+          // This is a remote URL from edit mode - don't include in FormData
+          // The existing video will be preserved on the server
+          console.log("⚠️ Video is remote URL from edit mode - not including in FormData");
+        }
       } else if (video) {
         console.log("❌ Video object exists but has no valid URI:", video);
       }
@@ -428,15 +444,25 @@ export default function AddServiceScreen({ navigation, route }) {
         console.log(`Image URI length:`, image.uri?.length);
         console.log(`Image file ${index + 1} type:`, getFileType(image.uri));
         console.log(`Raw image object ${index + 1}:`, image);
-        // Create proper file object with all required properties
-        const imageFile = {
-          uri: image.uri,
-          type: getFileType(image.uri),
-          name: fileName,
-        };
-        console.log(`Image ${index + 1} file object being sent:`, imageFile);
-        formData.append(`media[]`, imageFile);
-        console.log(`✅ Image ${index + 1} added to FormData as media[]`);
+        
+        // Check if this is a local file URI (for new uploads) or remote URL (for edit mode)
+        const isLocalFile = image.uri.startsWith('file://') || image.uri.startsWith('content://') || image.uri.startsWith('/');
+        
+        if (isLocalFile) {
+          // This is a new local file - add it to FormData
+          const imageFile = {
+            uri: image.uri,
+            type: getFileType(image.uri),
+            name: fileName,
+          };
+          console.log(`Image ${index + 1} file object being sent:`, imageFile);
+          formData.append(`media[]`, imageFile);
+          console.log(`✅ Image ${index + 1} added to FormData as media[]`);
+        } else {
+          // This is a remote URL from edit mode - don't include in FormData
+          // The existing images will be preserved on the server
+          console.log(`⚠️ Image ${index + 1} is remote URL from edit mode - not including in FormData`);
+        }
       });
 
       // Add sub-services

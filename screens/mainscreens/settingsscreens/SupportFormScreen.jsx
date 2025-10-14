@@ -64,8 +64,13 @@ export default function SupportFormScreen() {
 
   // Create support ticket mutation
   const { mutate: createTicket, isLoading: isCreating } = useMutation({
-    mutationFn: (formData) => createSupport({ payload: formData, token }),
+    mutationFn: (formData) => {
+      console.log("Mutation called with formData:", formData);
+      console.log("Token:", token);
+      return createSupport({ payload: formData, token });
+    },
     onSuccess: (data) => {
+      console.log("Ticket created successfully:", data);
       Alert.alert(
         "Success",
         "Support ticket created successfully. Our team will get back to you soon.",
@@ -125,6 +130,11 @@ export default function SupportFormScreen() {
       return;
     }
 
+    if (isCreating) {
+      console.log("Already creating ticket, ignoring duplicate submission");
+      return;
+    }
+
     // Create form data according to API requirements
     const formData = new FormData();
     formData.append("category", category);
@@ -143,7 +153,8 @@ export default function SupportFormScreen() {
       category,
       subject: subject.trim() || `${category} - ${description.trim().substring(0, 50)}`,
       description: description.trim(),
-      hasImage: !!imageUri
+      hasImage: !!imageUri,
+      isCreating: isCreating
     });
 
     createTicket(formData);
@@ -238,7 +249,10 @@ export default function SupportFormScreen() {
           ]}
         >
           {isCreating ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ActivityIndicator size="small" color="#fff" />
+              <ThemedText style={styles.submitButtonText}>Creating...</ThemedText>
+            </View>
           ) : (
             <ThemedText style={styles.submitButtonText}>Proceed</ThemedText>
           )}
@@ -372,6 +386,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+    overflow: "hidden",
   },
   attachmentPlaceholder: {
     alignItems: "center",
@@ -379,10 +394,12 @@ const styles = StyleSheet.create({
   },
   imagePreview: {
     position: "relative",
+    width: 60,
+    height: 60,
   },
   previewImage: {
-    width: 120,
-    height: 120,
+    width: 60,
+    height: 60,
     borderRadius: 8,
   },
   removeImage: {

@@ -12,6 +12,7 @@ import {
   Alert,
   PanResponder,
 } from "react-native";
+import { Video } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
@@ -319,6 +320,11 @@ export default function ServiceDetailsScreen({ route, navigation }) {
               style={[styles.bigBtn, { backgroundColor: C.primary }]}
               onPress={() => {
                 console.log("Navigating to edit service with ID:", serviceId);
+                console.log("Service data being passed:", {
+                  video: serviceData?.video,
+                  media: serviceData?.media,
+                  hasVideo: !!serviceData?.video
+                });
                 navigation.navigate("ChatNavigator", {
                   screen: "AddService",
                   params: {
@@ -458,6 +464,7 @@ export default function ServiceDetailsScreen({ route, navigation }) {
             "Service description not available",
           media: serviceData?.media || [],
           mediaType: serviceData?.media?.[0]?.type || "image",
+          video: serviceData?.video ? `https://colala.hmstech.xyz/storage/${serviceData.video}` : null,
           subServices: serviceData?.sub_services || [],
         }}
       />
@@ -548,11 +555,34 @@ function ViewServiceModal({
   onStatsOpen,
 }) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const videoRef = useRef(null);
   
-  // Create gallery from media array
-  const gallery = store.media && store.media.length > 0
-    ? store.media.map(media => `https://colala.hmstech.xyz/storage/${media.path}`)
-    : [store.image];
+  // Create gallery from media array with type information, including main video
+  const gallery = [];
+  
+  // Add main video first if it exists
+  if (store.video) {
+    gallery.push({
+      uri: store.video,
+      type: 'video'
+    });
+  }
+  
+  // Add media items
+  if (store.media && store.media.length > 0) {
+    store.media.forEach(media => {
+      gallery.push({
+        uri: `https://colala.hmstech.xyz/storage/${media.path}`,
+        type: media.type || 'image'
+      });
+    });
+  }
+  
+  // Fallback to store image if no media
+  if (gallery.length === 0) {
+    gallery.push({ uri: store.image, type: 'image' });
+  }
 
   // PanResponder for swipe gestures
   const panResponder = useRef(
@@ -610,12 +640,28 @@ function ViewServiceModal({
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Hero with overlay */}
           <View style={{ position: "relative" }} {...panResponder.panHandlers}>
-            <Image
-              source={toSrc(gallery[activeImageIndex])}
-              style={{ width: "100%", height: 250 }}
-            />
-            {store.mediaType === "video" && (
-              <View
+            {gallery[activeImageIndex]?.type === 'video' ? (
+              <Video
+                ref={videoRef}
+                source={{ uri: gallery[activeImageIndex].uri }}
+                style={{ width: "100%", height: 250 }}
+                useNativeControls
+                resizeMode="cover"
+                shouldPlay={false}
+                onPlaybackStatusUpdate={(status) => {
+                  if (status.isLoaded) {
+                    setIsVideoPlaying(status.isPlaying);
+                  }
+                }}
+              />
+            ) : (
+              <Image
+                source={toSrc(gallery[activeImageIndex]?.uri)}
+                style={{ width: "100%", height: 250 }}
+              />
+            )}
+            {gallery[activeImageIndex]?.type === "video" && (
+              <TouchableOpacity
                 style={{
                   position: "absolute",
                   top: "40%",
@@ -624,9 +670,30 @@ function ViewServiceModal({
                   padding: 20,
                   borderRadius: 40,
                 }}
+                onPress={async () => {
+                  try {
+                    if (videoRef.current) {
+                      const status = await videoRef.current.getStatusAsync();
+                      if (status.isLoaded) {
+                        if (status.isPlaying) {
+                          await videoRef.current.pauseAsync();
+                        } else {
+                          await videoRef.current.playAsync();
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.log('Video play error:', error);
+                  }
+                }}
+                activeOpacity={0.8}
               >
-                <Ionicons name="videocam" size={30} color="#fff" />
-              </View>
+                <Ionicons 
+                  name={isVideoPlaying ? "pause" : "play"} 
+                  size={30} 
+                  color="#fff" 
+                />
+              </TouchableOpacity>
             )}
             
             {/* Swipe arrows */}
@@ -707,23 +774,54 @@ function ViewServiceModal({
             showsHorizontalScrollIndicator={false}
             style={{ flexDirection: "row", padding: 10 }}
           >
-            {gallery.map((imageUri, i) => (
+            {gallery.map((mediaItem, i) => (
               <TouchableOpacity
                 key={i}
                 onPress={() => setActiveImageIndex(i)}
                 activeOpacity={0.7}
+                style={{ position: 'relative' }}
               >
-                <Image
-                  source={toSrc(imageUri)}
-                  style={{
-                    width: 60,
-                    height: 60,
-                    borderRadius: 10,
-                    marginRight: 8,
-                    borderWidth: activeImageIndex === i ? 2 : 0,
-                    borderColor: "#E53E3E",
-                  }}
-                />
+                {mediaItem.type === 'video' ? (
+                  <Video
+                    source={{ uri: mediaItem.uri }}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 10,
+                      marginRight: 8,
+                      borderWidth: activeImageIndex === i ? 2 : 0,
+                      borderColor: "#E53E3E",
+                    }}
+                    shouldPlay={false}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Image
+                    source={toSrc(mediaItem.uri)}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 10,
+                      marginRight: 8,
+                      borderWidth: activeImageIndex === i ? 2 : 0,
+                      borderColor: "#E53E3E",
+                    }}
+                  />
+                )}
+                {mediaItem.type === 'video' && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 5,
+                      right: 12,
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      borderRadius: 8,
+                      padding: 2,
+                    }}
+                  >
+                    <Ionicons name="videocam" size={12} color="#fff" />
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>

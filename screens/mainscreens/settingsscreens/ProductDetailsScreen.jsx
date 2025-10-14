@@ -16,6 +16,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Video } from "expo-av";
 import ThemedText from "../../../components/ThemedText";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
@@ -46,7 +47,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { previewBoost, createBoost } from "../../../utils/mutations/settings";
 import { getBalance } from "../../../utils/queries/settings";
-import { markAsUnavailable, markAsAvailable, quantity } from "../../../utils/mutations/products";
+import {
+  markAsUnavailable,
+  markAsAvailable,
+  quantity,
+} from "../../../utils/mutations/products";
 export default function ProductDetailsScreen({ route, navigation }) {
   const item = route?.params?.item ?? route?.params?.params?.item ?? {};
   const productId = route?.params?.id || item?.id;
@@ -58,18 +63,21 @@ export default function ProductDetailsScreen({ route, navigation }) {
   const handleTopUpNavigation = () => {
     console.log("handleTopUpNavigation called");
     console.log("handleTopUpNavigation - navigation object:", navigation);
-    console.log("handleTopUpNavigation - navigation.navigate:", navigation?.navigate);
-    
+    console.log(
+      "handleTopUpNavigation - navigation.navigate:",
+      navigation?.navigate
+    );
+
     if (navigation && navigation.navigate) {
       console.log("handleTopUpNavigation - navigating to FlutterwaveWebView");
-      navigation.navigate('FlutterwaveWebView', {
+      navigation.navigate("FlutterwaveWebView", {
         amount: topUpAmount,
         order_id: `topup_${Date.now()}`,
-        isTopUp: true
+        isTopUp: true,
       });
     } else {
-      console.error('Navigation not available in handleTopUpNavigation');
-      Alert.alert('Error', 'Navigation not available');
+      console.error("Navigation not available in handleTopUpNavigation");
+      Alert.alert("Error", "Navigation not available");
     }
   };
 
@@ -78,7 +86,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
     console.log("handleEditProductNavigation called");
     console.log("handleEditProductNavigation - navigation object:", navigation);
     console.log("handleEditProductNavigation - productId:", productId);
-    
+
     if (navigation && navigation.navigate) {
       console.log("handleEditProductNavigation - navigating to AddProduct");
       navigation.navigate("AddProduct", {
@@ -87,13 +95,16 @@ export default function ProductDetailsScreen({ route, navigation }) {
         productId: productId,
       });
     } else {
-      console.error('Navigation not available in handleEditProductNavigation');
-      Alert.alert('Error', 'Navigation not available');
+      console.error("Navigation not available in handleEditProductNavigation");
+      Alert.alert("Error", "Navigation not available");
     }
   };
-  
+
   // Debug the function creation
-  console.log("handleTopUpNavigation function created:", typeof handleTopUpNavigation);
+  console.log(
+    "handleTopUpNavigation function created:",
+    typeof handleTopUpNavigation
+  );
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
 
@@ -175,7 +186,8 @@ export default function ProductDetailsScreen({ route, navigation }) {
 
   // Quantity update mutation
   const quantityMutation = useMutation({
-    mutationFn: (newQuantity) => quantity(productId, { quantity: newQuantity.toString() }, token),
+    mutationFn: (newQuantity) =>
+      quantity(productId, { quantity: newQuantity.toString() }, token),
     onSuccess: () => {
       // Refresh the product data to get updated quantity
       queryClient.invalidateQueries(["productDetails", productId]);
@@ -411,7 +423,10 @@ export default function ProductDetailsScreen({ route, navigation }) {
               <ThemedText
                 style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}
               >
-                ₦{Number(product.discount_price || product.price || item.price || 0).toLocaleString()}
+                ₦
+                {Number(
+                  product.discount_price || product.price || item.price || 0
+                ).toLocaleString()}
               </ThemedText>
               {product.discount_price && (
                 <ThemedText
@@ -480,6 +495,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
                 backgroundColor: C.card,
                 borderColor: C.line,
                 shadowColor: "#000",
+                marginVertical: 10,
               },
             ]}
           >
@@ -631,9 +647,18 @@ export default function ProductDetailsScreen({ route, navigation }) {
       )}
 
       {/* FULL-SCREEN PRODUCT MODAL */}
-      {console.log("About to render ViewProductModal with navigation:", navigation)}
-      {console.log("About to render ViewProductModal with handleTopUpNavigation:", handleTopUpNavigation)}
-      {console.log("About to render ViewProductModal - handleTopUpNavigation type:", typeof handleTopUpNavigation)}
+      {console.log(
+        "About to render ViewProductModal with navigation:",
+        navigation
+      )}
+      {console.log(
+        "About to render ViewProductModal with handleTopUpNavigation:",
+        handleTopUpNavigation
+      )}
+      {console.log(
+        "About to render ViewProductModal - handleTopUpNavigation type:",
+        typeof handleTopUpNavigation
+      )}
       <ViewProductModal
         visible={viewOpen}
         onClose={() => setViewOpen(false)}
@@ -699,7 +724,7 @@ function ViewProductModal(props) {
     topUpAmount,
     setTopUpAmount,
   } = props;
-  
+
   // Debug props
   console.log("ViewProductModal received props:", {
     visible,
@@ -715,35 +740,55 @@ function ViewProductModal(props) {
     quantityMutation: !!quantityMutation,
     stats: !!stats,
     chart: !!chart,
-    statsLoading
+    statsLoading,
   });
-  
+
   // Additional debugging for onTopUp specifically
   console.log("onTopUp prop details:", {
     onTopUp,
     onTopUpType: typeof onTopUp,
     onTopUpExists: !!onTopUp,
-    onTopUpFromProps: !!props.onTopUp
+    onTopUpFromProps: !!props.onTopUp,
   });
-  // Create gallery from API images or fallback to dummy images
-  const gallery =
-    images.length > 0
-      ? images.map((img) => `https://colala.hmstech.xyz/storage/${img.path}`)
-      : [
-          item.image,
-          "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60",
-          "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60",
-        ];
+  // Create gallery from API images and video or fallback to dummy images
+  const gallery = [];
+  
+  // Add main video first if it exists
+  if (item.video && item.video.trim() !== "") {
+    gallery.push({
+      uri: `https://colala.hmstech.xyz/storage/${item.video}`,
+      type: 'video'
+    });
+  }
+  
+  // Add images
+  if (images.length > 0) {
+    images.forEach((img) => {
+      gallery.push({
+        uri: `https://colala.hmstech.xyz/storage/${img.path}`,
+        type: 'image'
+      });
+    });
+  } else {
+    // Fallback to dummy images
+    gallery.push(
+      { uri: item.image, type: 'image' },
+      { uri: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=1200&q=60", type: 'image' },
+      { uri: "https://images.unsplash.com/photo-1603899122775-bf2b68fdd0c5?w=1200&q=60", type: 'image' }
+    );
+  }
 
   const [active, setActive] = useState(0);
   const [tab, setTab] = useState("overview");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const videoRef = useRef(null);
   // Fix price display: discount_price should be the main price (red), price should be strikethrough
-  const priceNow = item.discount_price 
+  const priceNow = item.discount_price
     ? `₦${Number(item.discount_price).toLocaleString()}`
     : `₦${Number(item.price || 0).toLocaleString()}`;
-  const oldPrice = item.discount_price 
+  const oldPrice = item.discount_price
     ? `₦${Number(item.price || 0).toLocaleString()}`
     : null;
 
@@ -753,8 +798,9 @@ function ViewProductModal(props) {
   console.log("ViewProductModal item qty:", item.qty);
   console.log("ViewProductModal item quantity:", item.quantity);
 
-  // Check if there's a video
-  const hasVideo = item.video && item.video.trim() !== "";
+  // Check if current gallery item is a video
+  const currentItem = gallery[active];
+  const isCurrentVideo = currentItem?.type === 'video';
 
   // Swipe functionality for image gallery
   const panResponder = useRef(
@@ -879,9 +925,25 @@ function ViewProductModal(props) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 24 }}
         >
-          {/* Hero image with swipe functionality */}
+          {/* Hero image/video with swipe functionality */}
           <View style={styles.heroWrap} {...panResponder.panHandlers}>
-            <Image source={toSrc(gallery[active])} style={styles.heroImg} />
+            {isCurrentVideo ? (
+              <Video
+                ref={videoRef}
+                source={{ uri: currentItem.uri }}
+                style={styles.heroImg}
+                useNativeControls
+                resizeMode="cover"
+                shouldPlay={false}
+                onPlaybackStatusUpdate={(status) => {
+                  if (status.isLoaded) {
+                    setIsVideoPlaying(status.isPlaying);
+                  }
+                }}
+              />
+            ) : (
+              <Image source={toSrc(currentItem?.uri)} style={styles.heroImg} />
+            )}
 
             {/* Swipe areas for touch navigation */}
             {active > 0 && (
@@ -906,9 +968,32 @@ function ViewProductModal(props) {
               />
             )}
 
-            {hasVideo && (
-              <TouchableOpacity style={styles.playOverlay}>
-                <Ionicons name="play" size={26} color="#fff" />
+            {isCurrentVideo && (
+              <TouchableOpacity 
+                style={styles.playOverlay}
+                onPress={async () => {
+                  try {
+                    if (videoRef.current) {
+                      const status = await videoRef.current.getStatusAsync();
+                      if (status.isLoaded) {
+                        if (status.isPlaying) {
+                          await videoRef.current.pauseAsync();
+                        } else {
+                          await videoRef.current.playAsync();
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.log('Video play error:', error);
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={isVideoPlaying ? "pause" : "play"} 
+                  size={26} 
+                  color="#fff" 
+                />
               </TouchableOpacity>
             )}
 
@@ -992,10 +1077,30 @@ function ViewProductModal(props) {
                   },
                 ]}
               >
-                <Image
-                  source={toSrc(g)}
-                  style={{ width: "100%", height: "100%", borderRadius: 10 }}
-                />
+                {g.type === 'video' ? (
+                  <View style={{ position: 'relative', width: "100%", height: "100%", borderRadius: 10 }}>
+                    <Image
+                      source={toSrc(g.uri)}
+                      style={{ width: "100%", height: "100%", borderRadius: 10 }}
+                    />
+                    <View style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: [{ translateX: -15 }, { translateY: -15 }],
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      borderRadius: 20,
+                      padding: 8,
+                    }}>
+                      <Ionicons name="play" size={16} color="#fff" />
+                    </View>
+                  </View>
+                ) : (
+                  <Image
+                    source={toSrc(g.uri)}
+                    style={{ width: "100%", height: "100%", borderRadius: 10 }}
+                  />
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1171,16 +1276,18 @@ function ViewProductModal(props) {
                     >
                       <TouchableOpacity
                         onPress={() => {
-                          const currentQty = parseInt(item.qty || item.quantity || 0);
+                          const currentQty = parseInt(
+                            item.qty || item.quantity || 0
+                          );
                           if (currentQty > 0) {
                             quantityMutation.mutate(currentQty - 1);
                           }
                         }}
                         style={[
                           styles.qtySquare,
-                          { 
+                          {
                             backgroundColor: C.primary,
-                            opacity: quantityMutation.isPending ? 0.6 : 1
+                            opacity: quantityMutation.isPending ? 0.6 : 1,
                           },
                         ]}
                         disabled={quantityMutation.isPending}
@@ -1206,14 +1313,16 @@ function ViewProductModal(props) {
 
                       <TouchableOpacity
                         onPress={() => {
-                          const currentQty = parseInt(item.qty || item.quantity || 0);
+                          const currentQty = parseInt(
+                            item.qty || item.quantity || 0
+                          );
                           quantityMutation.mutate(currentQty + 1);
                         }}
                         style={[
                           styles.qtySquare,
-                          { 
+                          {
                             backgroundColor: C.primary,
-                            opacity: quantityMutation.isPending ? 0.6 : 1
+                            opacity: quantityMutation.isPending ? 0.6 : 1,
                           },
                         ]}
                         disabled={quantityMutation.isPending}
@@ -1260,13 +1369,21 @@ function ViewProductModal(props) {
                   <TouchableOpacity
                     style={[styles.editWide, { backgroundColor: C.primary }]}
                     onPress={() => {
-                      console.log("Edit Product button pressed in ViewProductModal, onEditProduct exists:", !!onEditProduct);
+                      console.log(
+                        "Edit Product button pressed in ViewProductModal, onEditProduct exists:",
+                        !!onEditProduct
+                      );
                       if (onEditProduct) {
                         onClose();
                         onEditProduct();
                       } else {
-                        console.error("onEditProduct function not available in ViewProductModal");
-                        Alert.alert('Error', 'Edit Product functionality not available');
+                        console.error(
+                          "onEditProduct function not available in ViewProductModal"
+                        );
+                        Alert.alert(
+                          "Error",
+                          "Edit Product functionality not available"
+                        );
                       }
                     }}
                   >
@@ -1567,6 +1684,7 @@ function BoostSetupModal({
 }) {
   const [showStateModal, setShowStateModal] = useState(false);
   const [editBudgetOpen, setEditBudgetOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const { token } = useAuth();
 
   const previewMutation = useMutation({
@@ -1646,7 +1764,10 @@ function BoostSetupModal({
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }}>
+        <ScrollView 
+          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          scrollEnabled={!isDragging}
+        >
           <ThemedText style={{ color: "#111", marginBottom: 8 }}>
             Get your post across several audiences
           </ThemedText>
@@ -1702,6 +1823,7 @@ function BoostSetupModal({
             step={100}
             color={C.primary}
             format={(v) => `₦ ${Number(Math.round(v)).toLocaleString()}`}
+            onDragChange={setIsDragging}
           />
 
           <ThemedText
@@ -1722,6 +1844,7 @@ function BoostSetupModal({
             step={1}
             color={C.primary}
             format={(v) => `${Math.round(v)} Days`}
+            onDragChange={setIsDragging}
           />
 
           <View style={{ height: 18 }} />
@@ -1802,7 +1925,7 @@ function ReviewAdModal({
   const estimatedReach = Math.round((daily / 500) * 1000 * days);
   const estimatedClicks = Math.round(estimatedReach * 0.1); // 10% of reach
   const totalAmount = daily * days;
-  
+
   const { token } = useAuth();
 
   const data = previewData || {};
@@ -1945,7 +2068,13 @@ function ReviewAdModal({
                   {product?.name || item?.name || item?.title || "Product Name"}
                 </ThemedText>
                 <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
-                  ₦{Number(product?.discount_price || product?.price || item?.price || 0).toLocaleString()}
+                  ₦
+                  {Number(
+                    product?.discount_price ||
+                      product?.price ||
+                      item?.price ||
+                      0
+                  ).toLocaleString()}
                 </ThemedText>
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
@@ -2029,8 +2158,10 @@ function ReviewAdModal({
                 if (onTopUpModalOpen) {
                   onTopUpModalOpen();
                 } else {
-                  console.error("onTopUpModalOpen function not available in ReviewAdModal");
-                  Alert.alert('Error', 'Top Up functionality not available');
+                  console.error(
+                    "onTopUpModalOpen function not available in ReviewAdModal"
+                  );
+                  Alert.alert("Error", "Top Up functionality not available");
                 }
               }}
             >
@@ -2553,29 +2684,42 @@ function SliderRow({
   const thumbLeft = width * pct;
 
   const updateFromLocationX = (locX) => {
-    if (width <= 0) return;
+    if (width <= 0) {
+      console.log("Slider: Width not set yet", width);
+      return;
+    }
     const ratio = clamp(locX / width, 0, 1);
     const raw = min + ratio * (max - min);
-    setValue(stepTo(clamp(raw, min, max), step));
+    const newValue = stepTo(clamp(raw, min, max), step);
+    console.log("Slider: Updating value", { locX, width, ratio, raw, newValue, currentValue: safeValue });
+    setValue(newValue);
   };
 
   const pan = React.useRef(
     PanResponder.create({
-      // take control early so the parent ScrollView doesn’t steal the gesture
+      // take control early so the parent ScrollView doesn't steal the gesture
       onStartShouldSetPanResponder: () => true,
       onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false, // don't give it back mid-gesture
       onPanResponderGrant: (evt) => {
+        console.log("Slider: Touch started", evt.nativeEvent.locationX);
         onDragChange?.(true);
         updateFromLocationX(evt.nativeEvent.locationX); // immediate jump to tap
       },
       onPanResponderMove: (evt) => {
+        console.log("Slider: Touch moving", evt.nativeEvent.locationX);
         updateFromLocationX(evt.nativeEvent.locationX); // drag updates
       },
-      onPanResponderRelease: () => onDragChange?.(false),
-      onPanResponderTerminate: () => onDragChange?.(false),
+      onPanResponderRelease: () => {
+        console.log("Slider: Touch released");
+        onDragChange?.(false);
+      },
+      onPanResponderTerminate: () => {
+        console.log("Slider: Touch terminated");
+        onDragChange?.(false);
+      },
     })
   ).current;
 
@@ -3497,13 +3641,20 @@ const styles = StyleSheet.create({
 });
 
 /* ───────── Top Up Modal ───────── */
-function TopUpModal({ visible, onClose, onTopUp, C, topUpAmount, setTopUpAmount }) {
+function TopUpModal({
+  visible,
+  onClose,
+  onTopUp,
+  C,
+  topUpAmount,
+  setTopUpAmount,
+}) {
   const [amount, setAmount] = useState(topUpAmount.toString());
 
   const handleTopUp = () => {
     const numAmount = parseInt(amount) || 0;
     if (numAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid top-up amount');
+      Alert.alert("Invalid Amount", "Please enter a valid top-up amount");
       return;
     }
     setTopUpAmount(numAmount);
@@ -3526,9 +3677,11 @@ function TopUpModal({ visible, onClose, onTopUp, C, topUpAmount, setTopUpAmount 
           <ThemedText style={[styles.topUpModalText, { color: C.sub }]}>
             Enter the amount you want to add to your wallet
           </ThemedText>
-          
+
           <View style={[styles.topUpInputContainer, { borderColor: C.line }]}>
-            <ThemedText style={[styles.topUpCurrency, { color: C.text }]}>₦</ThemedText>
+            <ThemedText style={[styles.topUpCurrency, { color: C.text }]}>
+              ₦
+            </ThemedText>
             <TextInput
               style={[styles.topUpInput, { color: C.text }]}
               value={amount}
@@ -3541,16 +3694,30 @@ function TopUpModal({ visible, onClose, onTopUp, C, topUpAmount, setTopUpAmount 
 
           <View style={styles.topUpModalButtons}>
             <TouchableOpacity
-              style={[styles.topUpModalButton, styles.topUpModalCancel, { borderColor: C.line }]}
+              style={[
+                styles.topUpModalButton,
+                styles.topUpModalCancel,
+                { borderColor: C.line },
+              ]}
               onPress={onClose}
             >
-              <ThemedText style={[styles.topUpModalButtonText, { color: C.text }]}>Cancel</ThemedText>
+              <ThemedText
+                style={[styles.topUpModalButtonText, { color: C.text }]}
+              >
+                Cancel
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.topUpModalButton, styles.topUpModalConfirm, { backgroundColor: C.primary }]}
+              style={[
+                styles.topUpModalButton,
+                styles.topUpModalConfirm,
+                { backgroundColor: C.primary },
+              ]}
               onPress={handleTopUp}
             >
-              <ThemedText style={styles.topUpModalButtonTextWhite}>Top Up</ThemedText>
+              <ThemedText style={styles.topUpModalButtonTextWhite}>
+                Top Up
+              </ThemedText>
             </TouchableOpacity>
           </View>
         </View>
@@ -3693,7 +3860,9 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                       <ThemedText
                         style={[styles.statValue, { color: C.primary }]}
                       >
-                        {((stats.impressions || 0) - (stats.profileClicks || 0)).toLocaleString()}
+                        {(
+                          (stats.impressions || 0) - (stats.profileClicks || 0)
+                        ).toLocaleString()}
                       </ThemedText>
                       <ThemedText style={[styles.statLabel, { color: C.sub }]}>
                         No Clicks

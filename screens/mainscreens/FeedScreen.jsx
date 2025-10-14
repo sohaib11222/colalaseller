@@ -21,6 +21,7 @@ import * as MediaLibrary from "expo-media-library";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../components/ThemedText";
 import { STATIC_COLORS } from "../../components/ThemeProvider";
+import { useAuth } from "../../contexts/AuthContext";
 
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,13 +33,27 @@ import * as PostMutations from "../../utils/mutations/posts"; // createPost, upd
 import { StatusBar } from "expo-status-bar";
 
 /* -------------------- HELPERS -------------------- */
-const absUrl = (maybePath) =>
-  !maybePath
-    ? null
-    : maybePath.startsWith("http")
-      ? maybePath
-      : `${API_DOMAIN.replace(/\/api$/, "")}${maybePath.startsWith("/") ? "" : "/"
-      }${maybePath}`;
+const absUrl = (maybePath) => {
+  if (!maybePath) {
+    console.log("absUrl: no path provided");
+    return null;
+  }
+  
+  if (maybePath.startsWith("http")) {
+    console.log("absUrl: already absolute URL:", maybePath);
+    return maybePath;
+  }
+  
+  // Add /storage/ prefix if the path doesn't already include it
+  let path = maybePath;
+  if (!path.startsWith("storage/") && !path.startsWith("/storage/")) {
+    path = `storage/${path}`;
+  }
+  
+  const result = `${API_DOMAIN.replace(/\/api$/, "")}${path.startsWith("/") ? "" : "/"}${path}`;
+  console.log("absUrl: converted", maybePath, "to", result);
+  return result;
+};
 
 const timeAgo = (iso) => {
   if (!iso) return "now";
@@ -82,21 +97,58 @@ const addQuery = (url, kv) => {
   return `${base}?${search.toString()}`;
 };
 
-const mapPost = (p) => {
+const mapPost = (p, currentUserId = null) => {
   const storeName = p?.user?.store?.store_name || p?.user?.full_name || "Store";
-  const avatar = absUrl(p?.user?.profile_picture) || null;
+  
+  // Check if this is our own post
+  const isOwnPost = currentUserId && p?.user?.id === currentUserId;
+  
+  // For our own posts, prioritize store profile image
+  // For other posts, use profile_picture first, then store profile image
+  let avatar = null;
+  if (isOwnPost) {
+    // For our own posts, prioritize store profile image
+    avatar = absUrl(p?.user?.store?.profile_image || p?.user?.profile_picture) || null;
+  } else {
+    // For other posts, use profile_picture first, then store profile image
+    avatar = absUrl(p?.user?.profile_picture || p?.user?.store?.profile_image) || null;
+  }
+  
+  // Debug profile image
+  console.log("Profile Image Debug for post", p.id, {
+    isOwnPost,
+    currentUserId,
+    postUserId: p?.user?.id,
+    profilePicture: p?.user?.profile_picture,
+    storeProfileImage: p?.user?.store?.profile_image,
+    selectedImage: isOwnPost 
+      ? (p?.user?.store?.profile_image || p?.user?.profile_picture)
+      : (p?.user?.profile_picture || p?.user?.store?.profile_image),
+    finalAvatar: avatar
+  });
+  
   const ver = p?.updated_at ? new Date(p.updated_at).getTime() : Date.now();
 
   // Handle both old and new API response structures
   const mediaUrls = p?.media_urls || p?.media || [];
+  console.log("mapPost Debug for post", p.id, {
+    mediaUrls,
+    mediaUrlsLength: mediaUrls.length,
+    hasMediaUrls: !!p?.media_urls,
+    hasMedia: !!p?.media
+  });
+  
   const images = mediaUrls
     .sort((a, b) => (a?.position ?? 0) - (b?.position ?? 0))
     .map((m) => {
       const url = m.url || m.path; // Handle both url and path fields
       const u = absUrl(url);
+      console.log("Processing media item:", { url, absUrl: u });
       return u ? addQuery(u, { v: ver }) : null;
     })
     .filter(Boolean);
+    
+  console.log("Final images array:", images);
 
   return {
     id: String(p.id),
@@ -368,6 +420,7 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownloa
   const [showFullCaption, setShowFullCaption] = useState(false);
   useEffect(() => setLiked(!!item.is_liked), [item.is_liked]);
 
+  
   const likeCount = liked
     ? (item.likes || 0) + (item.is_liked ? 0 : 1)
     : item.likes || 0;
@@ -406,21 +459,27 @@ function PostCard({ item, onOpenComments, onOpenOptions, onToggleLike, onDownloa
           style={styles.carouselWrap}
           onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}
         >
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={onCarouselScroll}
-            scrollEventThrottle={16}
-          >
-            {images.map((uri, idx) => (
-              <Image
-                key={`${item.id}-${idx}-${uri}`} // <- include uri in key
-                source={{ uri }}
-                style={[styles.postImage, { width: carouselW || "100%" }]}
-              />
-            ))}
-          </ScrollView>
+          {images.length > 0 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={onCarouselScroll}
+              scrollEventThrottle={16}
+            >
+              {images.map((uri, idx) => (
+                <Image
+                  key={`${item.id}-${idx}-${uri}`} // <- include uri in key
+                  source={{ uri }}
+                  style={[styles.postImage, { width: carouselW || "100%" }]}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={[styles.postImage, { width: carouselW || "100%", backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+              <ThemedText style={{ color: '#999', fontSize: 16 }}>No Image</ThemedText>
+            </View>
+          )}
 
           {images.length > 1 && (
             <View style={styles.dotsRow}>
@@ -551,8 +610,8 @@ function CommentsSheet({ visible, onClose, postId }) {
     body: c.body,
     time: timeAgo(c.created_at),
     user: c.user?.full_name || "User",
-    // avatar: absUrl(c.user?.profile_picture) || "https://via.placeholder.com/56",
-    avatar: absUrl(c.user?.profile_picture) || null,
+    // Check both profile_picture and store.profile_image fields for comments
+    avatar: absUrl(c.user?.profile_picture || c.user?.store?.profile_image) || null,
     replies: c.replies || [],
     _raw: c,
   }));
@@ -582,7 +641,7 @@ function CommentsSheet({ visible, onClose, postId }) {
   const ReplyBlock = ({ reply }) => (
     <View style={styles.replyContainer}>
       <Image
-        source={src(absUrl(reply.user?.profile_picture))}
+        source={src(absUrl(reply.user?.profile_picture || reply.user?.store?.profile_image))}
         style={styles.commentAvatar}
       />
       <View style={{ flex: 1 }}>
@@ -890,14 +949,14 @@ function OptionsSheetMine({ visible, onClose, onEditPost, onDeletePost }) {
 }
 
 /* -------------------- DATA HOOKS (in this file) -------------------- */
-function useAllAndMyPosts() {
+function useAllAndMyPosts(currentUserId) {
   return useQuery({
     queryKey: ["posts", "lists"],
     queryFn: async () => {
       const token = await getToken();
       const res = await PostQueries.getPosts(token);
-      const posts = (res?.data?.posts?.data || []).map(mapPost);
-      const myPosts = (res?.data?.myPosts?.data || []).map(mapPost);
+      const posts = (res?.data?.posts?.data || []).map(p => mapPost(p, currentUserId));
+      const myPosts = (res?.data?.myPosts?.data || []).map(p => mapPost(p, currentUserId));
       return { posts, myPosts };
     },
     staleTime: 30_000,
@@ -919,7 +978,7 @@ function useCreatePost() {
   });
 }
 
-function useUpdatePost() {
+function useUpdatePost(currentUserId) {
   const qc = useQueryClient();
 
   return useMutation({
@@ -943,7 +1002,7 @@ function useUpdatePost() {
     onSuccess: (res, vars) => {
       // 1) Map the updated post from server
       const updatedRaw = res?.data?.data;
-      const updated = updatedRaw ? mapPost(updatedRaw) : null;
+      const updated = updatedRaw ? mapPost(updatedRaw, currentUserId) : null;
       if (!updated) {
         // fallback: still refetch if something is off
         qc.invalidateQueries({ queryKey: ["posts", "lists"] });
@@ -1018,6 +1077,7 @@ function useToggleLikeMutation() {
 /* -------------------- MAIN SCREEN -------------------- */
 export default function FeedScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
   // const { theme } = useTheme();
 
   // Handle navigation safely
@@ -1134,14 +1194,28 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [hiddenPostIds, setHiddenPostIds] = useState(new Set());
 
-  const { data, isLoading, error, refetch } = useAllAndMyPosts();
+  const { data, isLoading, error, refetch } = useAllAndMyPosts(user?.id);
   const create = useCreatePost();
-  const update = useUpdatePost();
+  const update = useUpdatePost(user?.id);
   const remove = useDeletePost();
   const likeMut = useToggleLikeMutation();
 
   const posts = data?.posts || [];
   const myPosts = data?.myPosts || [];
+  
+  // Debug logging
+  console.log("FeedScreen Debug:", {
+    tab,
+    postsCount: posts.length,
+    myPostsCount: myPosts.length,
+    myPostsSample: myPosts[0] ? {
+      id: myPosts[0].id,
+      store: myPosts[0].store,
+      images: myPosts[0].images,
+      imagesLength: myPosts[0].images?.length
+    } : null
+  });
+  
   const rawList = tab === "my" ? myPosts : posts;
   const listData = rawList
     .filter((p) => !hiddenPostIds.has(String(p.id)))
@@ -1370,7 +1444,7 @@ export default function FeedScreen() {
             keptUrls: keptUrls || [],
             removedUrls: removedUrls || [],
           });
-          const updated = res?.data?.data ? mapPost(res.data.data) : null;
+          const updated = res?.data?.data ? mapPost(res.data.data, user?.id) : null;
           if (updated) {
             setActivePost(updated);
           }

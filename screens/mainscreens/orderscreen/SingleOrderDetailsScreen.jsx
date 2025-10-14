@@ -24,7 +24,6 @@ import { apiCall } from "../../../utils/customApiCall";
 import { API_ENDPOINTS } from "../../../apiConfig";
 import { markForDelivery, verifyCode } from "../../../utils/mutations/orders";
 
-
 /* ---------- helpers (UI preserved) ---------- */
 const currency = (n) => `₦${Number(n).toLocaleString()}`;
 const productImg = require("../../../assets/Frame 314.png");
@@ -42,15 +41,19 @@ const shadow = (e = 10) =>
 
 // Get the current status from order_tracking array (most recent entry)
 const getCurrentStatus = (orderTracking) => {
-  if (!orderTracking || !Array.isArray(orderTracking) || orderTracking.length === 0) {
+  if (
+    !orderTracking ||
+    !Array.isArray(orderTracking) ||
+    orderTracking.length === 0
+  ) {
     return "placed"; // default status
   }
-  
+
   // Sort by created_at to get the most recent status
-  const sortedTracking = [...orderTracking].sort((a, b) => 
-    new Date(b.created_at) - new Date(a.created_at)
+  const sortedTracking = [...orderTracking].sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
   );
-  
+
   return sortedTracking[0].status;
 };
 
@@ -77,6 +80,8 @@ function TrackOrderModal({
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [fullOpen, setFullOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [inputCode, setInputCode] = useState("");
   const [codeVerified, setCodeVerified] = useState(false);
   const isOutForDelivery = statusIndex(statusStr) >= 1;
@@ -86,6 +91,11 @@ function TrackOrderModal({
   const firstItem = items?.[0];
   const firstTitle = firstItem?.name || "Product";
   const firstPrice = firstItem?.unit_price || 0;
+  const firstImageSource = firstItem?.product?.images?.[0]?.path
+    ? {
+        uri: `https://colala.hmstech.xyz/storage/${firstItem.product.images[0].path}`,
+      }
+    : productImg;
 
   // const markMut = useMutation({
   //   mutationFn: async () => {
@@ -158,7 +168,10 @@ function TrackOrderModal({
       console.log("=== VERIFY ERROR ===");
       console.log("Error:", error);
       // You can add an alert here to show the error to the user
-      Alert.alert("Verification Failed", error.message || "Please check your code and try again.");
+      Alert.alert(
+        "Verification Failed",
+        error.message || "Please check your code and try again."
+      );
     },
   });
 
@@ -177,13 +190,28 @@ function TrackOrderModal({
   }) => (
     <View style={styles.stepCard}>
       <View style={{ flexDirection: "row" }}>
-        <Image source={productImg} style={styles.stepImg} />
+        <Image source={firstImageSource} style={styles.stepImg} />
         <View style={{ flex: 1, paddingLeft: 12 }}>
-          <ThemedText style={[styles.stepTitle, { color: highlight ? C.primary : C.text }]}>{title}</ThemedText>
-          <ThemedText style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}>{firstTitle}</ThemedText>
-          <ThemedText style={[styles.stepPrice, { color: C.primary }]}>{currency(firstPrice)}</ThemedText>
+          <ThemedText
+            style={[
+              styles.stepTitle,
+              { color: highlight ? C.primary : C.text },
+            ]}
+          >
+            {title}
+          </ThemedText>
+          <ThemedText
+            style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}
+          >
+            {firstTitle}
+          </ThemedText>
+          <ThemedText style={[styles.stepPrice, { color: C.primary }]}>
+            {currency(firstPrice)}
+          </ThemedText>
           <ThemedText style={[styles.stepTime, { color: C.sub }]}>
-            {firstItem?.created_at ? new Date(firstItem.created_at).toLocaleDateString() : "N/A"}
+            {firstItem?.created_at
+              ? new Date(firstItem.created_at).toLocaleDateString()
+              : "N/A"}
           </ThemedText>
         </View>
       </View>
@@ -197,7 +225,8 @@ function TrackOrderModal({
         >
           <Ionicons name="warning-outline" size={18} color={C.primary} />
           <ThemedText style={{ color: C.primary, marginLeft: 8 }}>
-            This order will only be marked as delivered once you enter the buyer’s unique code
+            This order will only be marked as delivered once you enter the
+            buyer’s unique code
           </ThemedText>
         </View>
       ) : null}
@@ -208,12 +237,32 @@ function TrackOrderModal({
           onPress={onActionPress}
           style={[
             styles.revealBtn,
-            { backgroundColor: disabledAction ? "#F2A7A7" : "#fff", borderWidth: 1, borderColor: C.primary },
+            {
+              backgroundColor: disabledAction ? "#F2A7A7" : "#fff",
+              borderWidth: 1,
+              borderColor: C.primary,
+            },
           ]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <Ionicons name="checkmark" size={18} color={disabledAction ? "#fff" : C.primary} />
-            <ThemedText style={{ marginLeft: 8, color: disabledAction ? "#fff" : C.primary, fontWeight: "600" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons
+              name="checkmark"
+              size={18}
+              color={disabledAction ? "#fff" : C.primary}
+            />
+            <ThemedText
+              style={{
+                marginLeft: 8,
+                color: disabledAction ? "#fff" : C.primary,
+                fontWeight: "600",
+              }}
+            >
               {actionLabel}
             </ThemedText>
           </View>
@@ -223,11 +272,16 @@ function TrackOrderModal({
       {showRequest ? (
         <>
           <TouchableOpacity
-            disabled={disabledRequest}                  // <-- NEW
+            disabled={disabledRequest} // <-- NEW
             onPress={onRequestCode}
             style={[
               styles.revealBtn,
-              { backgroundColor: "#fff", borderWidth: 1, borderColor: C.primary, opacity: disabledRequest ? 0.6 : 1 }, // <-- NEW
+              {
+                backgroundColor: "#fff",
+                borderWidth: 1,
+                borderColor: C.primary,
+                opacity: disabledRequest ? 0.6 : 1,
+              }, // <-- NEW
             ]}
           >
             <ThemedText style={{ color: C.primary, fontWeight: "600" }}>
@@ -250,12 +304,24 @@ function TrackOrderModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         {/* header */}
-        <View style={[styles.header, { borderBottomColor: C.line, backgroundColor: "#fff" }]}>
+        <View
+          style={[
+            styles.header,
+            { borderBottomColor: C.line, backgroundColor: "#fff" },
+          ]}
+        >
           <View style={styles.headerRow}>
-            <TouchableOpacity onPress={onClose} style={styles.backBtn} hitSlop={HITSLOP}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.backBtn}
+              hitSlop={HITSLOP}
+            >
               <Ionicons name="chevron-back" size={22} color={C.text} />
             </TouchableOpacity>
-            <ThemedText style={[styles.headerTitle, { color: C.text }]} pointerEvents="none">
+            <ThemedText
+              style={[styles.headerTitle, { color: C.text }]}
+              pointerEvents="none"
+            >
               Order Tracker
             </ThemedText>
             <View style={{ width: 40, height: 40 }} />
@@ -263,9 +329,20 @@ function TrackOrderModal({
         </View>
 
         {/* top pills */}
-        <View style={{ paddingHorizontal: 16, flexDirection: "row", gap: 12, marginTop: 10 }}>
+        <View
+          style={{
+            paddingHorizontal: 16,
+            flexDirection: "row",
+            gap: 12,
+            marginTop: 10,
+          }}
+        >
           <TouchableOpacity
-            style={[styles.pillBtn, { backgroundColor: "#fff", borderWidth: 1, borderColor: C.line }]}
+            style={[
+              styles.pillBtn,
+              { backgroundColor: "#fff", borderWidth: 1, borderColor: C.line },
+            ]}
+            // onPress={() => setFullOpen(true)}
             onPress={onClose}
           >
             <ThemedText style={{ color: C.text }}>Full Details</ThemedText>
@@ -274,7 +351,9 @@ function TrackOrderModal({
             style={[styles.pillBtn, { backgroundColor: C.primary }]}
             onPress={onOpenChat}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>Open Chat</ThemedText>
+            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+              Open Chat
+            </ThemedText>
           </TouchableOpacity>
         </View>
 
@@ -283,8 +362,15 @@ function TrackOrderModal({
           {/* 1 - Order placed */}
           <View style={{ flexDirection: "row", marginBottom: 20 }}>
             <View style={{ width: 46, alignItems: "center" }}>
-              <View style={[styles.dot, { backgroundColor: C.primary, borderColor: C.primary }]}>
-                <ThemedText style={{ color: "#fff", fontWeight: "700" }}>1</ThemedText>
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: C.primary, borderColor: C.primary },
+                ]}
+              >
+                <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                  1
+                </ThemedText>
               </View>
               <View style={[styles.vLine, { backgroundColor: C.primary }]} />
             </View>
@@ -303,7 +389,12 @@ function TrackOrderModal({
                       : { backgroundColor: "#fff", borderColor: C.primary },
                   ]}
                 >
-                  <ThemedText style={{ color: statusIndex(statusStr) >= 1 ? "#fff" : C.primary, fontWeight: "700" }}>
+                  <ThemedText
+                    style={{
+                      color: statusIndex(statusStr) >= 1 ? "#fff" : C.primary,
+                      fontWeight: "700",
+                    }}
+                  >
                     2
                   </ThemedText>
                 </View>
@@ -314,7 +405,11 @@ function TrackOrderModal({
                 highlight
                 showAction
                 disabledAction={statusIndex(statusStr) >= 1}
-                actionLabel={statusIndex(statusStr) >= 1 ? "Out for delivery" : "Mark as out for delivery"}
+                actionLabel={
+                  statusIndex(statusStr) >= 1
+                    ? "Out for delivery"
+                    : "Mark as out for delivery"
+                }
                 onActionPress={() => setConfirmOpen(true)}
               />
             </View>
@@ -332,7 +427,12 @@ function TrackOrderModal({
                       : { backgroundColor: "#fff", borderColor: C.primary },
                   ]}
                 >
-                  <ThemedText style={{ color: statusIndex(statusStr) >= 2 ? "#fff" : C.primary, fontWeight: "700" }}>
+                  <ThemedText
+                    style={{
+                      color: statusIndex(statusStr) >= 2 ? "#fff" : C.primary,
+                      fontWeight: "700",
+                    }}
+                  >
                     3
                   </ThemedText>
                 </View>
@@ -362,40 +462,491 @@ function TrackOrderModal({
                       : { backgroundColor: "#fff", borderColor: C.primary },
                   ]}
                 >
-                  <ThemedText style={{ color: statusIndex(statusStr) >= 3 ? "#fff" : C.primary, fontWeight: "700" }}>
+                  <ThemedText
+                    style={{
+                      color: statusIndex(statusStr) >= 3 ? "#fff" : C.primary,
+                      fontWeight: "700",
+                    }}
+                  >
                     4
                   </ThemedText>
                 </View>
               </View>
               <View style={styles.stepCard}>
                 <View style={{ flexDirection: "row" }}>
-                  <Image source={productImg} style={styles.stepImg} />
+                  <Image source={firstImageSource} style={styles.stepImg} />
                   <View style={{ flex: 1, paddingLeft: 12 }}>
-                    <ThemedText style={[styles.stepTitle, { color: C.text }]}>Funds Released</ThemedText>
-                    <ThemedText style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}>
+                    <ThemedText style={[styles.stepTitle, { color: C.text }]}>
+                      Funds Released
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.stepSub, { color: C.text, opacity: 0.85 }]}
+                    >
                       {firstTitle}
                     </ThemedText>
-                    <ThemedText style={[styles.stepPrice, { color: C.primary }]}>
+                    <ThemedText
+                      style={[styles.stepPrice, { color: C.primary }]}
+                    >
                       {currency(detail?.subtotal_with_shipping || 0)}
                     </ThemedText>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.revealBtn, { backgroundColor: C.primary, marginTop: 12 }]}
-                  onPress={() => { 
-                   //navigate tto EscrowWallet
-                   navigation.navigate("ChatNavigator", {
-                    screen: "EscrowWallet",
-                   });
+                  style={[
+                    styles.revealBtn,
+                    { backgroundColor: C.primary, marginTop: 12 },
+                  ]}
+                  onPress={() => {
+                    //navigate tto EscrowWallet
+                    navigation.navigate("ChatNavigator", {
+                      screen: "EscrowWallet",
+                    });
                   }}
                 >
-                  <ThemedText style={{ color: "#fff", fontWeight: "600" }}>View Wallet</ThemedText>
+                  <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                    View Wallet
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
           )}
         </ScrollView>
+
+        {/* Full details modal */}
+        <Modal
+          visible={fullOpen}
+          animationType="slide"
+          onRequestClose={() => setFullOpen(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+            {/* header */}
+            <View
+              style={[
+                styles.header,
+                { borderBottomColor: C.line, backgroundColor: "#fff" },
+              ]}
+            >
+              <View style={styles.headerRow}>
+                <TouchableOpacity
+                  onPress={() => setFullOpen(false)}
+                  style={styles.backBtn}
+                  hitSlop={HITSLOP}
+                >
+                  <Ionicons name="chevron-back" size={22} color={C.text} />
+                </TouchableOpacity>
+                <ThemedText
+                  style={[styles.headerTitle, { color: C.text }]}
+                  pointerEvents="none"
+                >
+                  Full Order Details
+                </ThemedText>
+                <View style={{ width: 40, height: 40 }} />
+              </View>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={{
+                padding: 16,
+                paddingBottom: 24,
+                backgroundColor: "white",
+              }}
+            >
+              {/* Order banner */}
+              <View
+                style={[styles.detailBanner, { backgroundColor: C.primary }]}
+              >
+                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                  {`ORD - ${
+                    detail?.order?.order_no ??
+                    String(detail?.id ?? "").toUpperCase()
+                  }`}
+                </ThemedText>
+              </View>
+
+              {/* Items card */}
+              <View
+                style={[
+                  styles.detailCard,
+                  { borderColor: C.line, backgroundColor: "white" },
+                ]}
+              >
+                {(items || []).map((it, idx) => (
+                  <View
+                    key={String(it.id ?? idx)}
+                    style={[
+                      styles.detailItemRow,
+                      idx > 0 && { borderTopWidth: 1, borderTopColor: C.line },
+                    ]}
+                  >
+                    <Image
+                      source={
+                        it.product?.images?.[0]?.path
+                          ? {
+                              uri: `https://colala.hmstech.xyz/storage/${it.product.images[0].path}`,
+                            }
+                          : productImg
+                      }
+                      style={styles.detailItemImg}
+                    />
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <ThemedText
+                        style={[styles.itemTitle, { color: C.text }]}
+                        numberOfLines={2}
+                      >
+                        {it.name || "Product"}
+                      </ThemedText>
+                      <ThemedText style={[styles.price, { color: C.primary }]}>
+                        {currency(it.unit_price || 0)}
+                      </ThemedText>
+                      <ThemedText style={[styles.qtyTxt, { color: C.sub }]}>
+                        {`Qty : ${it.qty || 0}`}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {/* Address */}
+              <View style={styles.addrHeaderRow}>
+                <ThemedText
+                  style={[styles.sectionTitle, { color: C.sub, marginTop: 10 }]}
+                >
+                  Delivery Address
+                </ThemedText>
+                <TouchableOpacity activeOpacity={0.8}>
+                  <ThemedText style={{ color: C.primary, marginTop: 10 }}>
+                    Delivery fee/Location
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+              <View
+                style={[
+                  styles.addressCard,
+                  {
+                    borderColor: C.line,
+                    backgroundColor: "white",
+                    paddingVertical: 12,
+                    marginTop: 5,
+                  },
+                ]}
+              >
+                <View style={styles.addrRow}>
+                  <ThemedText style={[styles.addrLabel, { color: C.sub }]}>
+                    Phone number
+                  </ThemedText>
+                  <View style={styles.addrRight}>
+                    <ThemedText style={[styles.addrValue, { color: C.text }]}>
+                      {detail?.order?.delivery_address?.phone || "N/A"}
+                    </ThemedText>
+                    <Ionicons name="copy-outline" size={14} color={C.sub} />
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.addrRow,
+                    { marginTop: 8, alignItems: "flex-start" },
+                  ]}
+                >
+                  <ThemedText style={[styles.addrLabel, { color: C.sub }]}>
+                    Address
+                  </ThemedText>
+                  <View style={styles.addrRight}>
+                    <ThemedText style={[styles.addrValue, { color: C.text }]}>
+                      {detail?.order?.delivery_address
+                        ? `${detail.order.delivery_address.line1 || ""} ${
+                            detail.order.delivery_address.line2 || ""
+                          } ${detail.order.delivery_address.city || ""} ${
+                            detail.order.delivery_address.state || ""
+                          }`.trim() || "N/A"
+                        : "N/A"}
+                    </ThemedText>
+                    <Ionicons name="location-outline" size={14} color={C.sub} />
+                  </View>
+                </View>
+              </View>
+
+              {/* Summary */}
+              <View
+                style={[
+                  styles.summaryWrap,
+                  { borderColor: C.line, backgroundColor: "white" },
+                ]}
+              >
+                <View style={styles.infoRow}>
+                  <ThemedText style={{ color: C.text }}>OrderId</ThemedText>
+                  <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                    {detail?.order?.order_no || String(detail?.id || "—")}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                    No of items
+                  </ThemedText>
+                  <ThemedText style={{ color: C.text, fontWeight: "800" }}>
+                    {String(
+                      (items || []).reduce(
+                        (a, b) => a + (Number(b.qty) || 0),
+                        0
+                      )
+                    )}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text }}>Items Cost</ThemedText>
+                  <ThemedText style={{ color: C.primary }}>
+                    {currency(
+                      (items || []).reduce(
+                        (a, b) =>
+                          a +
+                          (Number(b.unit_price) || 0) * (Number(b.qty) || 0),
+                        0
+                      )
+                    )}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text }}>
+                    Coupon Discount
+                  </ThemedText>
+                  <ThemedText style={{ color: C.primary }}>{`-${currency(
+                    Number(detail?.discount || 0)
+                  )}`}</ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text }}>
+                    Delivery fee
+                  </ThemedText>
+                  <ThemedText style={{ color: C.primary }}>
+                    {currency(10000)}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                    Total to pay
+                  </ThemedText>
+                  <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
+                    {currency(Number(detail?.subtotal_with_shipping || 0))}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {/* Review buttons */}
+              <View style={styles.reviewButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  activeOpacity={0.8}
+                  onPress={() => setReviewOpen(true)}
+                >
+                  <ThemedText style={styles.reviewButtonText}>
+                    View Product Review
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  activeOpacity={0.8}
+                  onPress={() => setReviewOpen(true)}
+                >
+                  <ThemedText style={styles.reviewButtonText}>
+                    View Store Review
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+
+              {/* Payment + tracking */}
+              <View
+                style={[
+                  styles.detailCard,
+                  { borderColor: C.line, marginHorizontal: 8 },
+                ]}
+              >
+                <View style={styles.infoRow}>
+                  <ThemedText style={{ color: C.text }}>Tracking id</ThemedText>
+                  <ThemedText style={{ color: C.text }}>
+                    {detail?.order?.tracking_no ||
+                      detail?.order?.order_no ||
+                      "N/A"}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text }}>
+                    Payment method
+                  </ThemedText>
+                  <ThemedText style={{ color: C.text }}>
+                    {detail?.payment_method ||
+                      detail?.order?.payment_method ||
+                      "Shopping Wallet"}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                    Total
+                  </ThemedText>
+                  <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
+                    {currency(Number(detail?.subtotal_with_shipping || 0))}
+                  </ThemedText>
+                </View>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Review Modal */}
+        <Modal
+          visible={reviewOpen}
+          animationType="slide"
+          onRequestClose={() => setReviewOpen(false)}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: "#F5F6F8" }}>
+            <View style={styles.reviewModalContainer}>
+              {/* Header */}
+              <View style={styles.reviewHeader}>
+                <ThemedText style={styles.reviewTitle}>My review</ThemedText>
+                <TouchableOpacity
+                  style={styles.reviewCloseBtn}
+                  onPress={() => setReviewOpen(false)}
+                >
+                  <Ionicons name="close" size={20} color="#000" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Overall Rating Card */}
+              <View style={styles.overallRatingCard}>
+                <View style={styles.starContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= 4 ? "star" : "star-outline"}
+                      size={32}
+                      color={star <= 4 ? "#E53E3E" : "#9CA3AF"}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {/* Review Details Card */}
+              <View style={styles.reviewDetailsCard}>
+                {/* Reviewer Info */}
+                <View style={styles.reviewerInfo}>
+                  <Image
+                    source={{ uri: "https://via.placeholder.com/40x40/4A90E2/FFFFFF?text=CP" }}
+                    style={styles.reviewerAvatar}
+                  />
+                  <View style={styles.reviewerDetails}>
+                    <ThemedText style={styles.reviewerName}>Chris Pine</ThemedText>
+                    <View style={styles.reviewerStars}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Ionicons
+                          key={star}
+                          name="star"
+                          size={12}
+                          color="#E53E3E"
+                        />
+                      ))}
+                    </View>
+                  </View>
+                  <ThemedText style={styles.reviewDate}>07-16-25/05:33AM</ThemedText>
+                </View>
+
+                {/* Product Images */}
+                <View style={styles.productImagesContainer}>
+                  {[1, 2, 3].map((img) => (
+                    <Image
+                      key={img}
+                      source={firstImageSource}
+                      style={styles.productImageThumb}
+                    />
+                  ))}
+                </View>
+
+                {/* Review Text */}
+                <ThemedText style={styles.reviewText}>
+                  Really great product, i enjoyed using it for a long time
+                </ThemedText>
+              </View>
+
+              {/* Action Buttons - Outside the cards */}
+              <View style={styles.reviewActions}>
+                <TouchableOpacity style={styles.replyButton}>
+                  <ThemedText style={styles.replyButtonText}>Reply</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.reportButton}>
+                  <ThemedText style={styles.reportButtonText}>Report Review</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+        </Modal>
 
         {/* Confirm Out for Delivery */}
         <Modal
@@ -412,7 +963,9 @@ function TrackOrderModal({
                 color={C.primary}
                 style={{ alignSelf: "center", marginBottom: 8 }}
               />
-              <ThemedText style={{ color: C.text, textAlign: "center", marginBottom: 18 }}>
+              <ThemedText
+                style={{ color: C.text, textAlign: "center", marginBottom: 18 }}
+              >
                 Do you confirm that this product is out for delivery
               </ThemedText>
 
@@ -425,7 +978,10 @@ function TrackOrderModal({
                 </TouchableOpacity>
                 <TouchableOpacity
                   disabled={markMut.isPending}
-                  style={[styles.solidBtn, { flex: 1, backgroundColor: C.primary }]}
+                  style={[
+                    styles.solidBtn,
+                    { flex: 1, backgroundColor: C.primary },
+                  ]}
                   onPress={() => markMut.mutate()}
                 >
                   <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
@@ -449,7 +1005,9 @@ function TrackOrderModal({
             style={styles.centerOverlay}
           >
             <View style={[styles.alertCard, { backgroundColor: "#fff" }]}>
-              <ThemedText style={{ color: C.text, textAlign: "center", marginBottom: 12 }}>
+              <ThemedText
+                style={{ color: C.text, textAlign: "center", marginBottom: 12 }}
+              >
                 Input Customer code
               </ThemedText>
 
@@ -458,7 +1016,12 @@ function TrackOrderModal({
                 onChangeText={setInputCode}
                 keyboardType="number-pad"
                 maxLength={6}
-                style={{ fontSize: 48, textAlign: "center", color: C.text, marginBottom: 18 }}
+                style={{
+                  fontSize: 48,
+                  textAlign: "center",
+                  color: C.text,
+                  marginBottom: 18,
+                }}
                 placeholder="— — — —"
                 placeholderTextColor="#BBB"
               />
@@ -472,7 +1035,10 @@ function TrackOrderModal({
                 </TouchableOpacity>
                 <TouchableOpacity
                   disabled={!inputCode || verifyMut.isPending}
-                  style={[styles.solidBtn, { flex: 1, backgroundColor: C.primary }]}
+                  style={[
+                    styles.solidBtn,
+                    { flex: 1, backgroundColor: C.primary },
+                  ]}
                   onPress={() => verifyMut.mutate(inputCode)}
                 >
                   <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
@@ -496,34 +1062,48 @@ function StoreBlock({ C, detail, onOpenTracker }) {
 
   const items = detail?.items || [];
   console.log("detail", detail);
-  
+
   // Use actual items from API, no fallback to hardcoded data
   const showItems = items;
 
   // Calculate from actual API data
   const itemsCount = items.reduce((a, b) => a + (Number(b.qty) || 0), 0);
-  const itemsCost = items.reduce((a, b) => a + (Number(b.unit_price) || 0) * (Number(b.qty) || 0), 0);
+  const itemsCost = items.reduce(
+    (a, b) => a + (Number(b.unit_price) || 0) * (Number(b.qty) || 0),
+    0
+  );
 
   // Use actual API values, show 0 if not available
   const coupon = detail?.discount ? Number(detail.discount) : 0;
   const points = 0; // Not available in API, show 0
   const fee = 10000; // Hardcoded delivery fee of 10,000
-  const totalPay = detail?.subtotal_with_shipping != null ? Number(detail.subtotal_with_shipping) : itemsCost;
+  const totalPay =
+    detail?.subtotal_with_shipping != null
+      ? Number(detail.subtotal_with_shipping)
+      : itemsCost;
   const onOpenChat = () => {
     console.log("=== STORE BLOCK CHAT NAVIGATION DEBUG ===");
     console.log("Opening chat with chat_id:", detail?.chat?.id);
     console.log("Full chat object:", detail?.chat);
-    console.log("Full detail object keys:", detail ? Object.keys(detail) : "No detail");
-    console.log("Navigation params being passed:", { chat_id: detail?.chat?.id });
-    
+    console.log(
+      "Full detail object keys:",
+      detail ? Object.keys(detail) : "No detail"
+    );
+    console.log("Navigation params being passed:", {
+      chat_id: detail?.chat?.id,
+    });
+
     if (!detail?.chat?.id) {
       console.warn("⚠️ WARNING: No chat_id found in detail.chat");
-      console.log("Available detail keys:", detail ? Object.keys(detail) : "No detail");
+      console.log(
+        "Available detail keys:",
+        detail ? Object.keys(detail) : "No detail"
+      );
       if (detail?.chat) {
         console.log("Chat object keys:", Object.keys(detail.chat));
       }
     }
-    
+
     navigation.navigate("ChatNavigator", {
       screen: "ChatDetails",
       params: {
@@ -536,12 +1116,22 @@ function StoreBlock({ C, detail, onOpenTracker }) {
     <View
       style={[
         styles.infoRow,
-        topBorder && { borderTopWidth: 1, borderTopColor: C.line, marginTop: 8, paddingTop: 8 },
+        topBorder && {
+          borderTopWidth: 1,
+          borderTopColor: C.line,
+          marginTop: 8,
+          paddingTop: 8,
+        },
         { backgroundColor: C.chip },
       ]}
     >
       <ThemedText style={{ color: C.text }}>{left}</ThemedText>
-      <ThemedText style={[{ color: C.text }, strongRight && { color: C.primary, fontWeight: "800" }]}>
+      <ThemedText
+        style={[
+          { color: C.text },
+          strongRight && { color: C.primary, fontWeight: "800" },
+        ]}
+      >
         {right}
       </ThemedText>
     </View>
@@ -550,20 +1140,36 @@ function StoreBlock({ C, detail, onOpenTracker }) {
   return (
     <View style={styles.section}>
       <View style={[styles.storeHeader, { backgroundColor: C.primary }]}>
-        <ThemedText style={styles.storeName}>{detail?.store?.store_name || "Store"}</ThemedText>
+        <ThemedText style={styles.storeName}>
+          {detail?.store?.store_name || "Store"}
+        </ThemedText>
 
-        <TouchableOpacity style={[styles.chatBtn, { backgroundColor: "#fff" }]} activeOpacity={0.9}
+        <TouchableOpacity
+          style={[styles.chatBtn, { backgroundColor: "#fff" }]}
+          activeOpacity={0.9}
           onPress={onOpenChat}
         >
-          <ThemedText style={[styles.chatBtnTxt, { color: C.primary }]}>Start Chat</ThemedText>
+          <ThemedText style={[styles.chatBtnTxt, { color: C.primary }]}>
+            Start Chat
+          </ThemedText>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.roundIcon, { backgroundColor: C.primary }]} activeOpacity={0.8}>
-          <Ionicons name="chevron-down" size={18} color="#fff" />
+        <TouchableOpacity
+          style={[styles.roundIcon, { backgroundColor: C.primary }]}
+          activeOpacity={0.8}
+          onPress={() => setExpanded((v) => !v)}
+        >
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={18}
+            color="#fff"
+          />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.roundIcon, { backgroundColor: C.primary }]} activeOpacity={0.8}>
+        {/* <TouchableOpacity style={[styles.roundIcon, { backgroundColor: C.primary }]} activeOpacity={0.8}
+          onPress={() => setExpanded((v) => !v)}
+        >
           <Ionicons name="close" size={18} color="#fff" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       <View style={[styles.itemsCard, { borderColor: C.line }]}>
@@ -575,16 +1181,21 @@ function StoreBlock({ C, detail, onOpenTracker }) {
               idx > 0 && { borderTopWidth: 1, borderTopColor: C.line },
             ]}
           >
-            <Image 
+            <Image
               source={
-                it.product?.images?.[0]?.path 
-                  ? { uri: `https://colala.hmstech.xyz/storage/${it.product.images[0].path}` }
+                it.product?.images?.[0]?.path
+                  ? {
+                      uri: `https://colala.hmstech.xyz/storage/${it.product.images[0].path}`,
+                    }
                   : productImg
-              } 
-              style={styles.itemImg} 
+              }
+              style={styles.itemImg}
             />
             <View style={{ flex: 1, paddingRight: 8 }}>
-              <ThemedText style={[styles.itemTitle, { color: C.text }]} numberOfLines={2}>
+              <ThemedText
+                style={[styles.itemTitle, { color: C.text }]}
+                numberOfLines={2}
+              >
                 {it.name || "Product"}
               </ThemedText>
               <ThemedText style={[styles.price, { color: C.primary }]}>
@@ -607,20 +1218,29 @@ function StoreBlock({ C, detail, onOpenTracker }) {
         {/* Open Chat row */}
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[styles.openChatRow, { borderColor: C.line, backgroundColor: C.chip }]}
+          style={[
+            styles.openChatRow,
+            { borderColor: C.line, backgroundColor: C.chip },
+          ]}
           onPress={onOpenChat}
         >
-          <ThemedText style={{ color: C.text, opacity: 0.9 }}>Open Chat</ThemedText>
+          <ThemedText style={{ color: C.text, opacity: 0.9 }}>
+            Open Chat
+          </ThemedText>
         </TouchableOpacity>
 
         {/* Expanded details */}
         {expanded && (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: C.sub }]}>Delivery Address</ThemedText>
+            <ThemedText style={[styles.sectionTitle, { color: C.sub }]}>
+              Delivery Address
+            </ThemedText>
             <View style={[styles.addressCard, { borderColor: C.line }]}>
               {/* Use actual delivery address from API */}
               <View style={styles.addrRow}>
-                <ThemedText style={[styles.addrLabel, { color: C.sub }]}>Name</ThemedText>
+                <ThemedText style={[styles.addrLabel, { color: C.sub }]}>
+                  Name
+                </ThemedText>
                 <View style={styles.addrRight}>
                   <ThemedText style={[styles.addrValue, { color: C.text }]}>
                     {detail?.order?.delivery_address?.label || "N/A"}
@@ -629,7 +1249,9 @@ function StoreBlock({ C, detail, onOpenTracker }) {
                 </View>
               </View>
               <View style={[styles.addrRow, { marginTop: 8 }]}>
-                <ThemedText style={[styles.addrLabel, { color: C.sub }]}>Phone number</ThemedText>
+                <ThemedText style={[styles.addrLabel, { color: C.sub }]}>
+                  Phone number
+                </ThemedText>
                 <View style={styles.addrRight}>
                   <ThemedText style={[styles.addrValue, { color: C.text }]}>
                     {detail?.order?.delivery_address?.phone || "N/A"}
@@ -637,14 +1259,24 @@ function StoreBlock({ C, detail, onOpenTracker }) {
                   <Ionicons name="copy-outline" size={14} color={C.sub} />
                 </View>
               </View>
-              <View style={[styles.addrRow, { marginTop: 8, alignItems: "flex-start" }]}>
-                <ThemedText style={[styles.addrLabel, { color: C.sub }]}>Address</ThemedText>
+              <View
+                style={[
+                  styles.addrRow,
+                  { marginTop: 8, alignItems: "flex-start" },
+                ]}
+              >
+                <ThemedText style={[styles.addrLabel, { color: C.sub }]}>
+                  Address
+                </ThemedText>
                 <View style={styles.addrRight}>
                   <ThemedText style={[styles.addrValue, { color: C.text }]}>
-                    {detail?.order?.delivery_address ? 
-                      `${detail.order.delivery_address.line1 || ""} ${detail.order.delivery_address.line2 || ""} ${detail.order.delivery_address.city || ""} ${detail.order.delivery_address.state || ""}`.trim() || "N/A"
-                      : "N/A"
-                    }
+                    {detail?.order?.delivery_address
+                      ? `${detail.order.delivery_address.line1 || ""} ${
+                          detail.order.delivery_address.line2 || ""
+                        } ${detail.order.delivery_address.city || ""} ${
+                          detail.order.delivery_address.state || ""
+                        }`.trim() || "N/A"
+                      : "N/A"}
                   </ThemedText>
                   <Ionicons name="location-outline" size={14} color={C.sub} />
                 </View>
@@ -652,13 +1284,37 @@ function StoreBlock({ C, detail, onOpenTracker }) {
             </View>
 
             <View style={[styles.summaryWrap, { borderColor: C.line }]}>
-              <InfoRow left="Order ID" right={detail?.order?.order_no || String(detail?.id || "—")} />
-              <InfoRow left="No it items" right={String(itemsCount)} topBorder />
-              <InfoRow left="Items Cost" right={currency(itemsCost)} topBorder />
-              <InfoRow left="Coupon Discount" right={`-${currency(coupon)}`} topBorder />
-              <InfoRow left="Points Discount" right={`-${currency(points)}`} topBorder />
+              <InfoRow
+                left="Order ID"
+                right={detail?.order?.order_no || String(detail?.id || "—")}
+              />
+              <InfoRow
+                left="No it items"
+                right={String(itemsCount)}
+                topBorder
+              />
+              <InfoRow
+                left="Items Cost"
+                right={currency(itemsCost)}
+                topBorder
+              />
+              <InfoRow
+                left="Coupon Discount"
+                right={`-${currency(coupon)}`}
+                topBorder
+              />
+              <InfoRow
+                left="Points Discount"
+                right={`-${currency(points)}`}
+                topBorder
+              />
               <InfoRow left="Delivery fee" right={currency(fee)} topBorder />
-              <InfoRow left="Total to pay" right={currency(totalPay)} strongRight topBorder />
+              <InfoRow
+                left="Total to pay"
+                right={currency(totalPay)}
+                strongRight
+                topBorder
+              />
             </View>
           </>
         )}
@@ -668,7 +1324,9 @@ function StoreBlock({ C, detail, onOpenTracker }) {
           onPress={() => setExpanded((v) => !v)}
           style={[styles.expandBtn, { borderColor: C.primary }]}
         >
-          <ThemedText style={{ color: C.primary }}>{expanded ? "Collapse" : "Expand"}</ThemedText>
+          <ThemedText style={{ color: C.primary }}>
+            {expanded ? "Collapse" : "Expand"}
+          </ThemedText>
         </TouchableOpacity>
       </View>
     </View>
@@ -727,7 +1385,12 @@ export default function SingleOrderDetailsScreen() {
     enabled: !!selectedId,
     queryFn: async () => {
       const token = await getToken();
-      const res = await apiCall(API_ENDPOINTS.ORDERS.Order_Detail(selectedId), "GET", undefined, token);
+      const res = await apiCall(
+        API_ENDPOINTS.ORDERS.Order_Detail(selectedId),
+        "GET",
+        undefined,
+        token
+      );
       return res?.data ?? res;
     },
     staleTime: 15_000,
@@ -745,17 +1408,25 @@ export default function SingleOrderDetailsScreen() {
     console.log("=== CHAT NAVIGATION DEBUG ===");
     console.log("Opening chat with chat_id:", detail?.chat?.id);
     console.log("Full chat object:", detail?.chat);
-    console.log("Full detail object keys:", detail ? Object.keys(detail) : "No detail");
-    console.log("Navigation params being passed:", { chat_id: detail?.chat?.id });
-    
+    console.log(
+      "Full detail object keys:",
+      detail ? Object.keys(detail) : "No detail"
+    );
+    console.log("Navigation params being passed:", {
+      chat_id: detail?.chat?.id,
+    });
+
     if (!detail?.chat?.id) {
       console.warn("⚠️ WARNING: No chat_id found in detail.chat");
-      console.log("Available detail keys:", detail ? Object.keys(detail) : "No detail");
+      console.log(
+        "Available detail keys:",
+        detail ? Object.keys(detail) : "No detail"
+      );
       if (detail?.chat) {
         console.log("Chat object keys:", Object.keys(detail.chat));
       }
     }
-    
+
     navigation.navigate("ChatNavigator", {
       screen: "ChatDetails",
       params: { chat_id: detail?.chat?.id },
@@ -773,11 +1444,18 @@ export default function SingleOrderDetailsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: C.line, backgroundColor: "#fff" }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: C.line, backgroundColor: "#fff" },
+        ]}
+      >
         <View style={styles.headerRow}>
           <TouchableOpacity
             onPress={() =>
-              navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Home")
+              navigation.canGoBack()
+                ? navigation.goBack()
+                : navigation.navigate("Home")
             }
             style={styles.backBtn}
             hitSlop={HITSLOP}
@@ -785,7 +1463,10 @@ export default function SingleOrderDetailsScreen() {
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </TouchableOpacity>
 
-          <ThemedText style={[styles.headerTitle, { color: C.text }]} pointerEvents="none">
+          <ThemedText
+            style={[styles.headerTitle, { color: C.text }]}
+            pointerEvents="none"
+          >
             Order Details
           </ThemedText>
 
@@ -796,12 +1477,17 @@ export default function SingleOrderDetailsScreen() {
       {/* Tabs (functional filters) */}
       <View style={styles.tabsWrap}>
         {STATUS.map((label, i) => {
-          const statusKey = i === 0 ? "placed" : 
-                           i === 1 ? "out_for_delivery" : 
-                           i === 2 ? "delivered" : "completed";
+          const statusKey =
+            i === 0
+              ? "placed"
+              : i === 1
+              ? "out_for_delivery"
+              : i === 2
+              ? "delivered"
+              : "completed";
           const isCurrentStatus = currentStatusIndex === i;
           const isActiveFilter = activeFilter === statusKey;
-          
+
           return (
             <TouchableOpacity
               key={label}
@@ -809,12 +1495,21 @@ export default function SingleOrderDetailsScreen() {
                 styles.tabBtn,
                 isActiveFilter
                   ? { backgroundColor: C.primary }
-                  : { backgroundColor: "#ECEFF3", borderWidth: 1, borderColor: C.line },
+                  : {
+                      backgroundColor: "#ECEFF3",
+                      borderWidth: 1,
+                      borderColor: C.line,
+                    },
               ]}
               onPress={() => setActiveFilter(statusKey)}
               activeOpacity={0.9}
             >
-              <ThemedText style={[styles.tabTxt, { color: isActiveFilter ? "#fff" : C.text }]}>
+              <ThemedText
+                style={[
+                  styles.tabTxt,
+                  { color: isActiveFilter ? "#fff" : C.text },
+                ]}
+              >
                 {label}
                 {isCurrentStatus && " ✓"}
               </ThemedText>
@@ -828,20 +1523,25 @@ export default function SingleOrderDetailsScreen() {
         {(() => {
           const statusKey = activeFilter === "all" ? null : activeFilter;
           const shouldShowOrder = !statusKey || currentStatus === statusKey;
-          
+
           if (!shouldShowOrder) {
             return (
-              <View style={[styles.emptyState, { backgroundColor: C.card, borderColor: C.line }]}>
+              <View
+                style={[
+                  styles.emptyState,
+                  { backgroundColor: C.card, borderColor: C.line },
+                ]}
+              >
                 <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
                   No orders in this status
                 </ThemedText>
-                <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+                {/* <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
                   This order is currently in "{currentStatus}" status
-                </ThemedText>
+                </ThemedText> */}
               </View>
             );
           }
-          
+
           return (
             <StoreBlock
               C={C}
@@ -919,7 +1619,7 @@ function makeStyles(C) {
       alignItems: "center",
       justifyContent: "center",
     },
-    tabTxt: { fontSize: 11, fontWeight: "400" },
+    tabTxt: { fontSize: 9, fontWeight: "400" },
 
     /* store section */
     section: { marginBottom: 16 },
@@ -970,7 +1670,13 @@ function makeStyles(C) {
       paddingTop: 12,
       paddingBottom: 12,
     },
-    itemImg: { width: 104, height: 96, borderTopLeftRadius: 10, borderBottomLeftRadius: 10, marginRight: 12 },
+    itemImg: {
+      width: 104,
+      height: 96,
+      borderTopLeftRadius: 10,
+      borderBottomLeftRadius: 10,
+      marginRight: 12,
+    },
     itemTitle: { color: "#000", fontWeight: "600", fontSize: 12 },
     price: { color: "#E53E3E", fontWeight: "800", marginTop: 6, fontSize: 12 },
     qtyTxt: { marginTop: 6, color: "#E53E3E", fontSize: 12 },
@@ -984,7 +1690,6 @@ function makeStyles(C) {
       justifyContent: "center",
     },
     trackTxt: { color: "#fff", fontWeight: "600", fontSize: 12 },
-
 
     openChatRow: {
       height: 50,
@@ -1008,19 +1713,25 @@ function makeStyles(C) {
     },
     addrRow: {
       justifyContent: "space-between",
+      backgroundColor: "white",
+      zIndex: 10,
     },
-    addrLabel: { color: "#6C727A", fontSize: 12 },
-    addrRight: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "70%" },
-    addrValue: { color: "#000", flexShrink: 1, fontSize: 12 },
+    addrLabel: { color: "#6C727A", fontSize: 10 },
+    addrRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      maxWidth: "70%",
+    },
+    addrValue: { color: "#000", flexShrink: 1, fontSize: 10 },
 
     summaryWrap: {
       marginHorizontal: 12,
       backgroundColor: "#fff",
       borderRadius: 12,
-      borderWidth: 1,
-      padding: 12,
       marginTop: 10,
       marginBottom: 8,
+      paddingBottom: 9,
     },
     infoRow: {
       height: 50,
@@ -1030,6 +1741,183 @@ function makeStyles(C) {
       alignItems: "center",
       justifyContent: "space-between",
       flexDirection: "row",
+      zIndex: 10,
+      marginTop: 10,
+    },
+    addrHeaderRow: {
+      marginTop: 10,
+      paddingHorizontal: 2,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    reviewButtonsContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 16,
+      gap: 12,
+      marginHorizontal: 10,
+    },
+    reviewButton: {
+      flex: 1,
+
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+     reviewButtonText: {
+       color: "#000",
+       fontSize: 12,
+       fontWeight: "400",
+     },
+     /* Review Modal Styles */
+     reviewModalContainer: {
+       flex: 1,
+       backgroundColor: "#F5F6F8",
+       paddingTop: 60,
+       paddingHorizontal: 16,
+       paddingBottom: 20,
+     },
+     reviewHeader: {
+       flexDirection: "row",
+       justifyContent: "space-between",
+       alignItems: "center",
+       marginBottom: 24,
+     },
+     reviewTitle: {
+       fontSize: 24,
+       fontWeight: "400",
+       color: "#000",
+       fontStyle: "italic",
+       textAlign: "center",
+       flex: 1,
+     },
+     reviewCloseBtn: {
+       width: 32,
+       height: 32,
+       borderRadius: 16,
+       backgroundColor: "#E5E7EB",
+       alignItems: "center",
+       justifyContent: "center",
+     },
+     overallRatingCard: {
+       backgroundColor: "#fff",
+       borderRadius: 16,
+       padding: 24,
+       alignItems: "center",
+       marginBottom: 16,
+       ...shadow(4),
+     },
+     starContainer: {
+       flexDirection: "row",
+       gap: 8,
+     },
+     reviewDetailsCard: {
+       backgroundColor: "#fff",
+       borderRadius: 16,
+       padding: 20,
+       marginBottom: 20,
+       ...shadow(4),
+     },
+     reviewerInfo: {
+       flexDirection: "row",
+       alignItems: "center",
+       marginBottom: 16,
+     },
+     reviewerAvatar: {
+       width: 40,
+       height: 40,
+       borderRadius: 20,
+       marginRight: 12,
+     },
+     reviewerDetails: {
+       flex: 1,
+     },
+     reviewerName: {
+       fontSize: 16,
+       fontWeight: "600",
+       color: "#000",
+       marginBottom: 4,
+     },
+     reviewerStars: {
+       flexDirection: "row",
+       gap: 2,
+     },
+     reviewDate: {
+       fontSize: 12,
+       color: "#6B7280",
+     },
+     productImagesContainer: {
+       flexDirection: "row",
+       gap: 8,
+       marginBottom: 16,
+     },
+     productImageThumb: {
+       width: 60,
+       height: 60,
+       borderRadius: 8,
+     },
+     reviewText: {
+       fontSize: 14,
+       color: "#000",
+       lineHeight: 20,
+     },
+     reviewActions: {
+       flexDirection: "row",
+       gap: 12,
+       marginTop: 8,
+     },
+     replyButton: {
+       flex: 1,
+       backgroundColor: "#E53E3E",
+       borderRadius: 12,
+       paddingVertical: 14,
+       alignItems: "center",
+       justifyContent: "center",
+     },
+     replyButtonText: {
+       color: "#fff",
+       fontSize: 14,
+       fontWeight: "600",
+     },
+     reportButton: {
+       flex: 1,
+       backgroundColor: "#fff",
+       borderRadius: 12,
+       borderWidth: 1,
+       borderColor: "#E5E7EB",
+       paddingVertical: 14,
+       alignItems: "center",
+       justifyContent: "center",
+     },
+     reportButtonText: {
+       color: "#000",
+       fontSize: 14,
+       fontWeight: "400",
+     },
+    /* Full details modal */
+    detailCard: {
+      marginTop: -10,
+    },
+    detailItemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
+    },
+    detailItemImg: { width: 84, height: 76, borderRadius: 10, marginRight: 12 },
+    detailBanner: {
+      borderTopLeftRadius: 14,
+      borderTopRightRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 6,
+      ...shadow(6),
     },
 
     expandBtn: {
@@ -1069,10 +1957,25 @@ function makeStyles(C) {
       ...shadow(6),
     },
     stepImg: { width: 104, height: 96, borderRadius: 10 },
-    stepTitle: { color: "#E53E3E", fontWeight: "900", fontSize: 20, marginBottom: 2 },
-    stepSub: { color: "#000", opacity: 0.85, fontSize: 12 },
-    stepPrice: { color: "#E53E3E", fontWeight: "800", marginTop: 6, fontSize: 12 },
-    stepTime: { color: "#6C727A", alignSelf: "flex-end", marginTop: 4, fontSize: 7 },
+    stepTitle: {
+      color: "#E53E3E",
+      fontWeight: "900",
+      fontSize: 18,
+      marginBottom: 2,
+    },
+    stepSub: { color: "#000", opacity: 0.85, fontSize: 10 },
+    stepPrice: {
+      color: "#E53E3E",
+      fontWeight: "800",
+      marginTop: 6,
+      fontSize: 10,
+    },
+    stepTime: {
+      color: "#6C727A",
+      alignSelf: "flex-end",
+      marginTop: 4,
+      fontSize: 6,
+    },
 
     warnRow: {
       flexDirection: "row",
@@ -1130,13 +2033,13 @@ function makeStyles(C) {
       marginTop: 20,
     },
     emptyTitle: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: "600",
       marginBottom: 8,
       textAlign: "center",
     },
     emptyMessage: {
-      fontSize: 14,
+      fontSize: 12,
       textAlign: "center",
       lineHeight: 20,
     },

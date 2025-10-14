@@ -61,7 +61,7 @@ export default function ThemedText({
         // variantStyle,
         // ignore any incoming fontWeight so the custom family always wins
         Array.isArray(style)
-          ? style.map((s) => (s && { ...s, fontWeight: undefined }))
+          ? style.map((s) => s && { ...s, fontWeight: undefined })
           : style && { ...style, fontWeight: undefined },
       ]}
     >
