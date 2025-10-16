@@ -1193,11 +1193,17 @@ export default function RegisterStoreScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.saveSkipBtn} activeOpacity={0.9}>
-              <ThemedText style={styles.saveSkipText}>
-                Save &amp; Skip
-              </ThemedText>
-            </TouchableOpacity>
+            {!(level === 1 && phase === 1) && (
+              <TouchableOpacity 
+                style={styles.saveSkipBtn} 
+                activeOpacity={0.9}
+                onPress={() => navigation.replace("Login")}
+              >
+                <ThemedText style={styles.saveSkipText}>
+                  Save &amp; Exit
+                </ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Login (disabled look) */}

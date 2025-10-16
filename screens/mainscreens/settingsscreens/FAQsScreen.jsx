@@ -26,7 +26,7 @@ import { StatusBar } from "expo-status-bar";
 import { getFAQs } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
-
+import { WebView } from "react-native-webview";
 
 
 export default function FAQsScreen() {
@@ -74,6 +74,7 @@ export default function FAQsScreen() {
   const [currentVideoUrl, setCurrentVideoUrl] = useState(null);
   const [videoStatus, setVideoStatus] = useState({});
   const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [playInline, setPlayInline] = useState(false);
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
@@ -99,35 +100,15 @@ export default function FAQsScreen() {
     return match ? match[1] : null;
   };
 
+  // Build embeddable YouTube URL
+  const toYouTubeEmbedUrl = (url) => {
+    const id = extractYouTubeId(url);
+    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&controls=1` : null;
+  };
+
   // Check if URL is a YouTube video
   const isYouTubeVideo = (url) => {
     return extractYouTubeId(url) !== null;
-  };
-
-  // Open YouTube video in YouTube app
-  const openYouTubeVideo = async (url) => {
-    const videoId = extractYouTubeId(url);
-    if (!videoId) {
-      Alert.alert('Error', 'Invalid YouTube URL');
-      return;
-    }
-
-    // Try to open in YouTube app first
-    const youtubeAppUrl = `youtube://watch?v=${videoId}`;
-    const youtubeWebUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    try {
-      const canOpen = await Linking.canOpenURL(youtubeAppUrl);
-      if (canOpen) {
-        await Linking.openURL(youtubeAppUrl);
-      } else {
-        // Fallback to web browser
-        await Linking.openURL(youtubeWebUrl);
-      }
-    } catch (error) {
-      console.error('Error opening YouTube video:', error);
-      Alert.alert('Error', 'Could not open YouTube video');
-    }
   };
 
   // Check if URL is a direct video file
@@ -231,26 +212,62 @@ export default function FAQsScreen() {
             {/* Video banner */}
             {categoryData?.video && (
               <View style={[styles.videoCard, shadow(4)]}>
-                <Image
-                  source={{
-                    uri: `https://img.youtube.com/vi/${extractYouTubeId(categoryData.video)}/maxresdefault.jpg`,
-                  }}
-                  style={styles.videoImage}
-                />
-                <View style={styles.playOverlay}>
-                  <Ionicons name="play" size={26} color="#fff" />
-                </View>
-                <TouchableOpacity
-                  style={styles.videoTouchable}
-                  onPress={() => {
-                    if (isYouTubeVideo(categoryData.video)) {
-                      openYouTubeVideo(categoryData.video);
-                    } else {
-                      setCurrentVideoUrl(categoryData.video);
-                      setVideoModalVisible(true);
-                    }
-                  }}
-                />
+                {playInline ? (
+                  <>
+                    {isYouTubeVideo(categoryData.video) ? (
+                      <WebView
+                        source={{ uri: toYouTubeEmbedUrl(categoryData.video) }}
+                        style={styles.videoImage}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        allowsInlineMediaPlayback
+                        mediaPlaybackRequiresUserAction={false}
+                        onLoadStart={() => setIsVideoLoading(true)}
+                        onLoadEnd={() => setIsVideoLoading(false)}
+                        onError={() => {
+                          setIsVideoLoading(false);
+                          Alert.alert('Video Error', 'Failed to load YouTube video.');
+                        }}
+                      />
+                    ) : (
+                      <Video
+                        source={{ uri: categoryData.video }}
+                        style={styles.videoImage}
+                        resizeMode={ResizeMode.CONTAIN}
+                        shouldPlay={true}
+                        isLooping={false}
+                        onLoadStart={() => setIsVideoLoading(true)}
+                        onError={onVideoError}
+                        onPlaybackStatusUpdate={onVideoStatusUpdate}
+                      />
+                    )}
+                    {isVideoLoading && (
+                      <View style={styles.videoLoadingContainer}>
+                        <ActivityIndicator size="large" color="#fff" />
+                        <ThemedText style={styles.videoLoadingText}>Loading video...</ThemedText>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Image
+                      source={{
+                        uri: `https://img.youtube.com/vi/${extractYouTubeId(categoryData.video)}/maxresdefault.jpg`,
+                      }}
+                      style={styles.videoImage}
+                    />
+                    <View style={styles.playOverlay}>
+                      <Ionicons name="play" size={26} color="#fff" />
+                    </View>
+                    <TouchableOpacity
+                      style={styles.videoTouchable}
+                      onPress={() => {
+                        setCurrentVideoUrl(categoryData.video);
+                        setPlayInline(true);
+                      }}
+                    />
+                  </>
+                )}
               </View>
             )}
 
@@ -334,20 +351,34 @@ export default function FAQsScreen() {
                   <ThemedText style={styles.videoLoadingText}>Loading video...</ThemedText>
                 </View>
               )}
-              
-              <Video
-                source={{ uri: currentVideoUrl }}
-                style={styles.videoPlayer}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay={true}
-                isLooping={false}
-                onPlaybackStatusUpdate={onVideoStatusUpdate}
-                onLoadStart={onVideoLoadStart}
-                onError={onVideoError}
-                useNativeControls={true}
-                allowsFullscreen={true}
-                allowsExternalPlayback={true}
-              />
+
+              {isYouTubeVideo(currentVideoUrl) ? (
+                <WebView
+                  source={{ uri: toYouTubeEmbedUrl(currentVideoUrl) }}
+                  style={styles.videoPlayer}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  allowsInlineMediaPlayback
+                  mediaPlaybackRequiresUserAction={false}
+                  onLoadStart={() => setIsVideoLoading(true)}
+                  onLoadEnd={() => setIsVideoLoading(false)}
+                  onError={() => {
+                    setIsVideoLoading(false);
+                    Alert.alert('Video Error', 'Failed to load YouTube video.');
+                  }}
+                />
+              ) : (
+                <Video
+                  source={{ uri: currentVideoUrl }}
+                  style={styles.videoPlayer}
+                  resizeMode={ResizeMode.CONTAIN}
+                  shouldPlay={true}
+                  isLooping={false}
+                  onLoadStart={onVideoLoadStart}
+                  onError={onVideoError}
+                  onPlaybackStatusUpdate={onVideoStatusUpdate}
+                />
+              )}
             </View>
           )}
         </SafeAreaView>

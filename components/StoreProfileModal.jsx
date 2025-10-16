@@ -291,24 +291,28 @@ export default function StoreProfileModal({
      Anything missing stays hardcoded (e.g., "Open Now" schedule text)
   */
   const store = {
-    name: storeApi.name || storeProp.name || "Sasha Stores", // API
-    email: storeApi.email || storeProp.email || "sashastores@gmail.com", // API
-    phone: storeApi.phone || storeProp.phone || "070123456789", // API
-    location: storeApi.location || storeProp.location || "Lagos, Nigeria", // API
+    name: storeApi.name || "Not set", // API
+    email: storeApi.email || "Not set", // API
+    phone: storeApi.phone || "Not set", // API
+    location: storeApi.location || "Not set", // API
     avatar:
       toFileUrl(storeApi.profile_image) ||
-      storeProp.avatar ||
       require("../assets/Ellipse 18.png"),
     cover:
       toFileUrl(storeApi.banner_image) ||
-      storeProp.cover ||
       require("../assets/Rectangle 30.png"),
   };
 
   // stats (present in API)
   const statsQtySold = Number(storeApi.total_sold ?? 0); // API
   const statsFollowers = Number(storeApi.followers_count ?? 0); // API
-  const statsRating = Number(storeApi.average_rating ?? 4.7); // API with fallback
+  const statsRating = Number(
+    storeApi.average_rating ??
+    storeApi.avg_rating ??
+    storeApi.ratings_avg ??
+    storeApi.ratings_average ??
+    0
+  ); // API with fallback
 
   const promoUrl = React.useMemo(() => {
     const arr = Array.isArray(storeApi?.permotaional_banners)
@@ -377,7 +381,13 @@ export default function StoreProfileModal({
           store: store.name,
           store_image: store.avatar,
           location: store.location,
-          rating: 4.7, // 🔔 not provided; hardcoded
+          rating: Number(
+            p.average_rating ??
+            p.avg_rating ??
+            p.ratings_avg ??
+            p.ratings_average ??
+            p.rating ?? 0
+          ),
           price: `₦${price.toLocaleString()}`,
           originalPrice: original ? `₦${original.toLocaleString()}` : "₦0",
           image: imageUrl || require("../assets/Frame 264.png"),
@@ -401,50 +411,8 @@ export default function StoreProfileModal({
       })
     : [];
 
-  // Fallback demo list only if API has no products
-  const PRODUCTS = overviewLoading
-    ? []
-    : PRODUCTS_API.length
-    ? PRODUCTS_API
-    : [
-        // 🔔 Using the same demo items you had before since API has no products
-        {
-          id: "1",
-          title: "Dell Inspiron Laptop",
-          category: "Laptops",
-          brand: "Dell",
-          store: store.name,
-          store_image: store.avatar || require("../assets/Ellipse 18.png"),
-          location: store.location,
-          rating: 4.7,
-          price: "₦2,000,000",
-          originalPrice: "₦3,000,000",
-          image: require("../assets/Frame 264.png"),
-          tagImages: [
-            require("../assets/freedel.png"),
-            require("../assets/bulk.png"),
-          ],
-          sponsored: true,
-        },
-        {
-          id: "2",
-          title: "HP Spectre x360",
-          category: "Laptops",
-          brand: "HP",
-          store: store.name,
-          store_image: store.avatar || require("../assets/Ellipse 18.png"),
-          location: store.location,
-          rating: 4.7,
-          price: "₦2,000,000",
-          originalPrice: "₦3,000,000",
-          image: require("../assets/Frame 264 (1).png"),
-          tagImages: [
-            require("../assets/freedel.png"),
-            require("../assets/bulk.png"),
-          ],
-          sponsored: true,
-        },
-      ];
+  // Products strictly from API; no demo fallback
+  const PRODUCTS = overviewLoading ? [] : PRODUCTS_API;
 
   /* ===== NEW: ID-BASED FILTER STATE (labels unchanged) ===== */
   // visible labels for buttons
@@ -579,11 +547,7 @@ export default function StoreProfileModal({
     >
       <View>
         <Image source={src(item.image)} style={styles.image} />
-        {item.sponsored && (
-          <View style={styles.sponsoredBadge}>
-            <ThemedText style={styles.sponsoredText}>Sponsored</ThemedText>
-          </View>
-        )}
+      
       </View>
 
       <View style={[styles.grayStrip]}>
@@ -594,8 +558,14 @@ export default function StoreProfileModal({
           </ThemedText>
         </View>
         <View style={styles.ratingRow}>
-          <Ionicons name="star" size={12} color={C.primary} />
-          <ThemedText style={styles.ratingTxt}>{item.rating}</ThemedText>
+          {Number(item.rating) > 0 ? (
+            <>
+              <Ionicons name="star" size={12} color={C.primary} />
+              <ThemedText style={styles.ratingTxt}>{statsRating}</ThemedText>
+            </>
+          ) : (
+            <ThemedText style={styles.ratingTxt}>{statsRating}</ThemedText>
+          )}
         </View>
       </View>
 
@@ -613,11 +583,7 @@ export default function StoreProfileModal({
           </ThemedText>
         </View>
 
-        <View style={styles.tagsRow}>
-          {item.tagImages.map((img, i) => (
-            <Image key={i} source={src(img)} style={styles.tagIcon} />
-          ))}
-        </View>
+        
 
         <View style={styles.rowBetween}>
           <View style={styles.locationRow}>
@@ -636,26 +602,6 @@ export default function StoreProfileModal({
   );
 
   /* ---------- SOCIAL FEED (prefer API posts) ---------- */
-  const DEMO_POSTS = [
-    {
-      id: "1",
-      store: store.name,
-      avatar:
-        typeof store?.avatar === "number"
-          ? store.avatar
-          : store?.avatar ||
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
-      location: store.location,
-      timeAgo: "just now", // 🔔 not in API; hardcoded label
-      images: [
-        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200&auto=format&fit=crop",
-      ],
-      caption: "Get this phone at a cheap price for a limited period",
-      likes: 0,
-      comments: 0,
-      shares: 0,
-    },
-  ];
 
   const POSTS_API = Array.isArray(storeApi.posts)
     ? storeApi.posts.map((p) => ({
@@ -675,11 +621,7 @@ export default function StoreProfileModal({
       }))
     : [];
 
-  const FEED = overviewLoading
-    ? []
-    : Array.isArray(POSTS_API) && POSTS_API.length
-    ? POSTS_API
-    : DEMO_POSTS;
+  const FEED = overviewLoading ? [] : POSTS_API;
 
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -943,25 +885,7 @@ export default function StoreProfileModal({
             }),
         };
       })
-    : [
-        // 🔔 fallback demo if API returns no addresses
-        {
-          label: "Address 1",
-          isMain: true,
-          state: "Lagos",
-          lga: "Ikeja",
-          fullAddress:
-            "No 2, abcdefght street, opposite abc building, acd bus stop, ikeja",
-          hours: [
-            { day: "Monday", time: "08:00 AM - 07:00PM" },
-            { day: "Tuesday", time: "08:00 AM - 07:00PM" },
-            { day: "Wednesday", time: "08:00 AM - 07:00PM" },
-            { day: "Thursday", time: "08:00 AM - 07:00PM" },
-            { day: "Friday", time: "08:00 AM - 07:00PM" },
-            { day: "Saturday", time: "08:00 AM - 07:00PM" },
-          ],
-        },
-      ];
+    : [];
 
   const CommentsSheet = ({ visible, onClose }) => {
     const postId = activePost?.id;
@@ -1509,14 +1433,16 @@ export default function StoreProfileModal({
   const API_STORE_REVIEWS = Array.isArray(storeApi.storeReveiws)
     ? storeApi.storeReveiws.map((r, i) => ({
         id: String(r.id ?? i),
-        user: r.user?.name || "User", // 🔔 structure not shown; kept safe
+        user: r.user?.full_name || r.user?.name || "User",
         avatar:
+          absUrl(r.user?.profile_picture) ||
           toFileUrl(r.user?.avatar) ||
           "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop",
         rating: Number(r.rating ?? 0),
         time: r.created_at || "",
-        text: r.text || r.review || "",
-        replies: [], // 🔔 not provided in sample
+        text: r.comment || r.text || r.review || "",
+        images: Array.isArray(r.images) ? r.images.map((p) => toFileUrl(p)) : [],
+        replies: [], // not in API
       }))
     : [];
 
@@ -1589,6 +1515,22 @@ export default function StoreProfileModal({
         </View>
 
         <ThemedText style={styles.reviewText}>{item.text}</ThemedText>
+
+        {!!(item.images && item.images.length) && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 8 }}
+          >
+            {item.images.map((uri, idx) => (
+              <Image
+                key={`${item.id}-img-${idx}`}
+                source={src(uri)}
+                style={{ width: 64, height: 64, borderRadius: 8, marginRight: 8 }}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         <View style={styles.replyRow}>
           <Ionicons
@@ -2030,6 +1972,12 @@ export default function StoreProfileModal({
                 source={require("../assets/SealCheck.png")}
                 style={styles.iconImg}
               />{" "}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="star" size={14} color={C.primary} />
+                <ThemedText style={{ color: "#000", fontSize: 12, fontWeight: "700" }}>
+                  {Number(statsRating) > 0 ? statsRating : "Not set"}
+                </ThemedText>
+              </View>
             </View>
             <View style={styles.metaRow}>
               <Ionicons name="mail-outline" size={16} color={C.sub} />
@@ -2118,7 +2066,7 @@ export default function StoreProfileModal({
                         {s.label}
                       </ThemedText>
                       <ThemedText style={styles.statValue}>
-                        {s.value}
+                        {Number(s.value) > 0 ? s.value : "Not set"}
                       </ThemedText>
                     </View>
                   </View>
@@ -2241,9 +2189,7 @@ export default function StoreProfileModal({
                 </View>
               ) : filtered.length === 0 ? (
                 <View style={{ paddingVertical: 16, alignItems: "center" }}>
-                  <ThemedText style={{ color: C.sub }}>
-                    No products available.
-                  </ThemedText>
+                  <ThemedText style={{ color: C.sub }}>No product data available.</ThemedText>
                 </View>
               ) : (
                 <FlatList
@@ -2271,9 +2217,7 @@ export default function StoreProfileModal({
                 </View>
               ) : visibleFeed.length === 0 ? (
                 <View style={{ paddingVertical: 16, alignItems: "center" }}>
-                  <ThemedText style={{ color: C.sub }}>
-                    No posts available.
-                  </ThemedText>
+                  <ThemedText style={{ color: C.sub }}>No feed data available.</ThemedText>
                 </View>
               ) : (
                 visibleFeed.map((p) => <PostCard key={p.id} item={p} />)
@@ -2329,9 +2273,7 @@ export default function StoreProfileModal({
                 ))}
                 {!activeReviews.length && (
                   <View style={styles.noReviewsBox}>
-                    <ThemedText style={{ color: C.sub }}>
-                      No reviews yet.
-                    </ThemedText>
+                    <ThemedText style={{ color: C.sub }}>No reviews data available.</ThemedText>
                   </View>
                 )}
               </View>
@@ -2628,6 +2570,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop:4
   },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   location: { fontSize: 7, color: "#444", fontWeight: "500" },

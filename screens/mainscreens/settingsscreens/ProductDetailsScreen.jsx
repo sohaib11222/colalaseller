@@ -1695,7 +1695,13 @@ function BoostSetupModal({
     },
     onError: (err) => {
       console.error("Preview Boost Failed:", err);
-      alert("Unable to preview boost. Please try again.");
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.errors?.duration?.[0] ||
+        err?.response?.data?.errors?.budget?.[0] ||
+        err?.message ||
+        "Unable to preview boost. Please try again.";
+      Alert.alert("Preview Failed", String(msg));
     },
   });
 
@@ -1857,6 +1863,10 @@ function BoostSetupModal({
                 alert("Please select location, daily budget and duration");
                 return;
               }
+              if (Number(days) > 90) {
+                Alert.alert("Invalid duration", "Duration must not be greater than 90 days.");
+                return;
+              }
               const payload = {
                 product_id: item?.id || productId, // item or productId available
                 location,
@@ -1940,7 +1950,13 @@ function ReviewAdModal({
     },
     onError: (err) => {
       console.error("Create Boost Failed:", err);
-      alert("Unable to create boost. Please try again.");
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.errors?.duration?.[0] ||
+        err?.response?.data?.errors?.budget?.[0] ||
+        err?.message ||
+        "Unable to create boost. Please try again.";
+      Alert.alert("Creation Failed", String(msg));
     },
   });
 
@@ -2685,7 +2701,7 @@ function SliderRow({
 
   const updateFromLocationX = (locX) => {
     if (width <= 0) {
-      console.log("Slider: Width not set yet", width);
+      // width not measured yet; ignore move until measured to avoid jumps
       return;
     }
     const ratio = clamp(locX / width, 0, 1);
@@ -3921,59 +3937,66 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
                       </View>
                     </View>
                     <View style={styles.chartData}>
-                      {chart.labels.map((label, index) => (
-                        <View key={index} style={styles.chartRow}>
-                          <ThemedText
-                            style={[styles.chartLabel, { color: C.sub }]}
-                          >
-                            Day {label}
-                          </ThemedText>
-                          <View style={styles.chartBars}>
-                            <View
-                              style={[
-                                styles.chartBar,
-                                {
-                                  backgroundColor: C.primary,
-                                  width: `${Math.min(
-                                    100,
-                                    (chart.impressions[index] /
-                                      Math.max(...chart.impressions)) *
-                                      100
-                                  )}%`,
-                                },
-                              ]}
-                            />
-                            <View
-                              style={[
-                                styles.chartBar,
-                                {
-                                  backgroundColor: "#10B981",
-                                  width: `${Math.min(
-                                    100,
-                                    (chart.visitors[index] /
-                                      Math.max(...chart.visitors)) *
-                                      100
-                                  )}%`,
-                                },
-                              ]}
-                            />
-                            <View
-                              style={[
-                                styles.chartBar,
-                                {
-                                  backgroundColor: "#F59E0B",
-                                  width: `${Math.min(
-                                    100,
-                                    (chart.orders[index] /
-                                      Math.max(...chart.orders)) *
-                                      100
-                                  )}%`,
-                                },
-                              ]}
-                            />
+                      {(() => {
+                        const reachVal = typeof estimatedReach === "undefined" ? 0 : estimatedReach;
+                        const clicksVal = typeof estimatedClicks === "undefined" ? 0 : estimatedClicks;
+                        const maxImpressions = Math.max(
+                          ...chart.impressions,
+                          reachVal
+                        );
+                        const maxVisitors = Math.max(
+                          ...chart.visitors,
+                          clicksVal
+                        );
+                        const maxOrders = Math.max(...chart.orders, 1);
+                        return chart.labels.map((label, index) => (
+                          <View key={index} style={styles.chartRow}>
+                            <ThemedText
+                              style={[styles.chartLabel, { color: C.sub }]}
+                            >
+                              Day {label}
+                            </ThemedText>
+                            <View style={styles.chartBars}>
+                              <View
+                                style={[
+                                  styles.chartBar,
+                                  {
+                                    backgroundColor: C.primary,
+                                    width: `${Math.min(
+                                      100,
+                                      (chart.impressions[index] / maxImpressions) * 100
+                                    )}%`,
+                                  },
+                                ]}
+                              />
+                              <View
+                                style={[
+                                  styles.chartBar,
+                                  {
+                                    backgroundColor: "#10B981",
+                                    width: `${Math.min(
+                                      100,
+                                      (chart.visitors[index] / maxVisitors) * 100
+                                    )}%`,
+                                  },
+                                ]}
+                              />
+                              <View
+                                style={[
+                                  styles.chartBar,
+                                  {
+                                    backgroundColor: "#F59E0B",
+                                    width: `${Math.min(
+                                      100,
+                                      (chart.orders[index] / maxOrders) * 100
+                                    )}%`,
+                                  },
+                                ]}
+                              />
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        ));
+                      })()}
                     </View>
                   </View>
                 </View>

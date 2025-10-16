@@ -42,13 +42,13 @@ const ASSETS = {
 };
 
 /* helpers */
-const pick = (v, fallback, note) => {
-  if (v === null || v === undefined || v === "") {
+const pick = (v, placeholder, note) => {
+  if (v === null || v === undefined || v === "" || (typeof v === 'number' && v === 0)) {
     if (note)
       console.warn(
-        `[StoreHome] missing ${note} in API → using hardcoded fallback`
+        `[StoreHome] missing ${note} in API → showing placeholder`
       );
-    return fallback;
+    return placeholder;
   }
   return v;
 };
@@ -132,54 +132,128 @@ export default function StoreHomeScreen() {
 
   const apiStore = builder?.store;
 
-  // derive store UI data with fallbacks
+  // Debug: Log the API response to see what data we're getting
+  useEffect(() => {
+    if (apiStore) {
+      console.log('[StoreHome] API Store Data:', {
+        store_name: apiStore.store_name,
+        store_location: apiStore.store_location,
+        store_email: apiStore.store_email,
+        store_phone: apiStore.store_phone,
+        total_sold: apiStore.total_sold,
+        followers_count: apiStore.followers_count,
+        average_rating: apiStore.average_rating,
+        categories: apiStore.categories,
+        theme_color: apiStore.theme_color
+      });
+    }
+  }, [apiStore]);
+
+  // derive store UI data with placeholders
   const store = useMemo(() => {
-    const hard = {
-      name: "Sasha Stores",
-      location: "Lagos, Nigeria",
-      email: "sashastores@gmail.com",
-      phone: "070123456789",
-      categories: ["Electronics", "Phones"],
+    const placeholders = {
+      name: "Store name not set",
+      location: "Location not set",
+      email: "Email not set",
+      phone: "Phone not set",
+      categories: [],
       categorytext: "Category",
-      stats: { qty: 100, followers: 500, rating: 4.7 },
+      stats: { qty: "Not set", followers: "Not set", rating: "Not set" },
       profile_image: null,
       banner_image: null,
       theme_color: theme?.colors?.primary || "#E53E3E",
       banners: [],
     };
 
-    if (!apiStore) return hard;
+    if (!apiStore) {
+      console.log('[StoreHome] No API store data available, using placeholders');
+      return placeholders;
+    }
 
     const catTitles = Array.isArray(apiStore.categories)
       ? apiStore.categories.map((c) => c?.title).filter(Boolean)
       : [];
 
     return {
-      name: pick(apiStore.store_name, hard.name, "store_name"),
-      location: pick(apiStore.store_location, hard.location, "store_location"),
-      email: pick(apiStore.store_email, hard.email, "store_email"),
-      phone: pick(apiStore.store_phone, hard.phone, "store_phone"),
-      categories: catTitles.length ? catTitles.slice(0, 2) : hard.categories,
+      name: pick(apiStore.store_name, "Store name not set", "store_name"),
+      location: pick(apiStore.store_location, "Location not set", "store_location"),
+      email: pick(apiStore.store_email, "Email not set", "store_email"),
+      phone: pick(apiStore.store_phone, "Phone not set", "store_phone"),
+      categories: catTitles.length ? catTitles.slice(0, 2) : [],
       categorytext: "Category",
       stats: {
-        qty: pick(apiStore.total_sold, hard.stats.qty, "total_sold"),
-        followers: pick(
-          apiStore.followers_count,
-          hard.stats.followers,
-          "followers_count"
-        ),
-        rating: pick(
-          apiStore.average_rating,
-          hard.stats.rating,
-          "average_rating"
-        ),
+        qty: (() => {
+          const qty = apiStore.total_sold;
+          if (qty === null || qty === undefined || qty === "" || qty === 0 || !qty) {
+            console.warn('[StoreHome] missing total_sold in API → showing placeholder');
+            return "Not set";
+          }
+          return qty;
+        })(),
+        followers: (() => {
+          const followers = apiStore.followers_count;
+          if (followers === null || followers === undefined || followers === "" || followers === 0 || !followers) {
+            console.warn('[StoreHome] missing followers_count in API → showing placeholder');
+            return "Not set";
+          }
+          return followers;
+        })(),
+        rating: (() => {
+          const rating = apiStore.average_rating;
+          const totalSold = apiStore.total_sold;
+          const followersCount = apiStore.followers_count;
+          
+          console.log('[StoreHome] Rating debug:', {
+            raw_rating: rating,
+            total_sold: totalSold,
+            followers_count: followersCount,
+            type: typeof rating,
+            is_null: rating === null,
+            is_undefined: rating === undefined,
+            is_empty_string: rating === "",
+            is_zero: rating === 0,
+            is_falsy: !rating
+          });
+          
+          // If this is a new account (no sales, no followers), then any rating is likely dummy
+          const isNewAccount = (!totalSold || totalSold === 0) && (!followersCount || followersCount === 0);
+          
+          // Also check for common dummy values
+          const commonDummyRatings = [4.7, 4.5, 5.0, 4.0, 3.5, 4.2, 4.8];
+          const isDummyRating = typeof rating === 'number' && commonDummyRatings.includes(rating);
+          
+          if (rating === null || rating === undefined || rating === "" || rating === 0 || !rating || isNewAccount || isDummyRating) {
+            console.warn('[StoreHome] missing, dummy, or new account rating → showing placeholder', {
+              rating,
+              totalSold,
+              followersCount,
+              isNewAccount,
+              isDummyRating
+            });
+            return "Not set";
+          }
+          return rating;
+        })(),
       },
       profile_image: apiStore.profile_image || null,
       banner_image: apiStore.banner_image || null, // header cover
-      theme_color: pick(apiStore.theme_color, hard.theme_color, "theme_color"),
+      theme_color: pick(apiStore.theme_color, placeholders.theme_color, "theme_color"),
       banners: Array.isArray(apiStore.banners) ? apiStore.banners : [],
     };
   }, [apiStore, theme?.colors?.primary]);
+
+  // Debug: Log the final store object to see what's being displayed
+  useEffect(() => {
+    console.log('[StoreHome] Final store object:', {
+      name: store.name,
+      location: store.location,
+      email: store.email,
+      phone: store.phone,
+      categories: store.categories,
+      stats: store.stats,
+      theme_color: store.theme_color
+    });
+  }, [store]);
 
   // sources (API if present, else local assets)
   const headerAvatarSource = store.profile_image
@@ -383,34 +457,54 @@ export default function StoreHomeScreen() {
             }}
           >
             <InfoRow icon="call-outline" text={store.categorytext} />
-            <View
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: "#0000FF33",
-                  borderWidth: 0.5,
-                  borderColor: "#0000FF",
-                },
-              ]}
-            >
-              <ThemedText style={[styles.chipText, { color: "#0000FF" }]}>
-                {store.categories[0] ?? "Electronics"}
-              </ThemedText>
-            </View>
-            <View
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: "#FF000033",
-                  borderWidth: 0.5,
-                  borderColor: "#FF0000",
-                },
-              ]}
-            >
-              <ThemedText style={[styles.chipText, { color: "#FF0000" }]}>
-                {store.categories[1] ?? "Phones"}
-              </ThemedText>
-            </View>
+            {store.categories[0] && (
+              <View
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: "#0000FF33",
+                    borderWidth: 0.5,
+                    borderColor: "#0000FF",
+                  },
+                ]}
+              >
+                <ThemedText style={[styles.chipText, { color: "#0000FF" }]}>
+                  {store.categories[0]}
+                </ThemedText>
+              </View>
+            )}
+            {store.categories[1] && (
+              <View
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: "#FF000033",
+                    borderWidth: 0.5,
+                    borderColor: "#FF0000",
+                  },
+                ]}
+              >
+                <ThemedText style={[styles.chipText, { color: "#FF0000" }]}>
+                  {store.categories[1]}
+                </ThemedText>
+              </View>
+            )}
+            {store.categories.length === 0 && (
+              <View
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: "#CCCCCC33",
+                    borderWidth: 0.5,
+                    borderColor: "#CCCCCC",
+                  },
+                ]}
+              >
+                <ThemedText style={[styles.chipText, { color: "#666666" }]}>
+                  Categories not set
+                </ThemedText>
+              </View>
+            )}
           </View>
 
           {/* stats row */}
