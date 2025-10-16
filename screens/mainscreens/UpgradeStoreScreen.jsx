@@ -34,9 +34,6 @@ import {
   setBusinessDetails,
   uploadDocuments,
   uploadPhysicalStore,
-  uploadUtilityBill,
-  setTheme,
-  submitOnboarding,
 } from "../../utils/mutations/seller";
 import {
   storeOnboardingData,
@@ -108,7 +105,7 @@ export default function UpgradeStoreScreen({ navigation }) {
       totalSteps = steps.length;
       completedSteps = steps.filter(step => isStepCompleted(step)).length;
     } else if (level === 3) {
-      const steps = ["level3.physical_store", "level3.addresses", "level3.delivery_pricing", "level3.theme", "level3.utility_bill"];
+      const steps = ["level3.physical_store"];
       totalSteps = steps.length;
       completedSteps = steps.filter(step => isStepCompleted(step)).length;
     }
@@ -154,7 +151,7 @@ export default function UpgradeStoreScreen({ navigation }) {
         completion: level3Completion.percentage,
         completedSteps: level3Completion.completed,
         totalSteps: level3Completion.total,
-        requirements: ["Physical Store", "Address Setup", "Delivery Pricing", "Theme Customization", "Utility Bill"],
+        requirements: ["Physical Store Upload"],
         benefits: ["Full Store Features", "Advanced Analytics", "Premium Support"],
         current: currentLevel === 3,
         completed: level3Completion.percentage === 100,
@@ -380,11 +377,7 @@ export default function UpgradeStoreScreen({ navigation }) {
                       if (t === "Business Details") isCompleted = isStepCompleted("level2.business_details");
                       if (t === "Document Upload") isCompleted = isStepCompleted("level2.documents");
                     } else if (lv.level === 3) {
-                      if (t === "Physical Store") isCompleted = isStepCompleted("level3.physical_store");
-                      if (t === "Address Setup") isCompleted = isStepCompleted("level3.addresses");
-                      if (t === "Delivery Pricing") isCompleted = isStepCompleted("level3.delivery_pricing");
-                      if (t === "Theme Customization") isCompleted = isStepCompleted("level3.theme");
-                      if (t === "Utility Bill") isCompleted = isStepCompleted("level3.utility_bill");
+                      if (t === "Physical Store Upload") isCompleted = isStepCompleted("level3.physical_store");
                     }
                     
                     return (
@@ -1496,31 +1489,12 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   LEVEL 3  (2 phases + physical store bottom sheet + color theme switch)
+   LEVEL 3  (Final step - physical store upload only)
    ──────────────────────────────────────────────────────────────────────────── */
 function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigation }) {
-  const { setPrimary } = useTheme(); // change app color instantly
-  const [step, setStep] = useState(1); // 1 = question + video, 2 = address + pricing + color
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalAns, setPhysicalAns] = useState("");
   const [videoUri, setVideoUri] = useState("");
-  const [addrOpen, setAddrOpen] = useState(false);
-  const [address, setAddress] = useState("");
-  const [deliveryOpen, setDeliveryOpen] = useState(false);
-  const [delivery, setDelivery] = useState("");
-  const COLORS = [
-    "#E53E3E",
-    "#0000FF",
-    "#800080",
-    "#008000",
-    "#FFA500",
-    "#00FF48",
-    "#4C1066",
-    "#FBFF00",
-    "#FF0066",
-    "#374F23",
-  ];
-  const [brandColor, setBrandColor] = useState(COLORS[0]);
 
   // Mutations
   const uploadPhysicalStoreMutation = useMutation({
@@ -1528,68 +1502,20 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
     onSuccess: (data) => {
       console.log("Physical store uploaded:", data);
       refetchProgress();
+      // Navigate back to main screen after successful upload
+      onClose();
+      // Navigate back one screen in the navigation stack
+      navigation.goBack();
     },
     onError: (error) => {
       console.error("Upload physical store error:", error);
+      Alert.alert("Error", "Failed to upload physical store details. Please try again.");
     },
   });
 
-  const uploadUtilityBillMutation = useMutation({
-    mutationFn: (payload) => uploadUtilityBill(payload, token),
-    onSuccess: (data) => {
-      console.log("Utility bill uploaded:", data);
-      refetchProgress();
-    },
-    onError: (error) => {
-      console.error("Upload utility bill error:", error);
-    },
-  });
+  // Removed unused mutations since we no longer have step 2
 
-  const setThemeMutation = useMutation({
-    mutationFn: (payload) => setTheme(payload, token),
-    onSuccess: (data) => {
-      console.log("Theme set:", data);
-      refetchProgress();
-    },
-    onError: (error) => {
-      console.error("Set theme error:", error);
-    },
-  });
-
-  const submitOnboardingMutation = useMutation({
-    mutationFn: () => submitOnboarding(token),
-    onSuccess: (data) => {
-      console.log("Onboarding submitted:", data);
-      refetchProgress();
-    },
-    onError: (error) => {
-      console.error("Submit onboarding error:", error);
-    },
-  });
-
-  useEffect(() => {
-    if (!visible) setStep(1);
-  }, [visible]);
-
-  const SmallStepDot = ({ n }) => {
-    const active = n <= step;
-    return (
-      <View
-        style={[
-          styles.smallStep,
-          active
-            ? { backgroundColor: C.primary, borderColor: C.primary }
-            : { backgroundColor: C.card, borderColor: "#C4C4C4" },
-        ]}
-      >
-        <ThemedText
-          style={{ color: active ? "#fff" : "#6B7280", fontWeight: "800" }}
-        >
-          {n}
-        </ThemedText>
-      </View>
-    );
-  };
+  // No need for step management since this is now a single step
 
   const pickVideo = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -1601,6 +1527,12 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
   };
 
   const handleUploadPhysicalStore = () => {
+    // Validate required fields
+    if (!physicalAns) {
+      Alert.alert("Error", "Please select whether you have a physical store");
+      return;
+    }
+    
     const formData = new FormData();
     formData.append('has_physical_store', physicalAns === "Yes i have a physical store" ? 1 : 0);
     if (videoUri) {
@@ -1613,14 +1545,7 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
     uploadPhysicalStoreMutation.mutate(formData);
   };
 
-  const handleSetTheme = () => {
-    setThemeMutation.mutate({ theme_color: brandColor });
-  };
-
-  const handleCompleteRegistration = () => {
-    handleSetTheme();
-    submitOnboardingMutation.mutate();
-  };
+  // Removed unused functions since we no longer have step 2
 
   return (
     <Modal
@@ -1668,300 +1593,133 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
               }}
             >
               <ThemedText style={{ color: C.text, fontWeight: "800" }}>
-                Level 3
+                Level 3 - Final Step
               </ThemedText>
-              <TouchableOpacity>
-                <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
-                  View Benefits
-                </ThemedText>
-              </TouchableOpacity>
             </View>
             <View style={{ height: 30, justifyContent: "center" }}>
               <View
                 style={{
                   height: 3,
-                  backgroundColor: "#E5E7EB",
+                  backgroundColor: C.primary,
                   borderRadius: 999,
                 }}
               />
-              <View
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingHorizontal: 4,
-                }}
-              >
-                {[1, 2].map((n) => (
-                  <SmallStepDot key={n} n={n} />
-                ))}
-              </View>
             </View>
           </View>
 
-          {step === 1 ? (
-            <>
-              <SelectRow
-                C={C}
-                label={
-                  physicalAns || "Does your business have a physical store"
-                }
-                onPress={() => setPhysicalOpen(true)}
-              />
+          <SelectRow
+            C={C}
+            label={
+              physicalAns || "Does your business have a physical store"
+            }
+            onPress={() => setPhysicalOpen(true)}
+          />
 
-              <ThemedText style={{ color: C.text, marginTop: 10 }}>
-                Upload a 1 minute video of your store
-              </ThemedText>
+          <ThemedText style={{ color: C.text, marginTop: 10 }}>
+            Upload a 1 minute video of your store
+          </ThemedText>
+          <TouchableOpacity
+            style={{
+              height: 160,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+              backgroundColor: "#fff",
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 8,
+            }}
+            onPress={pickVideo}
+            activeOpacity={0.9}
+          >
+            {videoUri ? (
+              <View style={{ alignItems: "center" }}>
+                <Ionicons
+                  name="play-circle-outline"
+                  size={32}
+                  color="#BDBDBD"
+                />
+                <ThemedText style={{ color: "#8F8F8F", marginTop: 6 }}>
+                  Video selected
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={{ alignItems: "center" }}>
+                <Ionicons name="camera-outline" size={30} color="#BDBDBD" />
+                <ThemedText style={{ color: "#8F8F8F", marginTop: 6 }}>
+                  Select video to upload
+                </ThemedText>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 14,
+              marginTop: 26,
+            }}
+          >
+            <TouchableOpacity
+              onPress={onClose}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 14,
+                backgroundColor: "#EDEEEF",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="arrow-back" size={20} color="#111" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnGrow, { backgroundColor: C.primary }]}
+              onPress={handleUploadPhysicalStore}
+              disabled={uploadPhysicalStoreMutation.isPending}
+            >
+              {uploadPhysicalStoreMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
+                  Complete Setup
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Physical store bottom sheet */}
+          <BottomSheet
+            C={C}
+            visible={physicalOpen}
+            onClose={() => setPhysicalOpen(false)}
+            title="Physical Store"
+          >
+            {[
+              "Yes i have a physical store",
+              "No, i run my business from home",
+            ].map((t) => (
               <TouchableOpacity
+                key={t}
+                onPress={() => {
+                  setPhysicalAns(t);
+                  setPhysicalOpen(false);
+                }}
                 style={{
-                  height: 160,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  backgroundColor: "#fff",
-                  alignItems: "center",
+                  height: 54,
+                  borderRadius: 12,
+                  backgroundColor: "#F6F6F6",
+                  alignItems: "flex-start",
                   justifyContent: "center",
-                  marginTop: 8,
+                  paddingHorizontal: 16,
+                  marginBottom: 10,
                 }}
-                onPress={pickVideo}
-                activeOpacity={0.9}
               >
-                {videoUri ? (
-                  <View style={{ alignItems: "center" }}>
-                    <Ionicons
-                      name="play-circle-outline"
-                      size={32}
-                      color="#BDBDBD"
-                    />
-                    <ThemedText style={{ color: "#8F8F8F", marginTop: 6 }}>
-                      Video selected
-                    </ThemedText>
-                  </View>
-                ) : (
-                  <View style={{ alignItems: "center" }}>
-                    <Ionicons name="camera-outline" size={30} color="#BDBDBD" />
-                    <ThemedText style={{ color: "#8F8F8F", marginTop: 6 }}>
-                      Select video to upload
-                    </ThemedText>
-                  </View>
-                )}
+                <ThemedText style={{ color: "#111" }}>{t}</ThemedText>
               </TouchableOpacity>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 14,
-                  marginTop: 26,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={onClose}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 14,
-                    backgroundColor: "#EDEEEF",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons name="arrow-back" size={20} color="#111" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnGrow, { backgroundColor: C.primary }]}
-                  onPress={() => setStep(2)}
-                >
-                  <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-                    Proceed
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnGrow, { backgroundColor: "#000" }]}
-                >
-                  <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-                    Save & Exit
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-
-              {/* Physical store bottom sheet */}
-              <BottomSheet
-                C={C}
-                visible={physicalOpen}
-                onClose={() => setPhysicalOpen(false)}
-                title="Business Type"
-              >
-                {[
-                  "Yes i have a physical store",
-                  "No, i run my business from home",
-                ].map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    onPress={() => {
-                      setPhysicalAns(t);
-                      setPhysicalOpen(false);
-                    }}
-                    style={{
-                      height: 54,
-                      borderRadius: 12,
-                      backgroundColor: "#F6F6F6",
-                      alignItems: "flex-start",
-                      justifyContent: "center",
-                      paddingHorizontal: 16,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <ThemedText style={{ color: "#111" }}>{t}</ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </BottomSheet>
-            </>
-          ) : (
-            <>
-              <SelectRow
-                C={C}
-                label={address ? "Address added" : "Add Store Address"}
-                onPress={() => navigation.navigate("SettingsNavigator", { screen: "StoreAdress" })}
-              />
-              <SelectRow
-                C={C}
-                label={
-                  delivery ? "Delivery pricing set" : "Add Delivery pricing"
-                }
-                onPress={() => navigation.navigate("SettingsNavigator", { screen: "DeliveryDetails" })}
-              />
-
-              <ThemedText style={{ color: C.text, marginTop: 16 }}>
-                Select a color that suits your brand and your store shall be
-                customized as such
-              </ThemedText>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  marginTop: 10,
-                }}
-              >
-                {COLORS.map((c) => {
-                  const selected = brandColor === c;
-                  return (
-                    <TouchableOpacity
-                      key={c}
-                      style={{
-                        width: 70,
-                        height: 70,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                      onPress={() => {
-                        setBrandColor(c);
-                        setPrimary(c);
-                      }}
-                      activeOpacity={0.9}
-                    >
-                      <View
-                        style={{
-                          width: 54,
-                          height: 54,
-                          borderRadius: 27,
-                          backgroundColor: c,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {selected && (
-                          <View
-                            style={{
-                              position: "absolute",
-                              width: 60,
-                              height: 60,
-                              borderRadius: 30,
-                              borderWidth: 2.5,
-                              borderColor: "#000",
-                            }}
-                          />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 14,
-                  marginTop: 26,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => setStep(1)}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 14,
-                    backgroundColor: "#EDEEEF",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons name="arrow-back" size={20} color="#111" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnGrow, { backgroundColor: C.primary }]}
-                  onPress={handleCompleteRegistration}
-                  disabled={setThemeMutation.isPending || submitOnboardingMutation.isPending}
-                >
-                  {(setThemeMutation.isPending || submitOnboardingMutation.isPending) ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-                      Complete Registration
-                    </ThemedText>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Address & Delivery sheets */}
-              <BottomSheet
-                C={C}
-                visible={addrOpen}
-                onClose={() => setAddrOpen(false)}
-                title="Store Address"
-              >
-                <View style={[styles.inputBox, { borderColor: "#E5E7EB" }]}>
-                  <TextInput
-                    value={address}
-                    onChangeText={setAddress}
-                    placeholder="Enter store address"
-                    placeholderTextColor="#9CA3AF"
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </BottomSheet>
-              <BottomSheet
-                C={C}
-                visible={deliveryOpen}
-                onClose={() => setDeliveryOpen(false)}
-                title="Delivery Pricing"
-              >
-                <View style={[styles.inputBox, { borderColor: "#E5E7EB" }]}>
-                  <TextInput
-                    value={delivery}
-                    onChangeText={setDelivery}
-                    placeholder="Enter delivery pricing details"
-                    placeholderTextColor="#9CA3AF"
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </BottomSheet>
-            </>
-          )}
+            ))}
+          </BottomSheet>
         </ScrollView>
       </SafeAreaView>
     </Modal>

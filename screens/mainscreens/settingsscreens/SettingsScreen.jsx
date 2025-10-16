@@ -19,7 +19,7 @@ import { useTheme } from '../../../components/ThemeProvider';
 import { STATIC_COLORS } from '../../../components/ThemeProvider';
 
 //Code Related to the integration
-import { getBalance } from '../../../utils/queries/settings';
+import { getBalance, getEscrowWallet } from '../../../utils/queries/settings';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -56,9 +56,9 @@ const SettingsScreen = () => {
   // Fetch balance data using React Query
   const {
     data: balanceData,
-    isLoading,
-    error,
-    refetch,
+    isLoading: balanceLoading,
+    error: balanceError,
+    refetch: refetchBalance,
   } = useQuery({
     queryKey: ["balance", token],
     queryFn: () => {
@@ -74,19 +74,40 @@ const SettingsScreen = () => {
     },
   });
 
+  // Fetch escrow wallet data using React Query
+  const {
+    data: escrowData,
+    isLoading: escrowLoading,
+    error: escrowError,
+    refetch: refetchEscrow,
+  } = useQuery({
+    queryKey: ["escrowWallet", token],
+    queryFn: () => {
+      console.log("🚀 Executing getEscrowWallet API call with token:", token);
+      return getEscrowWallet(token);
+    },
+    enabled: !!token,
+    onSuccess: (data) => {
+      console.log("✅ Escrow wallet API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Escrow wallet API call failed:", error);
+    },
+  });
+
   // Handle pull-to-refresh
   const onRefresh = async () => {
-    console.log("🔄 Starting balance pull-to-refresh...");
+    console.log("🔄 Starting balance and escrow pull-to-refresh...");
     setRefreshing(true);
     try {
-      console.log("🔄 Refreshing balance data...");
-      await refetch();
-      console.log("✅ Balance data refreshed successfully");
+      console.log("🔄 Refreshing balance and escrow data...");
+      await Promise.all([refetchBalance(), refetchEscrow()]);
+      console.log("✅ Balance and escrow data refreshed successfully");
     } catch (error) {
-      console.error("❌ Error refreshing balance data:", error);
+      console.error("❌ Error refreshing balance and escrow data:", error);
     } finally {
       setRefreshing(false);
-      console.log("🔄 Balance pull-to-refresh completed");
+      console.log("🔄 Balance and escrow pull-to-refresh completed");
     }
   };
 
@@ -121,14 +142,19 @@ const SettingsScreen = () => {
 
   // Extract balance data from API response
   const shoppingBalance = balanceData?.data?.shopping_balance || 0;
-  const escrowBalance = balanceData?.data?.escrow_balance || 0;
+  const escrowBalance = escrowData?.data?.locked_balance || balanceData?.data?.escrow_balance || 0; // Use locked_balance from escrow wallet, fallback to escrow_balance
   const rewardBalance = balanceData?.data?.reward_balance || 0;
   const loyaltyPoints = balanceData?.data?.loyality_points || 0;
+  
+  // Combined loading and error states
+  const isLoading = balanceLoading || escrowLoading;
+  const error = balanceError || escrowError;
 
   // Debug logging for balance data
   console.log("📊 Balance data:", balanceData);
+  console.log("📊 Escrow wallet data:", escrowData);
   console.log("💰 Shopping balance:", shoppingBalance);
-  console.log("🔒 Escrow balance:", escrowBalance);
+  console.log("🔒 Escrow balance (from escrow wallet):", escrowBalance);
   console.log("🎁 Reward balance:", rewardBalance);
   console.log("⭐ Loyalty points:", loyaltyPoints);
   console.log("⏳ Is loading:", isLoading);
@@ -312,7 +338,7 @@ const SettingsScreen = () => {
             onRefresh={onRefresh}
             colors={[C.primary]}
             tintColor={C.primary}
-            title="Pull to refresh balance"
+            title="Pull to refresh wallet data"
             titleColor={C.primary}
             progressBackgroundColor={C.white}
           />
@@ -397,8 +423,8 @@ const SettingsScreen = () => {
           </ThemedText>
           <TouchableOpacity
             onPress={() => {
-              console.log("🔄 Retrying balance data fetch...");
-              refetch();
+              console.log("🔄 Retrying balance and escrow data fetch...");
+              Promise.all([refetchBalance(), refetchEscrow()]);
             }}
             style={[styles.retryButton, { backgroundColor: C.primary }]}
           >

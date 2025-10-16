@@ -20,7 +20,7 @@ import { StatusBar } from "expo-status-bar";
 const { height } = Dimensions.get("window");
 
 //Code Related to the integration
-import { setAddress } from "../../utils/mutations/seller";
+import { setAddress, updateAddress } from "../../utils/mutations/seller";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import { getOnboardingToken } from "../../utils/tokenStorage";
@@ -232,15 +232,15 @@ export default function AddAddressScreen() {
     );
   }, [stateName, lgaSearch]);
 
-  // Set Address Mutation
+  // Set Address Mutation (for creating new addresses)
   const setAddressMutation = useMutation({
     mutationFn: (payload) => {
-      console.log("Sending address with token:", authToken ? "Token present" : "No token");
+      console.log("Creating new address with token:", authToken ? "Token present" : "No token");
       console.log("Payload:", payload);
       return setAddress(payload, authToken);
     },
     onSuccess: (data) => {
-      console.log("Address saved successfully:", data);
+      console.log("Address created successfully:", data);
       if (data.status === true) {
         // Call the onSaved callback if provided
         onSaved?.(data);
@@ -249,7 +249,31 @@ export default function AddAddressScreen() {
       }
     },
     onError: (error) => {
-      console.error("Set address error:", error);
+      console.error("Create address error:", error);
+      console.error("Token status:", authToken ? "Token present" : "No token");
+      // You can add error handling here (Alert, toast, etc.)
+    },
+  });
+
+  // Update Address Mutation (for updating existing addresses)
+  const updateAddressMutation = useMutation({
+    mutationFn: ({ id, payload }) => {
+      console.log("Updating address with ID:", id);
+      console.log("Token:", authToken ? "Token present" : "No token");
+      console.log("Payload:", payload);
+      return updateAddress(id, payload, authToken);
+    },
+    onSuccess: (data) => {
+      console.log("Address updated successfully:", data);
+      if (data.status === true) {
+        // Call the onSaved callback if provided
+        onSaved?.(data);
+        // Navigate back to the previous screen
+        nav.goBack();
+      }
+    },
+    onError: (error) => {
+      console.error("Update address error:", error);
       console.error("Token status:", authToken ? "Token present" : "No token");
       // You can add error handling here (Alert, toast, etc.)
     },
@@ -269,14 +293,47 @@ export default function AddAddressScreen() {
 
   // Format hours for API
   const formatHoursForAPI = (hours) => {
-    const formattedHours = {};
+    const formattedHours = [];
+    
+    // Helper function to convert 12-hour format to 24-hour format
+    const convertTo24Hour = (timeStr) => {
+      if (!timeStr) return "";
+      
+      // If already in 24-hour format (HH:MM), return as is
+      if (!timeStr.includes("AM") && !timeStr.includes("PM")) {
+        return timeStr;
+      }
+      
+      const [time, period] = timeStr.split(" ");
+      const [hours, minutes] = time.split(":");
+      let hour24 = parseInt(hours);
+      
+      if (period === "AM") {
+        if (hour24 === 12) hour24 = 0;
+      } else if (period === "PM") {
+        if (hour24 !== 12) hour24 += 12;
+      }
+      
+      return `${hour24.toString().padStart(2, '0')}:${minutes}`;
+    };
+    
     Object.keys(hours).forEach((day) => {
       const dayHours = hours[day];
-      if (dayHours.from && dayHours.to && dayHours.from !== "Closed" && dayHours.to !== "Closed") {
-        // Convert to lowercase for API
-        const dayKey = day.toLowerCase();
-        formattedHours[dayKey] = `${dayHours.from}-${dayHours.to}`;
+      const dayKey = day.toLowerCase();
+      
+      // Only include days that are actually open (not closed)
+      const isOpen = dayHours.from && dayHours.to && 
+                    dayHours.from !== "Closed" && dayHours.to !== "Closed";
+      
+      if (isOpen) {
+        // Send open day with times
+        formattedHours.push({
+          day: dayKey,
+          open_time: convertTo24Hour(dayHours.from),
+          close_time: convertTo24Hour(dayHours.to)
+        });
       }
+      // Skip closed days entirely - don't send them to the backend
     });
     return formattedHours;
   };
@@ -298,14 +355,17 @@ export default function AddAddressScreen() {
       opening_hours: formatHoursForAPI(hours),
     };
 
-    // Add ID for edit mode (for future backend implementation)
-    if (isEditMode && editData?.id) {
-      payload.id = editData.id;
-      console.log("Edit mode - Address ID:", editData.id);
-    }
-
     console.log("Save payload:", payload);
-    setAddressMutation.mutate(payload);
+    
+    if (isEditMode && editData?.id) {
+      // Use update mutation for edit mode
+      console.log("Edit mode - Address ID:", editData.id);
+      updateAddressMutation.mutate({ id: editData.id, payload });
+    } else {
+      // Use create mutation for new addresses
+      console.log("Create mode - New address");
+      setAddressMutation.mutate(payload);
+    }
   };
 
   const setTime = (day, which) => {
@@ -394,20 +454,20 @@ export default function AddAddressScreen() {
         style={[
           styles.saveBtn, 
           { 
-            backgroundColor: isFormComplete && !setAddressMutation.isPending 
+            backgroundColor: isFormComplete && !setAddressMutation.isPending && !updateAddressMutation.isPending
               ? theme.colors.primary 
               : "#CCCCCC" 
           }
         ]}
         onPress={save}
         activeOpacity={0.9}
-        disabled={!isFormComplete || setAddressMutation.isPending}
+        disabled={!isFormComplete || setAddressMutation.isPending || updateAddressMutation.isPending}
       >
-        {setAddressMutation.isPending ? (
+        {(setAddressMutation.isPending || updateAddressMutation.isPending) ? (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
             <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
-              Saving...
+              {isEditMode ? "Updating..." : "Saving..."}
             </ThemedText>
           </View>
         ) : (

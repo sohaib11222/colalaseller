@@ -55,6 +55,9 @@ export const setAddress = async (payload, token) =>
 export const deleteAddress = async (id, token) =>
   await apiCall(API_ENDPOINTS.SELLER.Delete_Address(id), "DELETE", undefined, token);
 
+export const updateAddress = async (id, payload, token) =>
+  await apiCall(API_ENDPOINTS.SELLER.Update_Address(id), "PUT", payload, token);
+
 
 // Level 3 - Delivery Pricing
 // payload = { state: "Lagos", local_government: "Ikeja", variant: "light", price: 1000, is_free: false }

@@ -150,7 +150,7 @@ export default function ServiceDetailsScreen({ route, navigation }) {
   const isLoading = detailsLoading || statsLoading || chartLoading;
   const hasError = detailsError || statsError || chartError;
 
-  // Transform statistics data
+  // Transform statistics data - only use API data, no dummy data
   const stats = serviceStats?.data
     ? [
         ["Views", serviceStats.data.view?.toString() || "0"],
@@ -159,13 +159,7 @@ export default function ServiceDetailsScreen({ route, navigation }) {
         ["Chats", serviceStats.data.chat?.toString() || "0"],
         ["Phone Views", serviceStats.data.phone_view?.toString() || "0"],
       ]
-    : [
-        ["Views", "2000"],
-        ["Impressions", "1500"],
-        ["Clicks", "300"],
-        ["Chats", "5"],
-        ["Phone Views", "15"],
-      ];
+    : []; // No dummy data - show empty state instead
 
   // Format stats data for modal (similar to ProductDetailsScreen)
   const finalStats = {
@@ -178,7 +172,7 @@ export default function ServiceDetailsScreen({ route, navigation }) {
     completed: 0, // This might need to be from API
   };
 
-  // Transform chart data or use dummy data
+  // Transform chart data - only use API data, no dummy data
   // Check if chartData exists and has valid data (not empty array)
   const hasValidChartData = chartData?.data && 
     Array.isArray(chartData.data) && 
@@ -186,19 +180,15 @@ export default function ServiceDetailsScreen({ route, navigation }) {
     chartData.data[0] && 
     typeof chartData.data[0] === 'object';
 
+  // Only show chart if we have valid data from API
   const series = hasValidChartData
     ? {
-        labels: chartData.data.labels || ["1", "2", "3", "4", "5", "6", "7"],
-        impressions: chartData.data.impressions || [65, 40, 75, 30, 90, 65, 55],
-        visitors: chartData.data.visitors || [35, 60, 20, 18, 70, 55, 45],
-        chats: chartData.data.chats || [25, 20, 10, 6, 40, 35, 22],
+        labels: chartData.data.labels || [],
+        impressions: chartData.data.impressions || [],
+        visitors: chartData.data.visitors || [],
+        chats: chartData.data.chats || [],
       }
-    : {
-        labels: ["1", "2", "3", "4", "5", "6", "7"],
-        impressions: [65, 40, 75, 30, 90, 65, 55],
-        visitors: [35, 60, 20, 18, 70, 55, 45],
-        chats: [25, 20, 10, 6, 40, 35, 22],
-      };
+    : null; // No dummy data - show empty state instead
 
   // Price range from API data or fallback
   const priceRange =
@@ -357,9 +347,20 @@ export default function ServiceDetailsScreen({ route, navigation }) {
               { backgroundColor: C.card, borderColor: C.line },
             ]}
           >
-            <Legend />
-            <MiniGroupedBars series={series} />
-            <View style={[styles.pagerBar, { backgroundColor: "#E5E7EB" }]} />
+            {series ? (
+              <>
+                <Legend />
+                <MiniGroupedBars series={series} />
+                <View style={[styles.pagerBar, { backgroundColor: "#E5E7EB" }]} />
+              </>
+            ) : (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Ionicons name="bar-chart-outline" size={48} color={C.sub} />
+                <ThemedText style={[styles.emptyText, { color: C.sub, marginTop: 8 }]}>
+                  No chart data available
+                </ThemedText>
+              </View>
+            )}
           </View>
 
           {/* Stats card */}
@@ -374,17 +375,26 @@ export default function ServiceDetailsScreen({ route, navigation }) {
                 Service Statistics
               </ThemedText>
             </View>
-            {stats.map(([k, v]) => (
-              <View
-                key={k}
-                style={[styles.statRow, { borderTopColor: C.line }]}
-              >
-                <ThemedText style={{ color: C.sub }}>{k}</ThemedText>
-                <ThemedText style={{ color: C.text, fontWeight: "700" }}>
-                  {v}
+            {stats.length > 0 ? (
+              stats.map(([k, v]) => (
+                <View
+                  key={k}
+                  style={[styles.statRow, { borderTopColor: C.line }]}
+                >
+                  <ThemedText style={{ color: C.sub }}>{k}</ThemedText>
+                  <ThemedText style={{ color: C.text, fontWeight: "700" }}>
+                    {v}
+                  </ThemedText>
+                </View>
+              ))
+            ) : (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Ionicons name="stats-chart-outline" size={48} color={C.sub} />
+                <ThemedText style={[styles.emptyText, { color: C.sub, marginTop: 8 }]}>
+                  No statistics data available
                 </ThemedText>
               </View>
-            ))}
+            )}
           </View>
 
           <TouchableOpacity
@@ -994,10 +1004,19 @@ function Legend() {
 }
 
 function MiniGroupedBars({ series }) {
+  // Handle null or undefined series
+  if (!series || !series.labels || !Array.isArray(series.labels)) {
+    return null;
+  }
+
   const maxH = 150;
   const groups = series.labels.map((label, i) => ({
     label,
-    values: [series.impressions[i], series.visitors[i], series.chats[i]],
+    values: [
+      series.impressions?.[i] || 0, 
+      series.visitors?.[i] || 0, 
+      series.chats?.[i] || 0
+    ],
   }));
   const colors = ["#F59E0B", "#10B981", "#EF4444"];
 
@@ -1360,6 +1379,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: "500",
+    textAlign: "center",
+  },
 });
 
 /* ───────── Stats Modal ───────── */
@@ -1491,7 +1515,7 @@ function StatsModal({ visible, onClose, stats, chart, isLoading, C }) {
               </View>
 
               {/* Chart Section */}
-              {chart.labels.length > 0 && chart.labels[0] !== "N/A" && (
+              {chart && chart.labels && chart.labels.length > 0 && chart.labels[0] !== "N/A" && (
                 <View style={{ padding: 16 }}>
                   <ThemedText style={[styles.chartTitle, { color: C.text }]}>
                     Performance Over Time

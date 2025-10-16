@@ -27,23 +27,7 @@ import { StatusBar } from "expo-status-bar";
 
 
 
-/* ---------- Demo data (replace with API) ---------- */
-const AV = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200&auto=format&fit=crop";
-const P1 = "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=400&auto=format&fit=crop";
-const P2 = "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=400&auto=format&fit=crop";
-const P3 = "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=400&auto=format&fit=crop";
-
-const STORE_REVIEWS = [
-  { id: "s1", user: "Adam Sandler", avatar: AV, rating: 5, time: "07-16-25/05:33AM", body: "The Store is amazing", store: { name: "Sasha Stores", rating: 4.5, image: P1 }, gallery: [] },
-  { id: "s2", user: "Adam Sandler", avatar: AV, rating: 5, time: "07-16-25/05:33AM", body: "The Store is amazing", store: { name: "Sasha Stores", rating: 4.5, image: P1 }, gallery: [] },
-  { id: "s3", user: "Adam Sandler", avatar: AV, rating: 4, time: "07-16-25/05:33AM", body: "The Store is amazing", store: { name: "Sasha Stores", rating: 4.5, image: P1 }, gallery: [P1, P2, P3] },
-];
-
-const PRODUCT_REVIEWS = [
-  { id: "p1", user: "Adam Sandler", avatar: AV, rating: 5, time: "07-16-25/05:33AM", body: "I really enjoyed using the product", product: { title: "Iphone 12 pro max", price: "₦2,500,000", image: P1 }, gallery: [] },
-  { id: "p2", user: "Adam Sandler", avatar: AV, rating: 5, time: "07-16-25/05:33AM", body: "I really enjoyed using the product", product: { title: "Iphone 12 pro max", price: "₦2,500,000", image: P2 }, gallery: [] },
-  { id: "p3", user: "Adam Sandler", avatar: AV, rating: 4, time: "07-16-25/05:33AM", body: "I really enjoyed using the product", product: { title: "Iphone 12 pro max", price: "₦2,500,000", image: P3 }, gallery: [P1, P2, P3] },
-];
+/* ---------- No dummy data - using API only ---------- */
 
 /* ---------- Small helpers ---------- */
 const Stars = ({ value = 0, size = 14, color }) => (
@@ -63,7 +47,13 @@ const Stars = ({ value = 0, size = 14, color }) => (
 const Capsule = ({ C, left, onRightPress, rightText = "View Store" }) => (
   <View style={[styles.capsuleRow, { borderColor: C.line, backgroundColor: C.card }]}>
     <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-      <Image source={{ uri: left.image }} style={[styles.capsuleImg, { backgroundColor: C.bg }]} />
+      {left.image ? (
+        <Image source={{ uri: left.image }} style={[styles.capsuleImg, { backgroundColor: C.bg }]} />
+      ) : (
+        <View style={[styles.capsuleImg, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
+          <Ionicons name="storefront-outline" size={20} color={C.sub} />
+        </View>
+      )}
       <View style={{ marginLeft: 8 }}>
         {"rating" in left ? (
           <>
@@ -102,7 +92,13 @@ const ReviewCard = ({ C, item, type = "store", onPress, onPressRight }) => {
       {/* Header */}
       <View style={styles.cardTop}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          {item.avatar ? (
+            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
+              <Ionicons name="person-outline" size={20} color={C.sub} />
+            </View>
+          )}
           <View>
             <ThemedText style={[styles.name, { color: C.text }]}>{item.user}</ThemedText>
             <Stars value={item.rating} color={C.primary} />
@@ -117,12 +113,7 @@ const ReviewCard = ({ C, item, type = "store", onPress, onPressRight }) => {
       {/* Optional gallery */}
       <Gallery images={item.gallery} />
 
-      {/* Bottom capsule */}
-      {isStore ? (
-        <Capsule C={C} left={item.store} rightText="View Store" onRightPress={onPressRight} />
-      ) : (
-        <Capsule C={C} left={item.product} rightText="View product" onRightPress={onPressRight} />
-      )}
+     
     </TouchableOpacity>
   );
 };
@@ -188,7 +179,7 @@ export default function MyReviewsScreen() {
     return reviews.map(review => ({
       id: review.id,
       user: review.user?.full_name || "Unknown User",
-      avatar: review.user?.profile_picture ? `https://colala.hmstech.xyz/storage/${review.user.profile_picture}` : AV,
+      avatar: review.user?.profile_picture ? `https://colala.hmstech.xyz/storage/${review.user.profile_picture}` : null,
       rating: review.rating,
       time: new Date(review.created_at).toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -201,26 +192,26 @@ export default function MyReviewsScreen() {
       }).replace(/AM|PM/, (match) => match === 'AM' ? 'AM' : 'PM'),
       body: review.comment,
       store: {
-        name: "Store Name", // You might want to get this from store data
-        rating: 4.5,
-        image: P1
+        name: review.user?.full_name || "Store Name", // Use the actual store name from API
+        rating: review.rating, // Use the actual rating from the review API
+        image: review.user?.profile_picture ? `https://colala.hmstech.xyz/storage/${review.user.profile_picture}` : null // Use the actual store image from API
       },
       gallery: review.images ? review.images.map(img => `https://colala.hmstech.xyz/storage/${img}`) : []
     }));
   };
 
-  // Use API data if available, otherwise fallback to dummy data
+  // Use API data only - no fallback to dummy data
   const storeReviews = reviewsData?.data?.store_reviews ? 
-    transformReviewData(reviewsData.data.store_reviews) : STORE_REVIEWS;
+    transformReviewData(reviewsData.data.store_reviews) : [];
   const productReviews = reviewsData?.data?.product_reviews ? 
-    transformReviewData(reviewsData.data.product_reviews) : PRODUCT_REVIEWS;
+    transformReviewData(reviewsData.data.product_reviews) : [];
   
   const data = tab === "store" ? storeReviews : productReviews;
   
   // Check if we have real API data but it's empty
   const hasApiData = reviewsData?.data;
-  const isStoreReviewsEmpty = hasApiData && reviewsData.data.store_reviews?.length === 0;
-  const isProductReviewsEmpty = hasApiData && reviewsData.data.product_reviews?.length === 0;
+  const isStoreReviewsEmpty = hasApiData && (!reviewsData.data.store_reviews || reviewsData.data.store_reviews.length === 0);
+  const isProductReviewsEmpty = hasApiData && (!reviewsData.data.product_reviews || reviewsData.data.product_reviews.length === 0);
   const isCurrentTabEmpty = tab === "store" ? isStoreReviewsEmpty : isProductReviewsEmpty;
 
   // view modal state
@@ -374,9 +365,15 @@ export default function MyReviewsScreen() {
               <View style={[styles.viewCard, { backgroundColor: C.card, borderColor: C.line }]}>
                 <View style={styles.cardTop}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Image source={{ uri: activeReview.avatar }} style={styles.avatar} />
+                    {activeReview.avatar ? (
+                      <Image source={{ uri: activeReview.avatar }} style={styles.avatar} />
+                    ) : (
+                      <View style={[styles.avatar, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
+                        <Ionicons name="person-outline" size={20} color={C.sub} />
+                      </View>
+                    )}
                     <View>
-                      <ThemedText style={[styles.name, { color: C.text }]}>Chris Pine</ThemedText>
+                      <ThemedText style={[styles.name, { color: C.text }]}>{activeReview.user}</ThemedText>
                       <Stars value={activeReview.rating} color={C.primary} />
                     </View>
                   </View>

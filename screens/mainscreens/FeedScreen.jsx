@@ -611,7 +611,10 @@ function CommentsSheet({ visible, onClose, postId }) {
     time: timeAgo(c.created_at),
     user: c.user?.full_name || "User",
     // Check both profile_picture and store.profile_image fields for comments
-    avatar: absUrl(c.user?.profile_picture || c.user?.store?.profile_image) || null,
+    // Use user.profile_picture first, then store.profile_image, only show null if both are null
+    avatar: c.user?.profile_picture 
+      ? absUrl(c.user.profile_picture) 
+      : (c.user?.store?.profile_image ? absUrl(c.user.store.profile_image) : null),
     replies: c.replies || [],
     _raw: c,
   }));
@@ -641,7 +644,11 @@ function CommentsSheet({ visible, onClose, postId }) {
   const ReplyBlock = ({ reply }) => (
     <View style={styles.replyContainer}>
       <Image
-        source={src(absUrl(reply.user?.profile_picture || reply.user?.store?.profile_image))}
+        source={src(
+          reply.user?.profile_picture 
+            ? absUrl(reply.user.profile_picture) 
+            : (reply.user?.store?.profile_image ? absUrl(reply.user.store.profile_image) : null)
+        )}
         style={styles.commentAvatar}
       />
       <View style={{ flex: 1 }}>
@@ -1599,11 +1606,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sheetTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
     color: "#000",
     textAlign: "center",
-    marginLeft: 160,
+    marginLeft: 120,
   },
 
   optionRow: {

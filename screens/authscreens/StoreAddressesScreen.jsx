@@ -24,7 +24,7 @@ import { getAddresses } from "../../utils/queries/services";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import { getOnboardingToken } from "../../utils/tokenStorage";
-import { deleteAddress } from "../../utils/mutations/seller";
+import { deleteAddress,updateAddress } from "../../utils/mutations/seller";
 import { useMutation } from "@tanstack/react-query";
 function InlineHeader({ title, onBack }) {
   return (
