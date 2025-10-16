@@ -152,6 +152,11 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
             </TouchableOpacity>
           )}
         </View>
+      ) : planPrice === "Free" ? (
+        <View style={styles.freePill}>
+          <Ionicons name="gift-outline" size={16} color="#7A263A" />
+          <ThemedText style={styles.freeTxt}>Free Plan</ThemedText>
+        </View>
       ) : (
         <TouchableOpacity
           activeOpacity={0.9}
@@ -671,7 +676,7 @@ const styles = StyleSheet.create({
   },
 
   card: { width: CARD_W, borderRadius: 30, padding: 16, marginHorizontal: 2 },
-  planTitle: { color: "#2A1611", fontSize: 70, marginBottom: 8 },
+  planTitle: { color: "#2A1611", fontSize: 50, marginBottom: 8 },
 
   priceWrap: {
     backgroundColor: "#fff",
@@ -721,6 +726,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   activeTxt: { color: "#7A263A", fontWeight: "600" },
+
+  freePill: {
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "#E8F5E8",
+    borderWidth: 1,
+    borderColor: "#C8E6C8",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 70,
+    paddingHorizontal: 14,
+  },
+  freeTxt: { color: "#2E7D32", fontWeight: "600" },
 
   upgradeBtn: {
     height: 48,

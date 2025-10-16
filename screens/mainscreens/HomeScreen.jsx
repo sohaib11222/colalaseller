@@ -158,7 +158,7 @@ export default function StoreHomeScreen() {
       phone: "Phone not set",
       categories: [],
       categorytext: "Category",
-      stats: { qty: "Not set", followers: "Not set", rating: "Not set" },
+      stats: { qty: "0", followers: "0", rating: "0" },
       profile_image: null,
       banner_image: null,
       theme_color: theme?.colors?.primary || "#E53E3E",
@@ -186,7 +186,7 @@ export default function StoreHomeScreen() {
           const qty = apiStore.total_sold;
           if (qty === null || qty === undefined || qty === "" || qty === 0 || !qty) {
             console.warn('[StoreHome] missing total_sold in API → showing placeholder');
-            return "Not set";
+            return "0";
           }
           return qty;
         })(),
@@ -194,7 +194,7 @@ export default function StoreHomeScreen() {
           const followers = apiStore.followers_count;
           if (followers === null || followers === undefined || followers === "" || followers === 0 || !followers) {
             console.warn('[StoreHome] missing followers_count in API → showing placeholder');
-            return "Not set";
+            return "0";
           }
           return followers;
         })(),
@@ -230,7 +230,7 @@ export default function StoreHomeScreen() {
               isNewAccount,
               isDummyRating
             });
-            return "Not set";
+            return "0";
           }
           return rating;
         })(),
