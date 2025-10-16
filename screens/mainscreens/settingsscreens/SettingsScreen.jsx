@@ -1,5 +1,5 @@
 // screens/settings/SettingsScreen.jsx
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -11,17 +11,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import ThemedText from '../../../components/ThemedText';
-import { useTheme } from '../../../components/ThemeProvider';
-import { STATIC_COLORS } from '../../../components/ThemeProvider';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import ThemedText from "../../../components/ThemedText";
+import { useTheme } from "../../../components/ThemeProvider";
+import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 //Code Related to the integration
-import { getBalance, getEscrowWallet } from '../../../utils/queries/settings';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '../../../contexts/AuthContext';
+import { getBalance, getEscrowWallet } from "../../../utils/queries/settings";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -32,14 +32,14 @@ const SettingsScreen = () => {
   const C = useMemo(
     () => ({
       primary: STATIC_COLORS.primary,
-      bg: theme?.colors?.background || '#F5F6F8',
-      white: theme?.colors?.card || '#FFFFFF',
-      text: theme?.colors?.text || '#101318',
-      sub: theme?.colors?.muted || '#6C727A',
-      border: '#ECEDEF',
-      light: '#F8F9FB',
-      danger: '#F04438',
-      success: '#22C55E',
+      bg: theme?.colors?.background || "#F5F6F8",
+      white: theme?.colors?.card || "#FFFFFF",
+      text: theme?.colors?.text || "#101318",
+      sub: theme?.colors?.muted || "#6C727A",
+      border: "#ECEDEF",
+      light: "#F8F9FB",
+      danger: "#F04438",
+      success: "#22C55E",
     }),
     [theme]
   );
@@ -51,7 +51,6 @@ const SettingsScreen = () => {
   console.log("👤 User data from auth:", user);
   console.log("🏪 Store data:", user?.store);
   console.log("🔑 Token:", token ? "Present" : "Missing");
-
 
   // Fetch balance data using React Query
   const {
@@ -113,39 +112,36 @@ const SettingsScreen = () => {
 
   // Handle logout with confirmation
   const handleLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            console.log("🚪 Starting logout process...");
+            await logout();
+            console.log("✅ Logout successful");
+            // Navigation will be handled automatically by the auth state change
+          } catch (error) {
+            console.error("❌ Error during logout:", error);
+            Alert.alert("Error", "Failed to logout. Please try again.");
+          }
         },
-        {
-          text: "Logout",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              console.log("🚪 Starting logout process...");
-              await logout();
-              console.log("✅ Logout successful");
-              // Navigation will be handled automatically by the auth state change
-            } catch (error) {
-              console.error("❌ Error during logout:", error);
-              Alert.alert("Error", "Failed to logout. Please try again.");
-            }
-          },
-        },
-      ]
-    );
+      },
+    ]);
   };
 
   // Extract balance data from API response
   const shoppingBalance = balanceData?.data?.shopping_balance || 0;
-  const escrowBalance = escrowData?.data?.locked_balance || balanceData?.data?.escrow_balance || 0; // Use locked_balance from escrow wallet, fallback to escrow_balance
+  const escrowBalance =
+    escrowData?.data?.locked_balance || balanceData?.data?.escrow_balance || 0; // Use locked_balance from escrow wallet, fallback to escrow_balance
   const rewardBalance = balanceData?.data?.reward_balance || 0;
   const loyaltyPoints = balanceData?.data?.loyality_points || 0;
-  
+
   // Combined loading and error states
   const isLoading = balanceLoading || escrowLoading;
   const error = balanceError || escrowError;
@@ -161,59 +157,112 @@ const SettingsScreen = () => {
   console.log("❌ Has error:", error);
   console.log("🔄 Is refreshing:", refreshing);
 
-  const IMG_SUB_ACTIVE = require('../../../assets/Group 115.png');
-
+  const IMG_SUB_ACTIVE = require("../../../assets/Group 115.png");
 
   // Main section (match screenshot)
   const menuMain = [
-    { key: 'myProducts', label: 'My Products', img: require('../../../assets/Vector.png'), leftColor: '#E53E3E' },
-    { key: 'analytics', label: 'Analytics', img: require('../../../assets/Vector (11).png'), leftColor: '#E53EE2' },
     {
-      key: 'subscriptions',
-      label: 'Subscriptions',
-      img: require('../../../assets/Vector (12).png'),
-      leftColor: '#62E53E',
+      key: "myProducts",
+      label: "My Products",
+      img: require("../../../assets/Vector.png"),
+      leftColor: "#E53E3E",
+    },
+    {
+      key: "analytics",
+      label: "Analytics",
+      img: require("../../../assets/Vector (11).png"),
+      leftColor: "#E53EE2",
+    },
+    {
+      key: "subscriptions",
+      label: "Subscriptions",
+      img: require("../../../assets/Vector (12).png"),
+      leftColor: "#62E53E",
       badgeImg: IMG_SUB_ACTIVE,
     },
-    { key: 'promoted', label: 'Promoted Products', img: require('../../../assets/ChartLineUp.png'), leftColor: '#26A19F' },
-    { key: 'coupons', label: 'Manage Coupons/ Points', img: require('../../../assets/Vector (4).png'), leftColor: '#E5683E' },
-    { key: 'announcements', label: 'Announcements', img: require('../../../assets/Vector (14).png'), leftColor: '#3E86E5' },
-    { key: 'reviews', label: 'Reviews', img: require('../../../assets/Star copy 2.png'), leftColor: '#E53E41' },
+    {
+      key: "promoted",
+      label: "Promoted Products",
+      img: require("../../../assets/ChartLineUp.png"),
+      leftColor: "#26A19F",
+    },
+    {
+      key: "coupons",
+      label: "Manage Coupons/ Points",
+      img: require("../../../assets/Vector (4).png"),
+      leftColor: "#E5683E",
+    },
+    {
+      key: "announcements",
+      label: "Announcements",
+      img: require("../../../assets/Vector (14).png"),
+      leftColor: "#3E86E5",
+    },
+    {
+      key: "reviews",
+      label: "Reviews",
+      img: require("../../../assets/Star copy 2.png"),
+      leftColor: "#E53E41",
+    },
     // { key: 'referrals', label: 'Referrals', img: require('../../../assets/Users.png'), leftColor: '#4C3EE5' },
-    { key: 'support', label: 'Support', img: require('../../../assets/Headset.png'), leftColor: '#E5863E' },
-    { key: 'faqs', label: 'FAQs', img: require('../../../assets/Question.png'), leftColor: '#3EC9E5' },
+    {
+      key: "support",
+      label: "Support",
+      img: require("../../../assets/Headset.png"),
+      leftColor: "#E5863E",
+    },
+    {
+      key: "faqs",
+      label: "FAQs",
+      img: require("../../../assets/Question.png"),
+      leftColor: "#3EC9E5",
+    },
   ];
 
   // Others (match screenshot)
   const menuOthers = [
-    { key: 'sellerLeaderboard', label: 'Seller Leaderboard', img: require('../../../assets/Vector (5).png'), leftColor: '#fff' },
-    { key: 'savedCards', label: 'Saved Cards', img: require('../../../assets/CreditCard.png'), leftColor: '#fff' },
-    { key: 'accessControl', label: 'Account Access Control', img: require('../../../assets/Vector (15).png'), leftColor: '#fff' },
+    {
+      key: "sellerLeaderboard",
+      label: "Seller Leaderboard",
+      img: require("../../../assets/Vector (5).png"),
+      leftColor: "#fff",
+    },
+    {
+      key: "savedCards",
+      label: "Saved Cards",
+      img: require("../../../assets/CreditCard.png"),
+      leftColor: "#fff",
+    },
+    {
+      key: "accessControl",
+      label: "Account Access Control",
+      img: require("../../../assets/Vector (15).png"),
+      leftColor: "#fff",
+    },
   ];
 
   const onPressRow = (key) => {
     // Wire up to your settings navigator screens
     const map = {
-      myProducts: ['SettingsNavigator', { screen: 'MyProducts' }],
-      analytics: ['ChatNavigator', { screen: 'Analytics' }],
-      subscriptions: ['ChatNavigator', { screen: 'Subscription' }],
-      promoted: ['ChatNavigator', { screen: 'PromotedProducts' }],
-      coupons: ['ChatNavigator', { screen: 'Coupons' }],
-      announcements: ['ChatNavigator', { screen: 'Announcements' }],
-      reviews: ['ChatNavigator', { screen: 'MyReviews' }],
-      referrals: ['SettingsNavigator', { screen: 'Referrals' }],
-      support: ['ChatNavigator', { screen: 'Support' }],
-      faqs: ['ChatNavigator', { screen: 'FAQs' }],
+      myProducts: ["SettingsNavigator", { screen: "MyProducts" }],
+      analytics: ["ChatNavigator", { screen: "Analytics" }],
+      subscriptions: ["ChatNavigator", { screen: "Subscription" }],
+      promoted: ["ChatNavigator", { screen: "PromotedProducts" }],
+      coupons: ["ChatNavigator", { screen: "Coupons" }],
+      announcements: ["ChatNavigator", { screen: "Announcements" }],
+      reviews: ["ChatNavigator", { screen: "MyReviews" }],
+      referrals: ["SettingsNavigator", { screen: "Referrals" }],
+      support: ["ChatNavigator", { screen: "Support" }],
+      faqs: ["ChatNavigator", { screen: "FAQs" }],
 
-      sellerLeaderboard: ['ChatNavigator', { screen: 'SellerLeaderBoard' }],
-      savedCards: ['ChatNavigator', { screen: 'SavedCards' }],
-      accessControl: ['ChatNavigator', { screen: 'AccessControl' }],
+      sellerLeaderboard: ["ChatNavigator", { screen: "SellerLeaderBoard" }],
+      savedCards: ["ChatNavigator", { screen: "SavedCards" }],
+      accessControl: ["ChatNavigator", { screen: "AccessControl" }],
 
-
-      wallet: ['ChatNavigator', { screen: 'ShoppingWallet' }],
-      holdingWallet: ['ChatNavigator', { screen: 'EscrowWallet' }],
-      editProfile: ['SettingsNavigator', { screen: 'EditProfile' }],
-      shopUpgrade: ['ChatNavigator', { screen: 'UpgradeStore' }],
+      wallet: ["ChatNavigator", { screen: "ShoppingWallet" }],
+      holdingWallet: ["ChatNavigator", { screen: "EscrowWallet" }],
+      editProfile: ["SettingsNavigator", { screen: "EditProfile" }],
+      shopUpgrade: ["ChatNavigator", { screen: "UpgradeStore" }],
     };
 
     const route = map[key];
@@ -226,11 +275,13 @@ const SettingsScreen = () => {
       <View style={[styles.redTop, { backgroundColor: C.primary }]}>
         {/* Header row */}
         <View style={styles.headerRow}>
-          <ThemedText font="oleo" style={[styles.headerTitle, { color: C.white }]}>
+          <ThemedText
+            font="oleo"
+            style={[styles.headerTitle, { color: C.white }]}
+          >
             Settings
           </ThemedText>
           <View style={styles.iconRow}>
-
             <TouchableOpacity
               onPress={() =>
                 navigation.navigate("ChatNavigator", {
@@ -251,18 +302,20 @@ const SettingsScreen = () => {
 
         {/* Profile row */}
         <View style={styles.profileRow}>
-          <Image 
+          <Image
             source={
-              user?.store?.profile_image 
-                ? { uri: `https://colala.hmstech.xyz/storage/${user.store.profile_image}` }
-                : { uri: 'https://i.pravatar.cc/100?img=8' }
-            } 
-            style={[styles.profileImg, { borderColor: '#ffffff66' }]} 
+              user?.store?.profile_image
+                ? {
+                    uri: `https://colala.hmstech.xyz/storage/${user.store.profile_image}`,
+                  }
+                : { uri: "https://i.pravatar.cc/100?img=8" }
+            }
+            style={[styles.profileImg, { borderColor: "#ffffff66" }]}
           />
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
               <ThemedText style={[styles.name, { color: C.white }]}>
-                {user?.store?.store_name || user?.full_name || 'Store Name'}
+                {user?.store?.store_name || user?.full_name || "Store Name"}
               </ThemedText>
               <View style={styles.verifyPill}>
                 <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
@@ -270,7 +323,7 @@ const SettingsScreen = () => {
             </View>
             <View style={styles.locationRow}>
               <ThemedText style={[styles.locationText, { color: C.white }]}>
-                {user?.store?.store_location || user?.state || 'Location'}
+                {user?.store?.store_location || user?.state || "Location"}
               </ThemedText>
               <Ionicons name="caret-down" size={12} color={C.white} />
             </View>
@@ -280,32 +333,48 @@ const SettingsScreen = () => {
         {/* Wallet card (top + bottom bar as one piece) */}
         <View style={[styles.walletCard, { backgroundColor: C.white }]}>
           <View style={{ flex: 1 }}>
-            <ThemedText style={[styles.walletLabel, { color: C.sub }]}>Main Wallet</ThemedText>
+            <ThemedText style={[styles.walletLabel, { color: C.sub }]}>
+              Main Wallet
+            </ThemedText>
             {isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={C.primary} />
-                <ThemedText style={[styles.walletAmount, { marginLeft: 8, color: C.text }]}>
+                <ThemedText
+                  style={[
+                    styles.walletAmount,
+                    { marginLeft: 8, color: C.text },
+                  ]}
+                >
                   Loading...
                 </ThemedText>
               </View>
             ) : error ? (
-              <ThemedText style={[styles.walletAmount, { color: C.danger }]}>Error loading</ThemedText>
+              <ThemedText style={[styles.walletAmount, { color: C.danger }]}>
+                Error loading
+              </ThemedText>
             ) : (
               <ThemedText style={[styles.walletAmount, { color: C.text }]}>
                 ₦{parseFloat(shoppingBalance).toLocaleString()}
                 {parseFloat(shoppingBalance) === 0 && (
                   <ThemedText style={{ fontSize: 14, opacity: 0.8 }}>
-                    {" "}(No funds)
+                    {" "}
+                    (No funds)
                   </ThemedText>
                 )}
               </ThemedText>
             )}
           </View>
-          <TouchableOpacity style={[styles.viewWalletBtn, { backgroundColor: C.primary }]} onPress={() => onPressRow('wallet')}>
+          <TouchableOpacity
+            style={[styles.viewWalletBtn, { backgroundColor: C.primary }]}
+            onPress={() => onPressRow("wallet")}
+          >
             <ThemedText style={styles.viewWalletText}>View Wallet</ThemedText>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={[styles.holdingBar, { backgroundColor: '#FF6B6B' }]} onPress={() => onPressRow('holdingWallet')}>
+        <TouchableOpacity
+          style={[styles.holdingBar, { backgroundColor: "#FF6B6B" }]}
+          onPress={() => onPressRow("holdingWallet")}
+        >
           <ThemedText style={styles.holdingText}>
             {isLoading ? (
               "Loading escrow balance..."
@@ -314,14 +383,15 @@ const SettingsScreen = () => {
             ) : parseFloat(escrowBalance) === 0 ? (
               <>
                 No funds locked in holding wallet{" "}
-                <ThemedText style={{ color: '#640505', fontSize: 13 }}>
+                <ThemedText style={{ color: "#640505", fontSize: 13 }}>
                   · Click to view
                 </ThemedText>
               </>
             ) : (
               <>
-                ₦{parseFloat(escrowBalance).toLocaleString()} locked in holding wallet{" "}
-                <ThemedText style={{ color: '#640505', fontSize: 13 }}>
+                ₦{parseFloat(escrowBalance).toLocaleString()} locked in holding
+                wallet{" "}
+                <ThemedText style={{ color: "#640505", fontSize: 13 }}>
                   · Click to view
                 </ThemedText>
               </>
@@ -330,7 +400,7 @@ const SettingsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={{ paddingBottom: 28 }}
         refreshControl={
           <RefreshControl
@@ -346,7 +416,10 @@ const SettingsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Shop Upgrade */}
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: C.primary }]} onPress={() => onPressRow('shopUpgrade')}>
+        <TouchableOpacity
+          style={[styles.primaryBtn, { backgroundColor: C.primary }]}
+          onPress={() => onPressRow("shopUpgrade")}
+        >
           <ThemedText style={styles.primaryBtnText}>Shop Upgrade</ThemedText>
         </TouchableOpacity>
 
@@ -368,7 +441,9 @@ const SettingsScreen = () => {
         </View>
 
         {/* Others */}
-        <ThemedText style={[styles.sectionTitle, { color: C.sub }]}>Others</ThemedText>
+        <ThemedText style={[styles.sectionTitle, { color: C.sub }]}>
+          Others
+        </ThemedText>
         <View>
           {menuOthers.map((item) => (
             <OptionPillCard
@@ -385,7 +460,7 @@ const SettingsScreen = () => {
         {/* Logout */}
         <OptionPillCard
           label="Logout"
-          img={require('../../../assets/Vector (6).png')}
+          img={require("../../../assets/Vector (6).png")}
           leftColor="#fff"
           onPress={handleLogout}
           textColor={C.danger}
@@ -393,7 +468,13 @@ const SettingsScreen = () => {
         />
 
         {/* Delete Account */}
-        <TouchableOpacity style={[styles.disabledBtn, { borderColor: C.border, backgroundColor: C.light }]} onPress={() => { }}>
+        <TouchableOpacity
+          style={[
+            styles.disabledBtn,
+            { borderColor: C.border, backgroundColor: C.light },
+          ]}
+          onPress={() => {}}
+        >
           <ThemedText style={styles.disabledText}>Delete Account</ThemedText>
         </TouchableOpacity>
       </ScrollView>
@@ -419,7 +500,8 @@ const SettingsScreen = () => {
             Failed to load wallet data
           </ThemedText>
           <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
-            {error.message || "Unable to fetch wallet balance. Please check your connection and try again."}
+            {error.message ||
+              "Unable to fetch wallet balance. Please check your connection and try again."}
           </ThemedText>
           <TouchableOpacity
             onPress={() => {
@@ -440,7 +522,11 @@ const SettingsScreen = () => {
 
 /* ---------------- components ---------------- */
 const HeaderIconCircle = ({ children, onPress }) => (
-  <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.headerIconCircle}>
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.8}
+    style={styles.headerIconCircle}
+  >
     {children}
   </TouchableOpacity>
 );
@@ -450,29 +536,56 @@ const OptionPillCard = ({
   img,
   onPress,
   leftColor,
-  textColor = '#101318',
+  textColor = "#101318",
   badgeText,
-  badgeColor = '#22C55E',
-  badgeImg,              // 👈 NEW
+  badgeColor = "#22C55E",
+  badgeImg, // 👈 NEW
   C,
 }) => {
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.pillWrap}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={styles.pillWrap}
+    >
       <View style={[styles.pillLeft, { backgroundColor: leftColor }]}>
         <Image source={img} style={styles.pillIcon} resizeMode="contain" />
       </View>
 
-      <View style={[styles.pillBody, { backgroundColor: C.white, borderColor: C.border }]}>
-        <ThemedText style={[styles.pillLabel, { color: textColor }]} numberOfLines={1}>
+      <View
+        style={[
+          styles.pillBody,
+          { backgroundColor: C.white, borderColor: C.border },
+        ]}
+      >
+        <ThemedText
+          style={[styles.pillLabel, { color: textColor }]}
+          numberOfLines={1}
+        >
           {label}
         </ThemedText>
 
         {/* 👇 image tag takes precedence */}
         {badgeImg ? (
-          <Image source={badgeImg} style={{ height: 22, aspectRatio: 3.7, marginRight: 8, width: undefined }} />
+          <Image
+            source={badgeImg}
+            style={{
+              height: 22,
+              aspectRatio: 3.7,
+              marginRight: 8,
+              width: undefined,
+            }}
+          />
         ) : badgeText ? (
-          <View style={[styles.badgePill, { backgroundColor: badgeColor + '22', borderColor: badgeColor }]}>
-            <ThemedText style={[styles.badgePillText, { color: badgeColor }]}>{badgeText}</ThemedText>
+          <View
+            style={[
+              styles.badgePill,
+              { backgroundColor: badgeColor + "22", borderColor: badgeColor },
+            ]}
+          >
+            <ThemedText style={[styles.badgePillText, { color: badgeColor }]}>
+              {badgeText}
+            </ThemedText>
           </View>
         ) : null}
 
@@ -481,7 +594,6 @@ const OptionPillCard = ({
     </TouchableOpacity>
   );
 };
-
 
 /* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
@@ -495,47 +607,64 @@ const styles = StyleSheet.create({
   },
 
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'android' ? 8 : 2,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: Platform.OS === "android" ? 8 : 2,
     paddingBottom: 6,
   },
-  headerTitle: { flex: 1, fontSize: 22, fontWeight: '400' },
-  headerIcons: { flexDirection: 'row', gap: 12 },
+  headerTitle: { flex: 1, fontSize: 22, fontWeight: "400" },
+  headerIcons: { flexDirection: "row", gap: 12 },
   headerIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
   headerBadge: {
-    position: 'absolute',
+    position: "absolute",
     right: -2,
     top: -4,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 3,
     borderWidth: 1,
   },
-  headerBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  headerBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   /* Profile */
-  profileRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 12 },
-  profileImg: { width: 61, height: 61, borderRadius: 35, marginRight: 12, borderWidth: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center' },
-  name: { fontSize: 14.5, fontWeight: '800' },
-  verifyPill: { marginLeft: 8, backgroundColor: '#FACC15', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  profileImg: {
+    width: 61,
+    height: 61,
+    borderRadius: 35,
+    marginRight: 12,
+    borderWidth: 2,
+  },
+  nameRow: { flexDirection: "row", alignItems: "center" },
+  name: { fontSize: 14.5, fontWeight: "800" },
+  verifyPill: {
+    marginLeft: 8,
+    backgroundColor: "#FACC15",
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  locationRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
   locationText: { fontSize: 10, marginRight: 4, opacity: 0.95 },
 
   /* Wallet card + holding bar */
@@ -543,65 +672,80 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
-  walletLabel: { fontSize: 12, marginBottom: 4, opacity: 0.9, paddingBottom: 15 },
-  walletAmount: { fontSize: 26, fontWeight: '900', letterSpacing: 0.2, paddingBottom: 25 },
-  viewWalletBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginTop: 45 },
-  viewWalletText: { fontSize: 10, color: '#fff', fontWeight: '700' },
+  walletLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+    opacity: 0.9,
+    paddingBottom: 15,
+  },
+  walletAmount: {
+    fontSize: 26,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+    paddingBottom: 25,
+  },
+  viewWalletBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 45,
+  },
+  viewWalletText: { fontSize: 10, color: "#fff", fontWeight: "700" },
   loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingBottom: 25,
   },
 
   // Loading overlay styles
   loadingOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 1000,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   loadingSubtext: {
     marginTop: 8,
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   // Error overlay styles
   errorOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 32,
     zIndex: 1000,
   },
   errorTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorMessage: {
     fontSize: 14,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 20,
   },
   retryButton: {
@@ -612,7 +756,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   holdingBar: {
     opacity: 0.95,
@@ -623,7 +767,7 @@ const styles = StyleSheet.create({
     marginTop: -10,
     zIndex: 1,
   },
-  holdingText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  holdingText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 
   /* Primary button */
   primaryBtn: {
@@ -631,25 +775,25 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingVertical: 17,
     borderRadius: 15,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  primaryBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '400' },
+  primaryBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "400" },
 
   /* Pill option card */
   pillWrap: {
-    position: 'relative',
+    position: "relative",
     height: 64,
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
     // shadowOffset: { width: 0, height: 2 },
     // elevation: 2,
   },
   pillLeft: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
@@ -657,11 +801,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderBottomLeftRadius: 20,
     paddingLeft: 15,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   pillIcon: { width: 24, height: 24 },
   pillBody: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     bottom: 0,
     left: 50,
@@ -669,12 +813,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingLeft: 20,
     zIndex: 1,
   },
-  pillLabel: { flex: 1, fontSize: 14, fontWeight: '500' },
+  pillLabel: { flex: 1, fontSize: 14, fontWeight: "500" },
 
   badgePill: {
     borderRadius: 999,
@@ -683,7 +827,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginRight: 8,
   },
-  badgePillText: { fontSize: 10, fontWeight: '700' },
+  badgePillText: { fontSize: 10, fontWeight: "700" },
 
   /* Section title */
   sectionTitle: {
@@ -691,7 +835,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginHorizontal: 18,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 
   /* Delete account */
@@ -701,10 +845,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  disabledText: { color: '#A1A8B0', fontWeight: '700' },
-   iconRow: { flexDirection: "row" },
+  disabledText: { color: "#A1A8B0", fontWeight: "700" },
+  iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
 
