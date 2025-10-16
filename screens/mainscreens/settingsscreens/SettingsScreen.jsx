@@ -157,7 +157,6 @@ const SettingsScreen = () => {
   console.log("❌ Has error:", error);
   console.log("🔄 Is refreshing:", refreshing);
 
-  const IMG_SUB_ACTIVE = require("../../../assets/Group 115.png");
 
   // Main section (match screenshot)
   const menuMain = [
@@ -178,7 +177,6 @@ const SettingsScreen = () => {
       label: "Subscriptions",
       img: require("../../../assets/Vector (12).png"),
       leftColor: "#62E53E",
-      badgeImg: IMG_SUB_ACTIVE,
     },
     {
       key: "promoted",
