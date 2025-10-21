@@ -128,14 +128,20 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
       </View>
 
       {/* benefits */}
-      <View style={{ marginTop: 10 }}>
-        {features.length > 0 ? (
-          features.map((feature, i) => (
-            <Bullet key={`${item.id}-f${i}`} label={feature} />
-          ))
-        ) : (
-          <Bullet label="Basic features included" />
-        )}
+      <View style={{ marginTop: 10, flex: 1, maxHeight: 200 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: 4 }}
+          nestedScrollEnabled={true}
+        >
+          {features.length > 0 ? (
+            features.map((feature, i) => (
+              <Bullet key={`${item.id}-f${i}`} label={feature} />
+            ))
+          ) : (
+            <Bullet label="Basic features included" />
+          )}
+        </ScrollView>
       </View>
 
       {/* footer action */}
@@ -564,6 +570,7 @@ const walletAmount =
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.scroller}
+          style={styles.horizontalScrollView}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -668,14 +675,26 @@ const styles = StyleSheet.create({
   },
   title: { textAlign: "center", fontSize: 18, fontWeight: "600" },
 
+  horizontalScrollView: {
+    flex: 1,
+  },
   scroller: {
     paddingVertical: 18,
     alignItems: "flex-start",
     gap: 16,
     marginTop: 150,
+    paddingHorizontal: 0,
   },
 
-  card: { width: CARD_W, borderRadius: 30, padding: 16, marginHorizontal: 2 },
+  card: { 
+    width: CARD_W, 
+    borderRadius: 30, 
+    padding: 16, 
+    marginHorizontal: 8,
+    flexShrink: 0,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
   planTitle: { color: "#2A1611", fontSize: 50, marginBottom: 8 },
 
   priceWrap: {
@@ -870,11 +889,12 @@ const styles = StyleSheet.create({
 
   /* Loading and Error States */
   loadingContainer: {
-    flex: 1,
+    width: CARD_W,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 40,
     paddingHorizontal: 32,
+    marginHorizontal: 8,
   },
   loadingText: {
     marginTop: 16,
@@ -882,11 +902,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   errorContainer: {
-    flex: 1,
+    width: CARD_W,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 40,
     paddingHorizontal: 32,
+    marginHorizontal: 8,
   },
   errorText: {
     fontSize: 18,
@@ -906,11 +927,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   emptyContainer: {
-    flex: 1,
+    width: CARD_W,
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 40,
     paddingHorizontal: 32,
+    marginHorizontal: 8,
   },
   emptyText: {
     fontSize: 18,
