@@ -175,6 +175,10 @@ const API_ENDPOINTS = {
     Get_loyaltiy_Setting: `${API_DOMAIN}/seller/loyalty/settings`, // GET
     Update_loyaltiy_Setting: `${API_DOMAIN}/seller/loyalty/settings`, // POST
 
+    Phone_Requests: `${API_DOMAIN}/seller/phone-requests`, // GET
+    Approve_Phone_Request: (id) => `${API_DOMAIN}/seller/phone-requests/${id}/approve`, // POST
+    Decline_Phone_Request: (id) => `${API_DOMAIN}/seller/phone-requests/${id}/decline`, // POST
+    Phone_Visibility: `${API_DOMAIN}/seller/settings/phone-visibility`, // GET, POST
 
   },
   GENERAL: {

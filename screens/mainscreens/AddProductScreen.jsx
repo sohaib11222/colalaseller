@@ -2076,26 +2076,28 @@ function CategoriesSheet({
               </ThemedText>
             </View>
           ) : (
-            categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                onPress={() => onSelect(category.id)}
-                style={[
-                  styles.sheetRow,
-                  { borderColor: C.line, backgroundColor: "#F3F4F6" },
-                ]}
-                activeOpacity={0.9}
-              >
-                <ThemedText style={{ color: C.text }}>
-                  {category.title}
-                </ThemedText>
-                {category.products_count > 0 && (
-                  <ThemedText style={{ color: C.sub, fontSize: 12 }}>
-                    {category.products_count} products
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  onPress={() => onSelect(category.id)}
+                  style={[
+                    styles.sheetRow,
+                    { borderColor: C.line, backgroundColor: "#F3F4F6" },
+                  ]}
+                  activeOpacity={0.9}
+                >
+                  <ThemedText style={{ color: C.text }}>
+                    {category.title}
                   </ThemedText>
-                )}
-              </TouchableOpacity>
-            ))
+                  {category.products_count > 0 && (
+                    <ThemedText style={{ color: C.sub, fontSize: 12 }}>
+                      {category.products_count} products
+                    </ThemedText>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           )}
         </View>
       </View>
