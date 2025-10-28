@@ -10,14 +10,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Modal,
-  Dimensions,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { Video, ResizeMode } from "expo-av";
-import { Linking } from "react-native";
 import ThemedText from "../../../components/ThemedText";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
@@ -26,7 +23,6 @@ import { StatusBar } from "expo-status-bar";
 import { getFAQs } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
-import { WebView } from "react-native-webview";
 
 
 export default function FAQsScreen() {
@@ -34,6 +30,7 @@ export default function FAQsScreen() {
   // const { theme } = useTheme();
   const { token } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState("video"); // "video" or "faqs"
 
   // const C = useMemo(
   //   () => ({
@@ -70,11 +67,6 @@ export default function FAQsScreen() {
   });
 
   const [openId, setOpenId] = useState(null);
-  const [videoModalVisible, setVideoModalVisible] = useState(false);
-  const [currentVideoUrl, setCurrentVideoUrl] = useState(null);
-  const [videoStatus, setVideoStatus] = useState({});
-  const [isVideoLoading, setIsVideoLoading] = useState(false);
-  const [playInline, setPlayInline] = useState(false);
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
@@ -100,10 +92,13 @@ export default function FAQsScreen() {
     return match ? match[1] : null;
   };
 
-  // Build embeddable YouTube URL
-  const toYouTubeEmbedUrl = (url) => {
-    const id = extractYouTubeId(url);
-    return id ? `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&controls=1` : null;
+  // Get YouTube thumbnail URL
+  const getYouTubeThumbnail = (url) => {
+    const videoId = extractYouTubeId(url);
+    if (videoId) {
+      return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    }
+    return null;
   };
 
   // Check if URL is a YouTube video
@@ -111,29 +106,29 @@ export default function FAQsScreen() {
     return extractYouTubeId(url) !== null;
   };
 
-  // Check if URL is a direct video file
-  const isDirectVideoFile = (url) => {
-    if (!url) return false;
-    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
-    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
-  };
-
-  // Handle video status updates
-  const onVideoStatusUpdate = (status) => {
-    setVideoStatus(status);
-    setIsVideoLoading(false);
-  };
-
-  // Handle video loading
-  const onVideoLoadStart = () => {
-    setIsVideoLoading(true);
-  };
-
-  // Handle video error
-  const onVideoError = (error) => {
-    console.error('Video playback error:', error);
-    setIsVideoLoading(false);
-    Alert.alert('Video Error', 'Failed to load video. Please try again.');
+  // Handle video play - opens in YouTube app or browser
+  const handleVideoPlay = async (videoUrl) => {
+    try {
+      console.log("Opening video:", videoUrl);
+      const supported = await Linking.canOpenURL(videoUrl);
+      
+      if (supported) {
+        await Linking.openURL(videoUrl);
+      } else {
+        Alert.alert(
+          "Cannot Open Video",
+          "Unable to open the video. Please try again later.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      console.error("Error opening video:", error);
+      Alert.alert(
+        "Error",
+        "Failed to open video. Please try again later.",
+        [{ text: "OK" }]
+      );
+    }
   };
 
   return (
@@ -161,6 +156,67 @@ export default function FAQsScreen() {
 
           <View style={{ width: 40, height: 40 }} />
         </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            selectedTab === "video" && styles.tabButtonActive,
+          ]}
+          onPress={() => setSelectedTab("video")}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name="play-circle" 
+            size={18} 
+            color={selectedTab === "video" ? C.primary : C.sub} 
+          />
+          <ThemedText
+            style={[
+              styles.tabText,
+              { color: selectedTab === "video" ? C.primary : C.sub },
+              selectedTab === "video" && { fontWeight: "600" },
+            ]}
+          >
+            Video FAQs
+          </ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            selectedTab === "faqs" && styles.tabButtonActive,
+          ]}
+          onPress={() => setSelectedTab("faqs")}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name="document-text" 
+            size={18} 
+            color={selectedTab === "faqs" ? C.primary : C.sub} 
+          />
+          <ThemedText
+            style={[
+              styles.tabText,
+              { color: selectedTab === "faqs" ? C.primary : C.sub },
+              selectedTab === "faqs" && { fontWeight: "600" },
+            ]}
+          >
+            FAQs
+          </ThemedText>
+          {faqsList.length > 0 && (
+            <View style={[
+              styles.tabBadge,
+              selectedTab === "faqs" && styles.tabBadgeActive,
+            ]}>
+              <ThemedText style={styles.tabBadgeText}>
+                {faqsList.length}
+              </ThemedText>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -206,113 +262,91 @@ export default function FAQsScreen() {
           </View>
         )}
 
-        {/* Content */}
-        {!isLoading && !error && (
-          <>
-            {/* Video banner */}
-            {categoryData?.video && (
-              <View style={[styles.videoCard, shadow(4)]}>
-                {playInline ? (
-                  <>
-                    {isYouTubeVideo(categoryData.video) ? (
-                      <WebView
-                        source={{ uri: toYouTubeEmbedUrl(categoryData.video) }}
-                        style={styles.videoImage}
-                        javaScriptEnabled
-                        domStorageEnabled
-                        allowsInlineMediaPlayback
-                        mediaPlaybackRequiresUserAction={false}
-                        onLoadStart={() => setIsVideoLoading(true)}
-                        onLoadEnd={() => setIsVideoLoading(false)}
-                        onError={() => {
-                          setIsVideoLoading(false);
-                          Alert.alert('Video Error', 'Failed to load YouTube video.');
-                        }}
+        {/* Video FAQs Tab Content */}
+        {selectedTab === "video" && (
+          <View style={{ marginTop: 12 }}>
+            {categoryData?.video ? (
+              <TouchableOpacity 
+                style={[styles.videoCard, shadow(4)]}
+                onPress={() => handleVideoPlay(categoryData.video)}
+                activeOpacity={0.9}
+              >
+                <Image
+                  source={{
+                    uri: getYouTubeThumbnail(categoryData.video) || categoryData.video,
+                  }}
+                  style={styles.videoImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.playOverlay}>
+                  <Ionicons name="play" size={26} color="#fff" />
+                </View>
+                {isYouTubeVideo(categoryData.video) && (
+                  <View style={styles.youtubeIndicator}>
+                    <Ionicons name="logo-youtube" size={20} color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              !isLoading && !error && (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="videocam-off-outline" size={48} color={C.sub} style={{ marginBottom: 12 }} />
+                  <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+                    No video FAQs available
+                  </ThemedText>
+                  <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+                    Check back later for video tutorials.
+                  </ThemedText>
+                </View>
+              )
+            )}
+          </View>
+        )}
+
+        {/* Text FAQs Tab Content */}
+        {selectedTab === "faqs" && (
+          <View style={{ marginTop: 12 }}>
+            {faqsList.length > 0 ? (
+              faqsList.map((item) => {
+                const open = item.id === openId;
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.card,
+                      { backgroundColor: C.card, borderColor: C.line },
+                      open && { borderColor: C.primary, backgroundColor: "#fff" },
+                    ]}
+                  >
+                    <TouchableOpacity
+                      onPress={() => setOpenId(open ? null : item.id)}
+                      activeOpacity={0.85}
+                      style={styles.cardHead}
+                    >
+                      <ThemedText style={[styles.cardTitle, { color: C.text }]}>
+                        {item.question}
+                      </ThemedText>
+                      <Ionicons
+                        name={open ? "chevron-down" : "chevron-forward"}
+                        size={18}
+                        color={C.text}
                       />
-                    ) : (
-                      <Video
-                        source={{ uri: categoryData.video }}
-                        style={styles.videoImage}
-                        resizeMode={ResizeMode.CONTAIN}
-                        shouldPlay={true}
-                        isLooping={false}
-                        onLoadStart={() => setIsVideoLoading(true)}
-                        onError={onVideoError}
-                        onPlaybackStatusUpdate={onVideoStatusUpdate}
-                      />
-                    )}
-                    {isVideoLoading && (
-                      <View style={styles.videoLoadingContainer}>
-                        <ActivityIndicator size="large" color="#fff" />
-                        <ThemedText style={styles.videoLoadingText}>Loading video...</ThemedText>
+                    </TouchableOpacity>
+
+                    {open && (
+                      <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+                        <ThemedText style={[styles.answerText, { color: C.sub }]}>
+                          {item.answer}
+                        </ThemedText>
                       </View>
                     )}
-                  </>
-                ) : (
-                  <>
-                    <Image
-                      source={{
-                        uri: `https://img.youtube.com/vi/${extractYouTubeId(categoryData.video)}/maxresdefault.jpg`,
-                      }}
-                      style={styles.videoImage}
-                    />
-                    <View style={styles.playOverlay}>
-                      <Ionicons name="play" size={26} color="#fff" />
-                    </View>
-                    <TouchableOpacity
-                      style={styles.videoTouchable}
-                      onPress={() => {
-                        setCurrentVideoUrl(categoryData.video);
-                        setPlayInline(true);
-                      }}
-                    />
-                  </>
-                )}
-              </View>
-            )}
-
-            {/* FAQ list */}
-            <View style={{ marginTop: 12 }}>
-              {faqsList.length > 0 ? (
-                faqsList.map((item) => {
-                  const open = item.id === openId;
-                  return (
-                    <View
-                      key={item.id}
-                      style={[
-                        styles.card,
-                        { backgroundColor: C.card, borderColor: C.line },
-                        open && { borderColor: C.primary },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        onPress={() => setOpenId(open ? null : item.id)}
-                        activeOpacity={0.85}
-                        style={styles.cardHead}
-                      >
-                        <ThemedText style={[styles.cardTitle, { color: C.text }]}>
-                          {item.question}
-                        </ThemedText>
-                        <Ionicons
-                          name={open ? "chevron-down" : "chevron-forward"}
-                          size={18}
-                          color={C.text}
-                        />
-                      </TouchableOpacity>
-
-                      {open && (
-                        <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
-                          <ThemedText style={[styles.answerText, { color: C.sub }]}>
-                            {item.answer}
-                          </ThemedText>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })
-              ) : (
+                  </View>
+                );
+              })
+            ) : (
+              !isLoading && !error && (
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="help-circle-outline" size={48} color={C.sub} />
+                  <Ionicons name="document-text-outline" size={48} color={C.sub} style={{ marginBottom: 12 }} />
                   <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
                     No FAQs available
                   </ThemedText>
@@ -320,69 +354,11 @@ export default function FAQsScreen() {
                     Check back later for frequently asked questions.
                   </ThemedText>
                 </View>
-              )}
-            </View>
-          </>
+              )
+            )}
+          </View>
         )}
       </ScrollView>
-
-      {/* Video Modal */}
-      <Modal
-        visible={videoModalVisible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        onRequestClose={() => setVideoModalVisible(false)}
-      >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-          <View style={styles.videoModalHeader}>
-            <TouchableOpacity
-              onPress={() => setVideoModalVisible(false)}
-              style={styles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          
-          {currentVideoUrl && (
-            <View style={styles.videoContainer}>
-              {isVideoLoading && (
-                <View style={styles.videoLoadingContainer}>
-                  <ActivityIndicator size="large" color="#fff" />
-                  <ThemedText style={styles.videoLoadingText}>Loading video...</ThemedText>
-                </View>
-              )}
-
-              {isYouTubeVideo(currentVideoUrl) ? (
-                <WebView
-                  source={{ uri: toYouTubeEmbedUrl(currentVideoUrl) }}
-                  style={styles.videoPlayer}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  allowsInlineMediaPlayback
-                  mediaPlaybackRequiresUserAction={false}
-                  onLoadStart={() => setIsVideoLoading(true)}
-                  onLoadEnd={() => setIsVideoLoading(false)}
-                  onError={() => {
-                    setIsVideoLoading(false);
-                    Alert.alert('Video Error', 'Failed to load YouTube video.');
-                  }}
-                />
-              ) : (
-                <Video
-                  source={{ uri: currentVideoUrl }}
-                  style={styles.videoPlayer}
-                  resizeMode={ResizeMode.CONTAIN}
-                  shouldPlay={true}
-                  isLooping={false}
-                  onLoadStart={onVideoLoadStart}
-                  onError={onVideoError}
-                  onPlaybackStatusUpdate={onVideoStatusUpdate}
-                />
-              )}
-            </View>
-          )}
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -454,13 +430,6 @@ const styles = StyleSheet.create({
     marginLeft: -28,
     marginTop: -28,
   },
-  videoTouchable: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
 
   card: {
     borderRadius: 14,
@@ -528,46 +497,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Video modal styles
-  videoModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#000',
-  },
-  closeButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  videoContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  videoPlayer: {
-    width: '100%',
-    height: '100%',
-  },
-  videoLoadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    zIndex: 1,
-  },
-  videoLoadingText: {
-    color: '#fff',
-    marginTop: 12,
-    fontSize: 16,
-  },
-
   // Empty state styles
   emptyContainer: {
     flex: 1,
@@ -593,5 +522,67 @@ const styles = StyleSheet.create({
   answerText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+
+  // Tab styles
+  tabsContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECEEF2",
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#F5F6F8",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ECEEF2",
+    gap: 6,
+  },
+  tabButtonActive: {
+    backgroundColor: "#FFF0F0",
+    borderColor: "#E53E3E",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  tabBadge: {
+    backgroundColor: "#6C727A",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    minWidth: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tabBadgeActive: {
+    backgroundColor: "#E53E3E",
+  },
+  tabBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  // YouTube indicator
+  youtubeIndicator: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 0, 0, 0.8)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

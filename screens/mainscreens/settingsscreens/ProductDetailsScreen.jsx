@@ -932,9 +932,9 @@ function ViewProductModal(props) {
                 ref={videoRef}
                 source={{ uri: currentItem.uri }}
                 style={styles.heroImg}
-                useNativeControls
                 resizeMode="cover"
-                shouldPlay={false}
+                shouldPlay={true}
+                isLooping
                 onPlaybackStatusUpdate={(status) => {
                   if (status.isLoaded) {
                     setIsVideoPlaying(status.isPlaying);
