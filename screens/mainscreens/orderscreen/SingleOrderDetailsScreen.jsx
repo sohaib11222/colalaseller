@@ -1058,7 +1058,7 @@ function TrackOrderModal({
 function StoreBlock({ C, detail, onOpenTracker }) {
   const navigation = useNavigation();
   const styles = useMemo(() => makeStyles(C), [C]);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const items = detail?.items || [];
   console.log("detail", detail);
