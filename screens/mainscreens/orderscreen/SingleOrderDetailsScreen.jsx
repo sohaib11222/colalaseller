@@ -11,6 +11,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -22,7 +23,7 @@ import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { getToken } from "../../../utils/tokenStorage";
 import { apiCall } from "../../../utils/customApiCall";
 import { API_ENDPOINTS } from "../../../apiConfig";
-import { markForDelivery, verifyCode } from "../../../utils/mutations/orders";
+import { markForDelivery, verifyCode, acceptOrder, rejectOrder } from "../../../utils/mutations/orders";
 
 /* ---------- helpers (UI preserved) ---------- */
 const currency = (n) => `₦${Number(n).toLocaleString()}`;
@@ -1054,8 +1055,252 @@ function TrackOrderModal({
   );
 }
 
+/* ===================== Accept Order Modal ===================== */
+function AcceptOrderModal({ visible, onClose, C, detail, onAccept, isLoading }) {
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryMethod, setDeliveryMethod] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+
+  const handleAccept = () => {
+    if (!deliveryFee) {
+      Alert.alert("Error", "Please enter delivery fee");
+      return;
+    }
+
+    onAccept({
+      delivery_fee: parseFloat(deliveryFee),
+      estimated_delivery_date: deliveryDate || null,
+      delivery_method: deliveryMethod || null,
+      delivery_notes: deliveryNotes || null,
+    });
+  };
+
+  const styles = useMemo(() => makeStyles(C), [C]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalBackdrop}
+          onPress={onClose}
+        />
+        <View style={[styles.modalContent, { backgroundColor: C.card }]}>
+          <View style={styles.modalHeader}>
+            <ThemedText style={[styles.modalTitle, { color: C.text }]}>
+              Accept Order
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} hitSlop={HITSLOP}>
+              <Ionicons name="close" size={24} color={C.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: C.text }]}>
+                  Delivery Fee <ThemedText style={{ color: "#EF4444" }}>*</ThemedText>
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { borderColor: C.line, color: C.text }]}
+                  placeholder="Enter delivery fee"
+                  placeholderTextColor={C.sub}
+                  value={deliveryFee}
+                  onChangeText={setDeliveryFee}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: C.text }]}>
+                  Estimated Delivery Date
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { borderColor: C.line, color: C.text }]}
+                  placeholder="YYYY-MM-DD (optional)"
+                  placeholderTextColor={C.sub}
+                  value={deliveryDate}
+                  onChangeText={setDeliveryDate}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: C.text }]}>
+                  Delivery Method
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, { borderColor: C.line, color: C.text }]}
+                  placeholder="e.g., Express, Standard (optional)"
+                  placeholderTextColor={C.sub}
+                  value={deliveryMethod}
+                  onChangeText={setDeliveryMethod}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: C.text }]}>
+                  Delivery Notes
+                </ThemedText>
+                <TextInput
+                  style={[
+                    styles.textArea,
+                    { borderColor: C.line, color: C.text },
+                  ]}
+                  placeholder="Additional notes (optional)"
+                  placeholderTextColor={C.sub}
+                  value={deliveryNotes}
+                  onChangeText={setDeliveryNotes}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { borderColor: C.line }]}
+              onPress={onClose}
+              disabled={isLoading}
+            >
+              <ThemedText style={{ color: C.text }}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitBtn, { backgroundColor: C.primary }]}
+              onPress={handleAccept}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                  Accept Order
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+/* ===================== Reject Order Modal ===================== */
+function RejectOrderModal({ visible, onClose, C, detail, onReject, isLoading }) {
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  const handleReject = () => {
+    if (!rejectionReason.trim()) {
+      Alert.alert("Error", "Please provide a reason for rejection");
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Rejection",
+      "Are you sure you want to reject this order?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reject",
+          style: "destructive",
+          onPress: () => {
+            onReject({ rejection_reason: rejectionReason.trim() });
+          },
+        },
+      ]
+    );
+  };
+
+  const styles = useMemo(() => makeStyles(C), [C]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.modalOverlay}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalBackdrop}
+          onPress={onClose}
+        />
+        <View style={[styles.modalContent, { backgroundColor: C.card }]}>
+          <View style={styles.modalHeader}>
+            <ThemedText style={[styles.modalTitle, { color: C.text }]}>
+              Reject Order
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} hitSlop={HITSLOP}>
+              <Ionicons name="close" size={24} color={C.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalBody}>
+            <ThemedText style={[styles.inputLabel, { color: C.text }]}>
+              Rejection Reason <ThemedText style={{ color: "#EF4444" }}>*</ThemedText>
+            </ThemedText>
+            <TextInput
+              style={[
+                styles.textArea,
+                { borderColor: C.line, color: C.text },
+              ]}
+              placeholder="Please provide a reason for rejecting this order..."
+              placeholderTextColor={C.sub}
+              value={rejectionReason}
+              onChangeText={setRejectionReason}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
+          </View>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, { borderColor: C.line }]}
+              onPress={onClose}
+              disabled={isLoading}
+            >
+              <ThemedText style={{ color: C.text }}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.submitBtn,
+                { backgroundColor: "#EF4444" },
+              ]}
+              onPress={handleReject}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                  Reject Order
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 /* ===================== Expandable Store Block ===================== */
-function StoreBlock({ C, detail, onOpenTracker }) {
+function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject }) {
   const navigation = useNavigation();
   const styles = useMemo(() => makeStyles(C), [C]);
   const [expanded, setExpanded] = useState(false);
@@ -1206,12 +1451,14 @@ function StoreBlock({ C, detail, onOpenTracker }) {
               </ThemedText>
             </View>
 
-            <TouchableOpacity
-              style={[styles.trackBtn, { backgroundColor: C.primary }]}
-              onPress={onOpenTracker}
-            >
-              <ThemedText style={styles.trackTxt}>Track Order</ThemedText>
-            </TouchableOpacity>
+            {!isPending && (
+              <TouchableOpacity
+                style={[styles.trackBtn, { backgroundColor: C.primary }]}
+                onPress={onOpenTracker}
+              >
+                <ThemedText style={styles.trackTxt}>Track Order</ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         ))}
 
@@ -1328,6 +1575,33 @@ function StoreBlock({ C, detail, onOpenTracker }) {
             {expanded ? "Collapse" : "Expand"}
           </ThemedText>
         </TouchableOpacity>
+
+        {/* Accept/Reject buttons for pending orders */}
+        {isPending && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={onReject}
+              style={[styles.rejectBtn, { borderColor: "#EF4444" }]}
+            >
+              <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
+              <ThemedText style={{ color: "#EF4444", fontWeight: "600", marginLeft: 8 }}>
+                Reject Order
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={onAccept}
+              style={[styles.acceptBtn, { backgroundColor: C.primary }]}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+              <ThemedText style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
+                Accept Order
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -1363,6 +1637,8 @@ export default function SingleOrderDetailsScreen() {
   const styles = useMemo(() => makeStyles(C), [C]);
 
   const selectedId = String(route.params?.orderId ?? "");
+  const isPending = route.params?.isPending ?? false;
+  const queryClient = useQueryClient();
 
   // Debug function to validate chat_id extraction
   const validateChatId = (detail) => {
@@ -1436,10 +1712,52 @@ export default function SingleOrderDetailsScreen() {
   const STATUS = ["Order placed", "Out for delivery", "Delivered", "Completed"];
   const [activeFilter, setActiveFilter] = useState("all"); // "all", "placed", "out_for_delivery", "delivered", "completed"
   const [trackOpen, setTrackOpen] = useState(false);
+  const [acceptModalOpen, setAcceptModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  
+  // Check if order is actually pending
+  const orderStatus = detail?.status || "";
+  const isOrderPending = isPending || orderStatus === "pending" || orderStatus === "Pending";
 
   // Get current status from order_tracking
   const currentStatus = getCurrentStatus(detail?.order_tracking);
   const currentStatusIndex = statusIndex(currentStatus);
+
+  // Accept order mutation
+  const acceptOrderMutation = useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      return await acceptOrder(selectedId, payload, token);
+    },
+    onSuccess: () => {
+      Alert.alert("Success", "Order accepted successfully!");
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders", "detail", selectedId] });
+      setAcceptModalOpen(false);
+      navigation.goBack();
+    },
+    onError: (error) => {
+      Alert.alert("Error", error?.message || "Failed to accept order");
+    },
+  });
+
+  // Reject order mutation
+  const rejectOrderMutation = useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      return await rejectOrder(selectedId, payload, token);
+    },
+    onSuccess: () => {
+      Alert.alert("Success", "Order rejected successfully!");
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders", "detail", selectedId] });
+      setRejectModalOpen(false);
+      navigation.goBack();
+    },
+    onError: (error) => {
+      Alert.alert("Error", error?.message || "Failed to reject order");
+    },
+  });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1547,6 +1865,9 @@ export default function SingleOrderDetailsScreen() {
               C={C}
               detail={detail}
               onOpenTracker={() => setTrackOpen(true)}
+              isPending={isOrderPending}
+              onAccept={() => setAcceptModalOpen(true)}
+              onReject={() => setRejectModalOpen(true)}
             />
           );
         })()}
@@ -1562,6 +1883,26 @@ export default function SingleOrderDetailsScreen() {
         orderId={selectedId}
         onOpenChat={openChat}
         detail={detail}
+      />
+
+      {/* Accept Order Modal */}
+      <AcceptOrderModal
+        visible={acceptModalOpen}
+        onClose={() => setAcceptModalOpen(false)}
+        C={C}
+        detail={detail}
+        onAccept={acceptOrderMutation.mutate}
+        isLoading={acceptOrderMutation.isPending}
+      />
+
+      {/* Reject Order Modal */}
+      <RejectOrderModal
+        visible={rejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        C={C}
+        detail={detail}
+        onReject={rejectOrderMutation.mutate}
+        isLoading={rejectOrderMutation.isPending}
       />
     </SafeAreaView>
   );
@@ -2042,6 +2383,116 @@ function makeStyles(C) {
       fontSize: 12,
       textAlign: "center",
       lineHeight: 20,
+    },
+
+    /* Accept/Reject Action Buttons */
+    actionButtons: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 16,
+      paddingHorizontal: 12,
+    },
+    acceptBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      ...shadow(4),
+    },
+    rejectBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 12,
+      borderWidth: 2,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "transparent",
+    },
+
+    /* Modal Styles */
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.4)",
+    },
+    modalContent: {
+      maxHeight: "85%",
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      ...shadow(20),
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: C.line || "#ECEDEF",
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    modalBody: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    modalFooter: {
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 20,
+      borderTopWidth: 1,
+      borderTopColor: C.line || "#ECEDEF",
+    },
+    inputGroup: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      marginBottom: 8,
+    },
+    input: {
+      height: 48,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      fontSize: 14,
+    },
+    textArea: {
+      minHeight: 100,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      fontSize: 14,
+    },
+    cancelBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    submitBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      ...shadow(4),
     },
   });
 }

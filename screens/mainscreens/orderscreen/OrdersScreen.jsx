@@ -30,9 +30,40 @@ const OrdersScreen = ({ navigation }) => {
     card: "#fff",
   };
 
-  const [tab, setTab] = useState("new"); // 'new' | 'completed'
+  const [tab, setTab] = useState("pending"); // 'pending' | 'all'
   const [q, setQ] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+
+  // ---- API: fetch pending orders ----
+  const { 
+    data: pendingData, 
+    isLoading: pendingLoading, 
+    error: pendingError, 
+    refetch: refetchPending 
+  } = useQuery({
+    queryKey: ["orders", "pending"],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await OrderQueries.getPendingOrders(token);
+      const orders = res?.data?.orders ?? res?.data?.data ?? [];
+      
+      return orders.map((it) => {
+        const itemsCount = Array.isArray(it?.items) ? it.items.length : 0;
+        const totalRaw = it?.subtotal_with_shipping ?? it?.items_subtotal ?? 0;
+        
+        return {
+          id: String(it?.id ?? ""),
+          customer: it?.customer?.name ?? "Customer",
+          items: itemsCount,
+          total: Number(totalRaw || 0),
+          status: "pending",
+          _raw: it,
+        };
+      });
+    },
+    enabled: tab === "pending",
+    staleTime: 30_000,
+  });
 
   // ---- API: fetch all orders (new + completed) ----
   const { 
@@ -82,6 +113,7 @@ const OrdersScreen = ({ navigation }) => {
 
       return { newRows, completedRows };
     },
+    enabled: tab === "all",
     staleTime: 30_000,
   });
 
@@ -91,7 +123,11 @@ const OrdersScreen = ({ navigation }) => {
     setRefreshing(true);
     try {
       console.log("🔄 Refreshing orders data...");
-      await refetch();
+      if (tab === "pending") {
+        await refetchPending();
+      } else {
+        await refetch();
+      }
       console.log("✅ Orders data refreshed successfully");
     } catch (error) {
       console.error("❌ Error refreshing orders data:", error);
@@ -103,18 +139,19 @@ const OrdersScreen = ({ navigation }) => {
 
   const listNew = apiData?.newRows ?? [];
   const listCompleted = apiData?.completedRows ?? [];
+  const listPending = pendingData ?? [];
+  const allOrders = [...listNew, ...listCompleted];
 
   // Keep the same search behavior: filter by "customer" (hardcoded) or id
-  const source = tab === "new" ? listNew : listCompleted;
+  const source = tab === "pending" ? listPending : allOrders;
   const orders = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return source;
     return source.filter(
       (o) =>
-        o.status === tab &&
-        (o.customer.toLowerCase().includes(term) || String(o.id).toLowerCase().includes(term))
+        o.customer.toLowerCase().includes(term) || String(o.id).toLowerCase().includes(term)
     );
-  }, [q, tab, source]);
+  }, [q, source]);
 
   const formatNaira = (n) => `₦${Number(n || 0).toLocaleString()}`;
 
@@ -169,7 +206,10 @@ const OrdersScreen = ({ navigation }) => {
       onPress={() =>
         navigation?.navigate?.("ChatNavigator", {
           screen: "SingleOrderDetails",
-          params: { orderId: item.id }, // store order id
+          params: { 
+            orderId: item.id, // store order id
+            isPending: tab === "pending" // Pass whether it's a pending order
+          },
         })
       }
     >
@@ -235,34 +275,34 @@ const OrdersScreen = ({ navigation }) => {
       {/* Tabs */}
       <View style={styles.tabsWrap}>
         <TouchableOpacity
-          onPress={() => setTab("new")}
+          onPress={() => setTab("pending")}
           style={[
             styles.tabBtn,
-            tab === "new" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
+            tab === "pending" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
           ]}
         >
-          <ThemedText style={[styles.tabTxt, { color: tab === "new" ? "#fff" : "#6B7280" }]}>
-            New
+          <ThemedText style={[styles.tabTxt, { color: tab === "pending" ? "#fff" : "#6B7280" }]}>
+            Pending
           </ThemedText>
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setTab("completed")}
+          onPress={() => setTab("all")}
           style={[
             styles.tabBtn,
-            tab === "completed" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
+            tab === "all" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
           ]}
         >
-          <ThemedText style={[styles.tabTxt, { color: tab === "completed" ? "#fff" : "#6B7280" }]}>
-            Completed
+          <ThemedText style={[styles.tabTxt, { color: tab === "all" ? "#fff" : "#6B7280" }]}>
+            All Orders
           </ThemedText>
         </TouchableOpacity>
       </View>
 
       {/* List */}
-      {isLoading && !apiData ? (
+      {(tab === "pending" ? pendingLoading : isLoading) && !(tab === "pending" ? pendingData : apiData) ? (
         <LoadingState />
-      ) : error ? (
+      ) : (tab === "pending" ? pendingError : error) ? (
         <ErrorState />
       ) : (
         <FlatList
@@ -289,9 +329,9 @@ const OrdersScreen = ({ navigation }) => {
           ListEmptyComponent={() => (
             <EmptyState 
               message={
-                tab === "new" 
-                  ? "No new orders at the moment. Check back later!" 
-                  : "No completed orders yet. Complete some orders to see them here!"
+                tab === "pending" 
+                  ? "No pending orders at the moment. Check back later!" 
+                  : "No orders yet. Complete some orders to see them here!"
               }
             />
           )}

@@ -1,5 +1,6 @@
 // screens/payments/SubscriptionScreen.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { Animated } from "react-native";
 import {
   View,
   StyleSheet,
@@ -74,12 +75,18 @@ const Bullet = ({ label }) => (
 );
 
 /* plan card */
-function PlanCard({ item, isActive, onPress, onCancel }) {
+function PlanCard({ item, isActive, onPress, onCancel, billingPeriod = "monthly" }) {
   // Map API data to display format
   const planTitle = item.name;
-  const planPrice = item.price === "0.00" ? "Free" : `N${parseFloat(item.price).toLocaleString()}`;
+  
+  // Calculate price based on billing period
+  const basePrice = parseFloat(item.price || 0);
+  const calculatedPrice = billingPeriod === "yearly" ? basePrice * 12 : basePrice;
+  const planPrice = basePrice === 0 ? "Free" : `N${calculatedPrice.toLocaleString()}`;
+  
   const planCurrency = item.currency;
-  const planDuration = item.duration_days;
+  const planDuration = billingPeriod === "yearly" ? 365 : item.duration_days;
+  const planDurationText = billingPeriod === "yearly" ? "365 days" : `${planDuration} days`;
 
   // Convert features object to array
   const features = item.features ? Object.values(item.features) : [];
@@ -124,7 +131,7 @@ function PlanCard({ item, isActive, onPress, onCancel }) {
           colors={gradients.priceGrad}
           style={styles.priceTxt}
         />
-        <ThemedText style={styles.perTxt}>/{planDuration} days</ThemedText>
+        <ThemedText style={styles.perTxt}>/{planDurationText}</ThemedText>
       </View>
 
       {/* benefits */}
@@ -362,6 +369,18 @@ export default function SubscriptionScreen() {
   const [showPay, setShowPay] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("wallet");
+  const [billingPeriod, setBillingPeriod] = useState("monthly"); // 'monthly' or 'yearly'
+  const toggleAnimation = useRef(new Animated.Value(0)).current;
+
+  // Animate toggle when billing period changes
+  useEffect(() => {
+    Animated.spring(toggleAnimation, {
+      toValue: billingPeriod === "yearly" ? 1 : 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+  }, [billingPeriod]);
 
   // Navigation handler for Flutterwave Top Up
   const handleTopUpNavigation = () => {
@@ -565,6 +584,62 @@ const walletAmount =
           <View style={{ width: 40, height: 20 }} />
         </View>
 
+        {/* Billing Period Toggle */}
+        <View style={styles.toggleContainer}>
+          <ThemedText style={[
+            styles.toggleLabel, 
+            { 
+              color: billingPeriod === "monthly" ? theme.colors.primary : theme.colors.muted,
+              fontWeight: billingPeriod === "monthly" ? "700" : "500",
+            }
+          ]}>
+            Monthly
+          </ThemedText>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => setBillingPeriod(billingPeriod === "monthly" ? "yearly" : "monthly")}
+            style={[
+              styles.toggleSwitch,
+              { borderColor: theme.colors.primary },
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.toggleThumb,
+                {
+                  transform: [
+                    {
+                      translateX: toggleAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [2, 22],
+                      }),
+                    },
+                  ],
+                },
+                billingPeriod === "yearly" && { backgroundColor: "#fff" },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.toggleBackground,
+                {
+                  opacity: toggleAnimation,
+                  backgroundColor: theme.colors.primary,
+                },
+              ]}
+            />
+          </TouchableOpacity>
+          <ThemedText style={[
+            styles.toggleLabel, 
+            { 
+              color: billingPeriod === "yearly" ? theme.colors.primary : theme.colors.muted,
+              fontWeight: billingPeriod === "yearly" ? "700" : "500",
+            }
+          ]}>
+            Yearly
+          </ThemedText>
+        </View>
+
         {/* cards */}
         <ScrollView
           horizontal
@@ -623,6 +698,7 @@ const walletAmount =
                   isActive={isPlanActive(plan.id)}
                   onPress={() => handlePlanSelect(plan)}
                   onCancel={subscription && isPlanActive(plan.id) ? handleCancelSubscription : null}
+                  billingPeriod={billingPeriod}
                 />
               ))}
               <View style={{ width: 18 }} />
@@ -658,6 +734,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: -10,
     paddingTop: 50,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 10,
+    gap: 12,
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    minWidth: 60,
+    textAlign: "center",
+  },
+  toggleSwitch: {
+    width: 56,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E5E7EB",
+    borderWidth: 2,
+    justifyContent: "center",
+    paddingHorizontal: 2,
+    position: "relative",
+    overflow: "hidden",
+  },
+  toggleBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 14,
+  },
+  toggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    ...shadow(4),
+    zIndex: 10,
   },
   backBtn: {
     width: 37,

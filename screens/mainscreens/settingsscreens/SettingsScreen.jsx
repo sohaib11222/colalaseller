@@ -173,6 +173,12 @@ const SettingsScreen = () => {
       leftColor: "#E53EE2",
     },
     {
+      key: "visitors",
+      label: "Store Visitors",
+      img: require("../../../assets/Vector (11).png"),
+      leftColor: "#3E86E5",
+    },
+    {
       key: "subscriptions",
       label: "Subscriptions",
       img: require("../../../assets/Vector (12).png"),
@@ -244,6 +250,7 @@ const SettingsScreen = () => {
     const map = {
       myProducts: ["SettingsNavigator", { screen: "MyProducts" }],
       analytics: ["ChatNavigator", { screen: "Analytics" }],
+      visitors: ["ChatNavigator", { screen: "Visitors" }],
       subscriptions: ["ChatNavigator", { screen: "Subscription" }],
       promoted: ["ChatNavigator", { screen: "PromotedProducts" }],
       coupons: ["ChatNavigator", { screen: "Coupons" }],

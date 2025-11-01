@@ -40,3 +40,15 @@ export const markForDelivery = async (id, token) =>
 // Verify delivery code (backend likely POST too)
 export const verifyCode = async (id, code, token) =>
   apiCall(API_ENDPOINTS.ORDERS.Verify_Code(id), "POST", { code }, token);
+
+// Accept order
+export const acceptOrder = async (storeOrderId, payload, token) =>
+  apiCall(API_ENDPOINTS.ORDERS.Accept_Order(storeOrderId), "POST", payload, token);
+
+// Reject order
+export const rejectOrder = async (storeOrderId, payload, token) =>
+  apiCall(API_ENDPOINTS.ORDERS.Reject_Order(storeOrderId), "POST", payload, token);
+
+// Update delivery details
+export const updateDeliveryDetails = async (storeOrderId, payload, token) =>
+  apiCall(API_ENDPOINTS.ORDERS.Update_Delivery(storeOrderId), "PUT", payload, token);

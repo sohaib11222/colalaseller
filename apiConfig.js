@@ -184,6 +184,11 @@ const API_ENDPOINTS = {
   },
   ORDERS: {
     Get_All_Orders: `${API_DOMAIN}/seller/orders`, // GET
+    Get_Pending_Orders: `${API_DOMAIN}/seller/store-orders/pending`, // GET
+    Accept_Order: (storeOrderId) => `${API_DOMAIN}/seller/store-orders/${storeOrderId}/accept`, // POST
+    Reject_Order: (storeOrderId) => `${API_DOMAIN}/seller/store-orders/${storeOrderId}/reject`, // POST
+    Update_Delivery: (storeOrderId) => `${API_DOMAIN}/seller/store-orders/${storeOrderId}/delivery`, // PUT
+    Acceptance_Stats: `${API_DOMAIN}/seller/store-orders/acceptance-stats`, // GET
     Order_Detail: (id) => `${API_DOMAIN}/seller/orders/${id}`,
     Mark_For_Delivery: (id) => `${API_DOMAIN}/seller/orders/${id}/out-for-deliver`,
     Verify_Code: (id) => `${API_DOMAIN}/seller/orders/${id}/delivered`,
@@ -204,6 +209,11 @@ const API_ENDPOINTS = {
   },
   LEADERBOARD: {
     Sellers: `${API_DOMAIN}/leaderboard/sellers`, // GET
+  },
+  VISITORS: {
+    Get_Visitors: `${API_DOMAIN}/seller/visitors`, // GET
+    Get_Visitor_Activity: (userId) => `${API_DOMAIN}/seller/visitors/${userId}/activity`, // GET
+    Start_Chat: (userId) => `${API_DOMAIN}/seller/visitors/${userId}/start-chat`, // POST
   },
 };
 
