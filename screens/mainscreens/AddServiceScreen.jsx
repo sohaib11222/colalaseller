@@ -69,17 +69,15 @@ export default function AddServiceScreen({ navigation, route }) {
   const [fullDesc, setFullDesc] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
 
-  // price range (modal)
-  const [priceOpen, setPriceOpen] = useState(false);
+  // starting from price
   const [priceFrom, setPriceFrom] = useState("");
-  const [priceTo, setPriceTo] = useState("");
 
   // category modal
   const [catOpen, setCatOpen] = useState(false);
 
   // sub-services table (7 rows like your mock)
   const [subservices, setSubservices] = useState(
-    Array.from({ length: 7 }, () => ({ name: "", from: "", to: "" }))
+    Array.from({ length: 7 }, () => ({ name: "", from: "" }))
   );
 
   // Debug logging for edit mode
@@ -100,7 +98,6 @@ export default function AddServiceScreen({ navigation, route }) {
       setFullDesc(serviceData.full_description || "");
       setDiscountPrice(serviceData.discount_price || "");
       setPriceFrom(serviceData.price_from || "");
-      setPriceTo(serviceData.price_to || "");
 
       // Populate media
       if (serviceData.media && serviceData.media.length > 0) {
@@ -125,13 +122,12 @@ export default function AddServiceScreen({ navigation, route }) {
       if (serviceData.sub_services && serviceData.sub_services.length > 0) {
         const populatedSubServices = serviceData.sub_services.map(sub => ({
           name: sub.name || "",
-          from: sub.price_from || "",
-          to: sub.price_to || ""
+          from: sub.price_from || ""
         }));
         
         // Fill remaining slots with empty objects
         const remainingSlots = 7 - populatedSubServices.length;
-        const emptySlots = Array.from({ length: remainingSlots }, () => ({ name: "", from: "", to: "" }));
+        const emptySlots = Array.from({ length: remainingSlots }, () => ({ name: "", from: "" }));
         
         setSubservices([...populatedSubServices, ...emptySlots]);
       }
@@ -295,16 +291,14 @@ export default function AddServiceScreen({ navigation, route }) {
     // For edit mode, only require basic fields
     name.trim().length > 0 &&
     category && // category is now an ID (number), so just check if it exists
-    priceFrom.trim().length > 0 &&
-    priceTo.trim().length > 0
+    priceFrom.trim().length > 0
   ) : (
     // For create mode, require video and images
     !!video &&
     images.length >= 3 &&
     name.trim().length > 0 &&
     category && // category is now an ID (number), so just check if it exists
-    priceFrom.trim().length > 0 &&
-    priceTo.trim().length > 0
+    priceFrom.trim().length > 0
   );
 
   // Debug logging for validation
@@ -314,7 +308,6 @@ export default function AddServiceScreen({ navigation, route }) {
     name: name.trim().length > 0,
     category: !!category,
     priceFrom: priceFrom.trim().length > 0,
-    priceTo: priceTo.trim().length > 0,
     video: !!video,
     images: images.length,
     requiredImages: isEdit ? "N/A" : ">= 3"
@@ -373,9 +366,6 @@ export default function AddServiceScreen({ navigation, route }) {
       }
       if (priceFrom.trim()) {
         formData.append("price_from", parseFloat(priceFrom));
-      }
-      if (priceTo.trim()) {
-        formData.append("price_to", parseFloat(priceTo));
       }
       if (discountPrice.trim()) {
         formData.append("discount_price", parseFloat(discountPrice));
@@ -474,12 +464,6 @@ export default function AddServiceScreen({ navigation, route }) {
             formData.append(
               `sub_services[${index}][price_from]`,
               parseFloat(sub.from)
-            );
-          }
-          if (sub.to.trim()) {
-            formData.append(
-              `sub_services[${index}][price_to]`,
-              parseFloat(sub.to)
             );
           }
         });
@@ -760,16 +744,11 @@ export default function AddServiceScreen({ navigation, route }) {
           style={{ marginTop: 10 }}
         />
 
-        <PickerField
-          label={
-            priceFrom && priceTo
-              ? `₦${Number(priceFrom || 0).toLocaleString()} - ₦${Number(
-                  priceTo || 0
-                ).toLocaleString()}`
-              : "Price range"
-          }
-          empty={!(priceFrom && priceTo)}
-          onPress={() => setPriceOpen(true)}
+        <Field
+          value={priceFrom}
+          onChangeText={setPriceFrom}
+          placeholder="Starting From Price"
+          keyboardType="numeric"
           C={C}
           style={{ marginTop: 10 }}
         />
@@ -800,9 +779,9 @@ export default function AddServiceScreen({ navigation, route }) {
             marginBottom: 6,
           }}
         >
-          <ThemedText style={{ color: C.text, width: "52%" }}>Name</ThemedText>
-          <ThemedText style={{ color: C.text, width: "48%" }}>
-            Price Range
+          <ThemedText style={{ color: C.text, width: "58%" }}>Name</ThemedText>
+          <ThemedText style={{ color: C.text, width: "42%" }}>
+            Starting From
           </ThemedText>
         </View>
 
@@ -813,7 +792,7 @@ export default function AddServiceScreen({ navigation, route }) {
           >
             <MiniField
               C={C}
-              style={{ flex: 0.8}}
+              style={{ flex: 1 }}
               value={row.name}
               onChangeText={(v) =>
                 setSubservices((list) =>
@@ -822,30 +801,18 @@ export default function AddServiceScreen({ navigation, route }) {
               }
               placeholder="Subservice name"
             />
-            <View style={{ flex: 1, flexDirection: "row", gap: 10 }}>
-              <MiniField
-                C={C}
-                keyboardType="numeric"
-                value={row.from}
-                onChangeText={(v) =>
-                  setSubservices((list) =>
-                    list.map((r, i) => (i === idx ? { ...r, from: v } : r))
-                  )
-                }
-                placeholder="From"
-              />
-              <MiniField
-                C={C}
-                keyboardType="numeric"
-                value={row.to}
-                onChangeText={(v) =>
-                  setSubservices((list) =>
-                    list.map((r, i) => (i === idx ? { ...r, to: v } : r))
-                  )
-                }
-                placeholder="To"
-              />
-            </View>
+            <MiniField
+              C={C}
+              style={{ flex: 0.75 }}
+              keyboardType="numeric"
+              value={row.from}
+              onChangeText={(v) =>
+                setSubservices((list) =>
+                  list.map((r, i) => (i === idx ? { ...r, from: v } : r))
+                )
+              }
+              placeholder="Price"
+            />
           </View>
         ))}
 
@@ -886,16 +853,6 @@ export default function AddServiceScreen({ navigation, route }) {
         categories={categories}
         isLoading={categoriesLoading}
         error={categoriesError}
-        C={C}
-      />
-
-      <PriceRangeSheet
-        visible={priceOpen}
-        onClose={() => setPriceOpen(false)}
-        from={priceFrom}
-        to={priceTo}
-        setFrom={setPriceFrom}
-        setTo={setPriceTo}
         C={C}
       />
     </SafeAreaView>
@@ -1079,83 +1036,6 @@ function CategorySheet({
   );
 }
 
-function PriceRangeSheet({ visible, onClose, from, to, setFrom, setTo, C }) {
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <View style={styles.sheetOverlay}>
-        <View style={[styles.priceSheet, { backgroundColor: "#fff" }]}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <ThemedText
-              font="oleo"
-              style={[styles.sheetTitle, { color: C.text }]}
-            >
-              Price Range
-            </ThemedText>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.sheetClose, { borderColor: C.line }]}
-            >
-              <Ionicons name="close" size={18} color={C.text} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 14 }}>
-            <View
-              style={[
-                styles.fieldWrap,
-                { flex: 1, backgroundColor: C.card, borderColor: C.line },
-              ]}
-            >
-              <TextInput
-                placeholder="From"
-                placeholderTextColor="#9BA0A6"
-                keyboardType="numeric"
-                style={[styles.input, { color: C.text }]}
-                value={from}
-                onChangeText={setFrom}
-              />
-            </View>
-            <View
-              style={[
-                styles.fieldWrap,
-                { flex: 1, backgroundColor: C.card, borderColor: C.line },
-              ]}
-            >
-              <TextInput
-                placeholder="To"
-                placeholderTextColor="#9BA0A6"
-                keyboardType="numeric"
-                style={[styles.input, { color: C.text }]}
-                value={to}
-                onChangeText={setTo}
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={onClose}
-            activeOpacity={0.9}
-            style={[
-              styles.applyBtn,
-              { backgroundColor: C.primary, marginTop: 16 },
-            ]}
-          >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-              Save
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 /* --------------------------------- styles ---------------------------------- */
 
 const styles = StyleSheet.create({
@@ -1255,11 +1135,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: "85%",
   },
-  priceSheet: {
-    padding: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
   sheetHandle: {
     alignSelf: "center",
     width: 68,
@@ -1298,12 +1173,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-  },
-  applyBtn: {
-    height: 50,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
   },
 });

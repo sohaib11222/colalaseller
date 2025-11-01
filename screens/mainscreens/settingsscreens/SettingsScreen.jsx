@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -19,14 +20,16 @@ import { useTheme } from "../../../components/ThemeProvider";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 //Code Related to the integration
-import { getBalance, getEscrowWallet } from "../../../utils/queries/settings";
-import { useQuery } from "@tanstack/react-query";
+import { getBalance, getEscrowWallet, getPhoneRequests, getPhoneVisibility } from "../../../utils/queries/settings";
+import { updatePhoneVisibility } from "../../../utils/mutations/settings";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user, token, logout } = useAuth();
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
 
   const C = useMemo(
@@ -94,20 +97,84 @@ const SettingsScreen = () => {
     },
   });
 
+  // Fetch phone requests data using React Query
+  const {
+    data: phoneRequestsData,
+    isLoading: phoneRequestsLoading,
+    error: phoneRequestsError,
+    refetch: refetchPhoneRequests,
+  } = useQuery({
+    queryKey: ["phoneRequests", token],
+    queryFn: () => {
+      console.log("🚀 Executing getPhoneRequests API call with token:", token);
+      return getPhoneRequests(token);
+    },
+    enabled: !!token,
+    onSuccess: (data) => {
+      console.log("✅ Phone requests API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Phone requests API call failed:", error);
+    },
+  });
+
+  // Fetch phone visibility data using React Query
+  const {
+    data: phoneVisibilityData,
+    isLoading: phoneVisibilityLoading,
+    error: phoneVisibilityError,
+    refetch: refetchPhoneVisibility,
+  } = useQuery({
+    queryKey: ["phoneVisibility", token],
+    queryFn: () => {
+      console.log("🚀 Executing getPhoneVisibility API call with token:", token);
+      return getPhoneVisibility(token);
+    },
+    enabled: !!token,
+    onSuccess: (data) => {
+      console.log("✅ Phone visibility API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Phone visibility API call failed:", error);
+    },
+  });
+
+  // Mutation for updating phone visibility
+  const updatePhoneVisibilityMutation = useMutation({
+    mutationFn: ({ is_phone_visible, token }) => 
+      updatePhoneVisibility({ is_phone_visible, token }),
+    onSuccess: (data) => {
+      console.log("✅ Phone visibility updated successfully:", data);
+      // Invalidate and refetch phone visibility data
+      queryClient.invalidateQueries(["phoneVisibility"]);
+      Alert.alert("Success", data?.message || "Phone visibility updated successfully");
+    },
+    onError: (error) => {
+      console.error("❌ Phone visibility update failed:", error);
+      Alert.alert("Error", error?.message || "Failed to update phone visibility");
+    },
+  });
+
   // Handle pull-to-refresh
   const onRefresh = async () => {
-    console.log("🔄 Starting balance and escrow pull-to-refresh...");
+    console.log("🔄 Starting balance, escrow, phone requests, and phone visibility pull-to-refresh...");
     setRefreshing(true);
     try {
-      console.log("🔄 Refreshing balance and escrow data...");
-      await Promise.all([refetchBalance(), refetchEscrow()]);
-      console.log("✅ Balance and escrow data refreshed successfully");
+      console.log("🔄 Refreshing balance, escrow, phone requests, and phone visibility data...");
+      await Promise.all([refetchBalance(), refetchEscrow(), refetchPhoneRequests(), refetchPhoneVisibility()]);
+      console.log("✅ Balance, escrow, phone requests, and phone visibility data refreshed successfully");
     } catch (error) {
-      console.error("❌ Error refreshing balance and escrow data:", error);
+      console.error("❌ Error refreshing data:", error);
     } finally {
       setRefreshing(false);
-      console.log("🔄 Balance and escrow pull-to-refresh completed");
+      console.log("🔄 Pull-to-refresh completed");
     }
+  };
+
+  // Handle phone visibility toggle
+  const handlePhoneVisibilityToggle = (newValue) => {
+    console.log("📱 Toggling phone visibility to:", newValue);
+    updatePhoneVisibilityMutation.mutate({ is_phone_visible: newValue, token });
   };
 
   // Handle logout with confirmation
@@ -142,6 +209,14 @@ const SettingsScreen = () => {
   const rewardBalance = balanceData?.data?.reward_balance || 0;
   const loyaltyPoints = balanceData?.data?.loyality_points || 0;
 
+  // Calculate pending phone requests count
+  const phoneRequests = phoneRequestsData?.data?.requests || [];
+  const pendingPhoneRequestsCount = phoneRequests.filter(req => req.is_revealed === 0).length;
+
+  // Extract phone visibility status
+  const isPhoneVisible = phoneVisibilityData?.data?.is_phone_visible || false;
+  const storePhone = phoneVisibilityData?.data?.store_phone || "";
+
   // Combined loading and error states
   const isLoading = balanceLoading || escrowLoading;
   const error = balanceError || escrowError;
@@ -156,6 +231,13 @@ const SettingsScreen = () => {
   console.log("⏳ Is loading:", isLoading);
   console.log("❌ Has error:", error);
   console.log("🔄 Is refreshing:", refreshing);
+  
+  // Debug logging for phone requests
+  console.log("📱 Phone Requests Data:", phoneRequestsData);
+  console.log("📱 Phone Requests Array:", phoneRequests);
+  console.log("📱 Pending Phone Requests Count:", pendingPhoneRequestsCount);
+  console.log("📱 Phone Requests Loading:", phoneRequestsLoading);
+  console.log("📱 Phone Requests Error:", phoneRequestsError);
 
 
   // Main section (match screenshot)
@@ -243,6 +325,13 @@ const SettingsScreen = () => {
       img: require("../../../assets/Vector (15).png"),
       leftColor: "#fff",
     },
+    {
+      key: "phoneRequests",
+      label: "Pending Phone Reveal Request",
+      leftColor: "#fff",
+      img: require("../../../assets/Headset.png"),
+      countBadge: pendingPhoneRequestsCount,
+    },
   ];
 
   const onPressRow = (key) => {
@@ -263,6 +352,7 @@ const SettingsScreen = () => {
       sellerLeaderboard: ["ChatNavigator", { screen: "SellerLeaderBoard" }],
       savedCards: ["ChatNavigator", { screen: "SavedCards" }],
       accessControl: ["ChatNavigator", { screen: "AccessControl" }],
+      phoneRequests: ["ChatNavigator", { screen: "PhoneRequests" }],
 
       wallet: ["ChatNavigator", { screen: "ShoppingWallet" }],
       holdingWallet: ["ChatNavigator", { screen: "EscrowWallet" }],
@@ -457,9 +547,54 @@ const SettingsScreen = () => {
               img={item.img}
               leftColor={item.leftColor}
               onPress={() => onPressRow(item.key)}
+              countBadge={item.countBadge}
               C={C}
             />
           ))}
+
+          {/* Phone Visibility Toggle */}
+          <View style={styles.pillWrap}>
+            <View style={[styles.pillLeft, { backgroundColor: "#fff" }]}>
+              <Image 
+                source={require("../../../assets/phone.jpg")} 
+                style={styles.pillIcon} 
+                resizeMode="contain" 
+              />
+            </View>
+            <View
+              style={[
+                styles.pillBody,
+                { backgroundColor: C.white, borderColor: C.border },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <ThemedText
+                  style={[styles.pillLabel, { color: C.text, marginTop: 10 }]}
+                  numberOfLines={2}
+                >
+                  Allow people to view my phone number
+                </ThemedText>
+                {storePhone && (
+                  <ThemedText
+                    style={{
+                      fontSize: 11,
+                      color: C.sub,
+                      marginTop: 1,
+                    }}
+                  >
+                  </ThemedText>
+                )}
+              </View>
+              <Switch
+                value={isPhoneVisible}
+                onValueChange={handlePhoneVisibilityToggle}
+                trackColor={{ false: "#D1D5DB", true: C.primary }}
+                thumbColor={isPhoneVisible ? "#fff" : "#f4f3f4"}
+                ios_backgroundColor="#D1D5DB"
+                disabled={updatePhoneVisibilityMutation.isPending}
+              />
+            </View>
+          </View>
         </View>
 
         {/* Logout */}
@@ -545,8 +680,16 @@ const OptionPillCard = ({
   badgeText,
   badgeColor = "#22C55E",
   badgeImg, // 👈 NEW
+  countBadge, // 👈 For displaying count in left icon area
   C,
 }) => {
+  // Debug logging for countBadge
+  if (label === "Pending Phone Reveal Request") {
+    console.log("🔍 OptionPillCard - label:", label);
+    console.log("🔍 OptionPillCard - countBadge:", countBadge);
+    console.log("🔍 OptionPillCard - countBadge !== undefined:", countBadge !== undefined);
+  }
+  
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -554,7 +697,17 @@ const OptionPillCard = ({
       style={styles.pillWrap}
     >
       <View style={[styles.pillLeft, { backgroundColor: leftColor }]}>
-        <Image source={img} style={styles.pillIcon} resizeMode="contain" />
+        {countBadge !== undefined ? (
+          // Display count number in the icon area
+          <View style={styles.countBadgeContainer}>
+            <ThemedText style={styles.countBadgeText}>
+              {countBadge}
+            </ThemedText>
+          </View>
+        ) : (
+          // Display normal icon
+          <Image source={img} style={styles.pillIcon} resizeMode="contain" />
+        )}
       </View>
 
       <View
@@ -809,6 +962,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pillIcon: { width: 24, height: 24 },
+  countBadgeContainer: {
+    flex: 1,
+    // alignItems: "center",
+    marginLeft:5,
+    justifyContent: "center",
+  },
+  countBadgeText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#F04438",
+  },
   pillBody: {
     position: "absolute",
     top: 0,

@@ -1303,7 +1303,7 @@ function RejectOrderModal({ visible, onClose, C, detail, onReject, isLoading }) 
 function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject }) {
   const navigation = useNavigation();
   const styles = useMemo(() => makeStyles(C), [C]);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   const items = detail?.items || [];
   console.log("detail", detail);

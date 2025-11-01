@@ -141,3 +141,51 @@ export const sendMessage = async ({ id, payload, token }) =>
 //Loyaltiy
 export const updateLoyaltiySetting = async ({ payload, token }) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Update_loyaltiy_Setting, "POST", payload, token);
+
+
+//Phone Requests
+export const approvePhoneRequest = async ({ id, token }) => {
+  console.log("Approve Phone Request - ID:", id);
+  console.log("Approve Phone Request - Token:", token);
+  console.log("Approve Phone Request - URL:", API_ENDPOINTS.SETTINGS.Approve_Phone_Request(id));
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Approve_Phone_Request(id), "POST", undefined, token);
+    console.log("Approve Phone Request - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Approve Phone Request - Error:", error);
+    throw error;
+  }
+};
+
+export const declinePhoneRequest = async ({ id, token }) => {
+  console.log("Decline Phone Request - ID:", id);
+  console.log("Decline Phone Request - Token:", token);
+  console.log("Decline Phone Request - URL:", API_ENDPOINTS.SETTINGS.Decline_Phone_Request(id));
+  try {
+    const result = await apiCall(API_ENDPOINTS.SETTINGS.Decline_Phone_Request(id), "POST", undefined, token);
+    console.log("Decline Phone Request - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Decline Phone Request - Error:", error);
+    throw error;
+  }
+};
+
+export const updatePhoneVisibility = async ({ is_phone_visible, token }) => {
+  console.log("Update Phone Visibility - is_phone_visible:", is_phone_visible);
+  console.log("Update Phone Visibility - Token:", token);
+  try {
+    const result = await apiCall(
+      API_ENDPOINTS.SETTINGS.Phone_Visibility, 
+      "POST", 
+      { is_phone_visible }, 
+      token
+    );
+    console.log("Update Phone Visibility - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Update Phone Visibility - Error:", error);
+    throw error;
+  }
+};

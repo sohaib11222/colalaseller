@@ -853,15 +853,33 @@ export default function StoreProfileModal({
             time: range,
           }));
         } else if (Array.isArray(oh)) {
-          hoursArr = oh.map((t, i) => ({ day: `Day ${i + 1}`, time: t }));
+          hoursArr = oh.map((item, i) => {
+            // If item is an object with day, open_time, close_time
+            if (typeof item === 'object' && item !== null) {
+              const dayName = item.day || `Day ${i + 1}`;
+              const timeRange = item.open_time && item.close_time 
+                ? `${item.open_time} - ${item.close_time}`
+                : item.open_time || item.close_time || '—';
+              return { day: dayName, time: timeRange };
+            }
+            // If item is just a string
+            return { day: `Day ${i + 1}`, time: String(item) };
+          });
         } else if (typeof oh === "string") {
           try {
             const parsed = JSON.parse(oh);
             if (Array.isArray(parsed)) {
-              hoursArr = parsed.map((t, i) => ({
-                day: `Day ${i + 1}`,
-                time: t,
-              }));
+              hoursArr = parsed.map((item, i) => {
+                // Handle object format in parsed JSON
+                if (typeof item === 'object' && item !== null) {
+                  const dayName = item.day || `Day ${i + 1}`;
+                  const timeRange = item.open_time && item.close_time 
+                    ? `${item.open_time} - ${item.close_time}`
+                    : item.open_time || item.close_time || '—';
+                  return { day: dayName, time: timeRange };
+                }
+                return { day: `Day ${i + 1}`, time: String(item) };
+              });
             }
           } catch (_) {
             // ignore
@@ -1127,10 +1145,10 @@ export default function StoreProfileModal({
         </View>
 
         <View style={{ marginTop: 8 }}>
-          {hours?.map((h) => (
-            <View key={h.day} style={addrStyles.hoursRow}>
-              <ThemedText style={addrStyles.hoursDay}>{h.day}</ThemedText>
-              <ThemedText style={addrStyles.hoursTime}>{h.time}</ThemedText>
+          {hours?.map((h, index) => (
+            <View key={`${h.day}-${index}`} style={addrStyles.hoursRow}>
+              <ThemedText style={addrStyles.hoursDay}>{h?.day || '—'}</ThemedText>
+              <ThemedText style={addrStyles.hoursTime}>{h?.time || '—'}</ThemedText>
             </View>
           ))}
         </View>
@@ -1185,14 +1203,14 @@ export default function StoreProfileModal({
                           </ThemedText>
                         </View>
                       )}
-                      <TouchableOpacity
+                      {/* <TouchableOpacity
                         onPress={() => a.onViewMap?.(a)}
                         style={addrStyles.mapBtn}
                       >
                         <ThemedText style={addrStyles.mapBtnTxt}>
                           View on Map
                         </ThemedText>
-                      </TouchableOpacity>
+                      </TouchableOpacity> */}
                     </View>
                   </View>
 
@@ -1292,7 +1310,7 @@ export default function StoreProfileModal({
 
     hoursBox: {
       marginTop: 6,
-      backgroundColor: "#FFF4F4",
+      backgroundColor: "#E0E0E0",
       borderRadius: 12,
       padding: 10,
       borderWidth: 1,

@@ -80,3 +80,9 @@ export const addUserToStore = async (payload, token) => {
   }
 };
 
+export const getPhoneRequests = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Phone_Requests, "GET", undefined, token);
+
+export const getPhoneVisibility = async (token) =>
+  await apiCall(API_ENDPOINTS.SETTINGS.Phone_Visibility, "GET", undefined, token);
+
