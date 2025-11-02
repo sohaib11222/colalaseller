@@ -744,24 +744,26 @@ function TrackOrderModal({
                     Number(detail?.discount || 0)
                   )}`}</ThemedText>
                 </View>
-                <View
-                  style={[
-                    styles.infoRow,
-                    {
-                      borderTopWidth: 1,
-                      borderTopColor: C.line,
-                      marginTop: 8,
-                      paddingTop: 8,
-                    },
-                  ]}
-                >
-                  <ThemedText style={{ color: C.text }}>
-                    Delivery fee
-                  </ThemedText>
-                  <ThemedText style={{ color: C.primary }}>
-                    {currency(10000)}
-                  </ThemedText>
-                </View>
+                {detail?.shipping_fee && Number(detail.shipping_fee) > 0 && (
+                  <View
+                    style={[
+                      styles.infoRow,
+                      {
+                        borderTopWidth: 1,
+                        borderTopColor: C.line,
+                        marginTop: 8,
+                        paddingTop: 8,
+                      },
+                    ]}
+                  >
+                    <ThemedText style={{ color: C.text }}>
+                      Delivery fee
+                    </ThemedText>
+                    <ThemedText style={{ color: C.primary }}>
+                      {currency(detail.shipping_fee)}
+                    </ThemedText>
+                  </View>
+                )}
                 <View
                   style={[
                     styles.infoRow,
@@ -1321,7 +1323,8 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
   // Use actual API values, show 0 if not available
   const coupon = detail?.discount ? Number(detail.discount) : 0;
   const points = 0; // Not available in API, show 0
-  const fee = 10000; // Hardcoded delivery fee of 10,000
+  // Get shipping fee from API (only for non-pending orders)
+  const fee = isPending ? null : (detail?.shipping_fee ? Number(detail.shipping_fee) : 0);
   const totalPay =
     detail?.subtotal_with_shipping != null
       ? Number(detail.subtotal_with_shipping)
@@ -1555,7 +1558,9 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
                 right={`-${currency(points)}`}
                 topBorder
               />
-              <InfoRow left="Delivery fee" right={currency(fee)} topBorder />
+              {!isPending && fee !== null && (
+                <InfoRow left="Delivery fee" right={currency(fee)} topBorder />
+              )}
               <InfoRow
                 left="Total to pay"
                 right={currency(totalPay)}

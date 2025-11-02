@@ -35,6 +35,7 @@ import {
   uploadUtilityBill,
   setTheme,
   submitOnboarding,
+  submitHelpRequest,
 } from "../../utils/mutations/seller";
 import {
   storeOnboardingData,
@@ -159,6 +160,11 @@ export default function RegisterStoreScreen() {
 
   // ------------ Misc ------------
   const [showTerms, setShowTerms] = useState(false);
+  const [showHelpForm, setShowHelpForm] = useState(false);
+  const [showBenefitsModal, setShowBenefitsModal] = useState(false);
+  const [selectedService, setSelectedService] = useState("");
+  const [helpFee, setHelpFee] = useState("");
+  const [helpNotes, setHelpNotes] = useState("");
 
   const filteredLocations = allLocations.filter((c) =>
     c.toLowerCase().includes(locationSearch.toLowerCase())
@@ -746,13 +752,22 @@ export default function RegisterStoreScreen() {
               >
                 Level {level}
               </ThemedText>
-              <TouchableOpacity>
-                <ThemedText
-                  style={[styles.benefitsLink, { color: theme.colors.primary }]}
-                >
-                  View Benefits
-                </ThemedText>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => setShowHelpForm(true)}>
+                  <ThemedText
+                    style={[styles.benefitsLink, { color: theme.colors.primary }]}
+                  >
+                    Need Help?
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowBenefitsModal(true)}>
+                  <ThemedText
+                    style={[styles.benefitsLink, { color: theme.colors.primary }]}
+                  >
+                    View Benefits
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={styles.levelStepper}>
               {[...Array(stepsForLevel)].map((_, i) => {
@@ -1112,7 +1127,7 @@ export default function RegisterStoreScreen() {
                     }
                     filled={!!addressValue}
                   />
-                  <PickerRow
+                  {/* <PickerRow
                     label={
                       deliveryValue
                         ? "Delivery pricing set"
@@ -1124,7 +1139,7 @@ export default function RegisterStoreScreen() {
                       })
                     }
                     filled={!!deliveryValue}
-                  />
+                  /> */}
 
                   <ThemedText style={[styles.sectionTitle, { marginTop: 16 }]}>
                     Select a color that suits your brand and your store shall be
@@ -1403,6 +1418,31 @@ export default function RegisterStoreScreen() {
             </ThemedText>
           </View>
         </BottomSheet>
+
+        {/* Need Help Signing Up Form */}
+        <NeedHelpFormModal
+          visible={showHelpForm}
+          onClose={() => setShowHelpForm(false)}
+          theme={theme}
+          selectedService={selectedService}
+          setSelectedService={setSelectedService}
+          helpFee={helpFee}
+          setHelpFee={setHelpFee}
+          helpNotes={helpNotes}
+          setHelpNotes={setHelpNotes}
+          email={storeEmail}
+          phone={storePhone}
+          fullName={storeName}
+          onboardingToken={onboardingToken}
+        />
+
+        {/* Level Benefits Modal */}
+        <LevelBenefitsModal
+          visible={showBenefitsModal}
+          onClose={() => setShowBenefitsModal(false)}
+          level={level}
+          theme={theme}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -1445,6 +1485,422 @@ function RoundButton({ children, onPress, disabled }) {
     </TouchableOpacity>
   );
 }
+
+/* Level Benefits Modal */
+function LevelBenefitsModal({ visible, onClose, level, theme }) {
+  // Define benefits for each level
+  const levelBenefits = {
+    1: [
+      "Store Setup - Create your store profile with basic information",
+      "Basic Features - Access essential store management tools",
+      "Profile Customization - Add logo, banner, and store details",
+      "Category Selection - Choose your product categories",
+      "Social Media Links - Connect your social media profiles",
+    ],
+    2: [
+      "Business Verification - Verify your business credentials",
+      "Enhanced Features - Access advanced store management tools",
+      "Trust Badge - Display verified badge on your store",
+      "Document Upload - Secure document management",
+      "Business Credibility - Build customer trust",
+    ],
+    3: [
+      "Full Store Features - Access all platform features",
+      "Advanced Analytics - Track your store performance",
+      "Premium Support - Priority customer support",
+      "Physical Store Verification - Verify store location",
+      "Complete Store Setup - Fully functional store ready to sell",
+    ],
+  };
+
+  const benefits = levelBenefits[level] || levelBenefits[1];
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.benefitsModalOverlay}>
+        <View style={styles.benefitsModalContent}>
+          <View style={styles.benefitsModalHeader}>
+            <ThemedText style={[styles.benefitsModalTitle, { color: theme.colors.primary }]}>
+              Level {level} Benefits
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} style={styles.benefitsModalClose}>
+              <Ionicons name="close" size={24} color="#101318" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            style={{ maxHeight: 500 }}
+            contentContainerStyle={styles.benefitsList}
+          >
+            <ThemedText 
+              style={{ 
+                fontSize: 14, 
+                color: "#6C727A", 
+                marginBottom: 16,
+                lineHeight: 20 
+              }}
+            >
+              Complete Level {level} to unlock these benefits:
+            </ThemedText>
+
+            {benefits.map((benefit, index) => (
+              <View key={index} style={styles.benefitItem}>
+                <View style={styles.benefitIcon}>
+                  <Ionicons 
+                    name="checkmark-circle" 
+                    size={20} 
+                    color={theme.colors.primary} 
+                  />
+                </View>
+                <ThemedText style={styles.benefitText}>
+                  {benefit}
+                </ThemedText>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* Need Help Signing Up Form Modal */
+function NeedHelpFormModal({
+  visible,
+  onClose,
+  theme,
+  selectedService,
+  setSelectedService,
+  helpFee,
+  setHelpFee,
+  helpNotes,
+  setHelpNotes,
+  email,
+  phone,
+  fullName,
+  onboardingToken,
+}) {
+  const [showServicePicker, setShowServicePicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Form fields for contact details (pre-filled from registration or user can enter)
+  const [formEmail, setFormEmail] = useState(email || "");
+  const [formPhone, setFormPhone] = useState(phone || "");
+  const [formFullName, setFormFullName] = useState(fullName || "");
+
+  // Update form fields when props change
+  useEffect(() => {
+    if (email) setFormEmail(email);
+    if (phone) setFormPhone(phone);
+    if (fullName) setFormFullName(fullName);
+  }, [email, phone, fullName]);
+
+  const helpServices = [
+    { id: "store_setup", label: "Store Setup Assistance", fee: 5000 },
+    { id: "profile_media", label: "Profile & Media Upload", fee: 3000 },
+    { id: "business_docs", label: "Business Documentation", fee: 7000 },
+    { id: "store_config", label: "Store Configuration", fee: 4000 },
+    { id: "complete_setup", label: "Complete Setup Service", fee: 15000 },
+    { id: "custom", label: "Custom Service", fee: 0 },
+  ];
+
+  const handleSubmit = async () => {
+    if (!selectedService) {
+      Alert.alert("Error", "Please select a service");
+      return;
+    }
+
+    // Validate contact details
+    if (!formEmail.trim()) {
+      Alert.alert("Error", "Please enter your email address");
+      return;
+    }
+    
+    if (!formPhone.trim()) {
+      Alert.alert("Error", "Please enter your phone number");
+      return;
+    }
+    
+    if (!formFullName.trim()) {
+      Alert.alert("Error", "Please enter your full name");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formEmail.trim())) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    const service = helpServices.find((s) => s.id === selectedService);
+    const feeAmount = helpFee ? parseFloat(helpFee) : (service?.fee || 0);
+
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        service_type: selectedService,
+        email: formEmail.trim(),
+        phone: formPhone.trim(),
+        full_name: formFullName.trim(),
+        fee: feeAmount > 0 ? feeAmount : null,
+        notes: helpNotes.trim() || null,
+      };
+
+      const response = await submitHelpRequest(payload, onboardingToken);
+
+      if (response.status === "success" || response.status === true) {
+        Alert.alert(
+          "Request Submitted",
+          response.message || `Your help request for "${service?.label}" has been submitted. Our team will contact you shortly.${feeAmount > 0 ? `\n\nEstimated fee: ₦${feeAmount.toLocaleString()}` : ""}`,
+          [{ 
+            text: "OK", 
+            onPress: () => {
+              setSelectedService("");
+              setHelpFee("");
+              setHelpNotes("");
+              setFormEmail("");
+              setFormPhone("");
+              setFormFullName("");
+              onClose();
+            }
+          }]
+        );
+      } else {
+        Alert.alert(
+          "Error",
+          response.message || "Failed to submit help request. Please try again."
+        );
+      }
+    } catch (error) {
+      console.error("Submit help request error:", error);
+      Alert.alert(
+        "Error",
+        error.message || error.response?.data?.message || "Failed to submit help request. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Check if contact details are already filled from registration
+  const hasRegistrationDetails = email && phone && fullName;
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.helpFormOverlay}>
+        <View style={styles.helpFormContent}>
+          <View style={styles.helpFormHeader}>
+            <ThemedText style={[styles.helpFormTitle, { color: theme.colors.primary }]}>
+              Need Help Signing Up?
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} style={styles.helpFormClose}>
+              <Ionicons name="close" size={24} color="#101318" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+            <ThemedText style={styles.helpFormDescription}>
+              Our team can help you complete your store registration. Select a service below and we'll assist you.
+            </ThemedText>
+
+            {/* Contact Details - Show if not filled from registration */}
+            {!hasRegistrationDetails && (
+              <>
+                <View style={styles.helpFormField}>
+                  <ThemedText style={styles.helpFormLabel}>
+                    Full Name <ThemedText style={{ color: "#EF4444" }}>*</ThemedText>
+                  </ThemedText>
+                  <TextInput
+                    style={styles.helpFormInput}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#9AA0A6"
+                    value={formFullName}
+                    onChangeText={setFormFullName}
+                  />
+                </View>
+
+                <View style={styles.helpFormField}>
+                  <ThemedText style={styles.helpFormLabel}>
+                    Email Address <ThemedText style={{ color: "#EF4444" }}>*</ThemedText>
+                  </ThemedText>
+                  <TextInput
+                    style={styles.helpFormInput}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#9AA0A6"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={formEmail}
+                    onChangeText={setFormEmail}
+                  />
+                </View>
+
+                <View style={styles.helpFormField}>
+                  <ThemedText style={styles.helpFormLabel}>
+                    Phone Number <ThemedText style={{ color: "#EF4444" }}>*</ThemedText>
+                  </ThemedText>
+                  <TextInput
+                    style={styles.helpFormInput}
+                    placeholder="Enter your phone number"
+                    placeholderTextColor="#9AA0A6"
+                    keyboardType="phone-pad"
+                    value={formPhone}
+                    onChangeText={setFormPhone}
+                  />
+                </View>
+              </>
+            )}
+
+            {/* Service Selection */}
+            <View style={styles.helpFormField}>
+              <ThemedText style={styles.helpFormLabel}>
+                Select Service <ThemedText style={{ color: "#EF4444" }}>*</ThemedText>
+              </ThemedText>
+              <TouchableOpacity
+                style={styles.helpFormPicker}
+                onPress={() => setShowServicePicker(true)}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={[styles.helpFormPickerText, !selectedService && { color: "#9AA0A6" }]}>
+                  {selectedService
+                    ? helpServices.find((s) => s.id === selectedService)?.label
+                    : "Choose a service"}
+                </ThemedText>
+                <Ionicons name="chevron-down" size={20} color="#9AA0A6" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Optional Fee */}
+            {selectedService && (
+              <View style={styles.helpFormField}>
+                <ThemedText style={styles.helpFormLabel}>
+                  Service Fee (Optional)
+                </ThemedText>
+                <View style={styles.helpFormFeeContainer}>
+                  <ThemedText style={styles.helpFormFeePrefix}>₦</ThemedText>
+                  <TextInput
+                    style={styles.helpFormFeeInput}
+                    placeholder="Enter amount (optional)"
+                    placeholderTextColor="#9AA0A6"
+                    keyboardType="numeric"
+                    value={helpFee}
+                    onChangeText={setHelpFee}
+                  />
+                </View>
+                {selectedService && helpServices.find((s) => s.id === selectedService)?.fee > 0 && (
+                  <ThemedText style={styles.helpFormFeeHint}>
+                    Suggested fee: ₦{helpServices.find((s) => s.id === selectedService)?.fee?.toLocaleString() || 0}
+                  </ThemedText>
+                )}
+              </View>
+            )}
+
+            {/* Notes */}
+            <View style={styles.helpFormField}>
+              <ThemedText style={styles.helpFormLabel}>Additional Notes (Optional)</ThemedText>
+              <TextInput
+                style={styles.helpFormTextArea}
+                placeholder="Tell us what specific help you need..."
+                placeholderTextColor="#9AA0A6"
+                multiline
+                numberOfLines={4}
+                value={helpNotes}
+                onChangeText={setHelpNotes}
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[
+                styles.helpFormSubmit, 
+                { backgroundColor: theme.colors.primary },
+                isSubmitting && styles.helpFormSubmitDisabled
+              ]}
+              onPress={handleSubmit}
+              activeOpacity={0.9}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <ThemedText style={styles.helpFormSubmitText}>Submit Request</ThemedText>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Service Picker Modal */}
+          <Modal
+            visible={showServicePicker}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowServicePicker(false)}
+          >
+            <View style={styles.servicePickerOverlay}>
+              <View style={styles.servicePickerContent}>
+                <View style={styles.servicePickerHeader}>
+                  <ThemedText style={styles.servicePickerTitle}>Select Service</ThemedText>
+                  <TouchableOpacity onPress={() => setShowServicePicker(false)}>
+                    <Ionicons name="close" size={24} color="#101318" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView>
+                  {helpServices.map((service) => (
+                    <TouchableOpacity
+                      key={service.id}
+                      style={[
+                        styles.servicePickerItem,
+                        selectedService === service.id && { backgroundColor: "#FFF0F0" },
+                      ]}
+                      onPress={() => {
+                        setSelectedService(service.id);
+                        setShowServicePicker(false);
+                        if (service.fee > 0) {
+                          setHelpFee(service.fee.toString());
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={styles.servicePickerItemLabel}>
+                          {service.label}
+                        </ThemedText>
+                        {service.fee > 0 && (
+                          <ThemedText style={styles.servicePickerItemFee}>
+                            ₦{service.fee.toLocaleString()}
+                          </ThemedText>
+                        )}
+                      </View>
+                      {selectedService === service.id && (
+                        <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function BottomSheet({
   visible,
   title,
@@ -1785,5 +2241,225 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginTop: 16,
+  },
+
+  /* Need Help Form Styles */
+  helpFormOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  helpFormContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "90%",
+    paddingBottom: 20,
+  },
+  helpFormHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECEEF2",
+  },
+  helpFormTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  helpFormClose: {
+    padding: 4,
+  },
+  helpFormDescription: {
+    fontSize: 14,
+    color: "#6C727A",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+    lineHeight: 20,
+  },
+  helpFormField: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  helpFormLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#101318",
+    marginBottom: 8,
+  },
+  helpFormPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#F9FAFB",
+  },
+  helpFormPickerText: {
+    fontSize: 15,
+    color: "#101318",
+  },
+  helpFormFeeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#F9FAFB",
+  },
+  helpFormFeePrefix: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#101318",
+    marginRight: 8,
+  },
+  helpFormFeeInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#101318",
+  },
+  helpFormFeeHint: {
+    fontSize: 12,
+    color: "#6C727A",
+    marginTop: 6,
+  },
+  helpFormInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#101318",
+    backgroundColor: "#F9FAFB",
+  },
+  helpFormTextArea: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 100,
+    textAlignVertical: "top",
+    fontSize: 15,
+    color: "#101318",
+    backgroundColor: "#F9FAFB",
+  },
+  helpFormSubmit: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  helpFormSubmitText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  helpFormSubmitDisabled: {
+    opacity: 0.6,
+  },
+  servicePickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  servicePickerContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+    paddingBottom: 20,
+  },
+  servicePickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECEEF2",
+  },
+  servicePickerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#101318",
+  },
+  servicePickerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F6F8",
+  },
+  servicePickerItemLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#101318",
+    marginBottom: 4,
+  },
+  servicePickerItemFee: {
+    fontSize: 13,
+    color: "#6C727A",
+  },
+  benefitsModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  benefitsModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 20,
+  },
+  benefitsModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECEEF2",
+  },
+  benefitsModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#101318",
+  },
+  benefitsModalClose: {
+    padding: 4,
+  },
+  benefitsList: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  benefitItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  benefitIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  benefitText: {
+    flex: 1,
+    fontSize: 15,
+    color: "#101318",
+    lineHeight: 22,
   },
 });

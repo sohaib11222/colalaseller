@@ -10,6 +10,9 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
+  ScrollView,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -76,12 +79,16 @@ function LockRow({ C, item, onPressLink }) {
     }
   };
 
+  // Get first item name from store_order items
+  const firstItem = item.store_order?.items?.[0];
+  const productName = firstItem?.name || firstItem?.product?.name || 'Order Items';
+
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.85}
       style={[styles.rowCard, { backgroundColor: C.card, borderColor: C.line }]}
-
+      onPress={onPressLink}
     >
-
       <View
         style={[
           styles.leadingIcon,
@@ -93,21 +100,19 @@ function LockRow({ C, item, onPressLink }) {
 
       <View style={{ flex: 1 }}>
         <ThemedText style={[styles.rowTitle, { color: C.text }]}>
-          {item.order_item?.name || 'Unknown Product'}
+          {productName}
         </ThemedText>
         <ThemedText style={[styles.rowSubtitle, { color: C.sub }]}>
           Order: {item.order?.order_no || 'N/A'}
         </ThemedText>
-        <TouchableOpacity onPress={onPressLink} activeOpacity={0.85}>
-          <ThemedText style={[styles.rowLink, { color: C.primary }]}>
-            View Details
-          </ThemedText>
-        </TouchableOpacity>
+        <ThemedText style={[styles.rowLink, { color: C.primary, marginTop: 4 }]}>
+          View Details
+        </ThemedText>
       </View>
 
       <View style={{ alignItems: "flex-end" }}>
         <ThemedText style={[styles.rowAmount, { color: getStatusColor(item.status) }]}>
-          ₦{parseFloat(item.amount).toLocaleString()}
+          ₦{parseFloat(item.amount || 0).toLocaleString()}
         </ThemedText>
         <ThemedText style={[styles.rowWhen, { color: C.sub }]}>
           {formatDate(item.created_at)}
@@ -116,16 +121,191 @@ function LockRow({ C, item, onPressLink }) {
           {item.status?.toUpperCase()}
         </ThemedText>
       </View>
-    </View>
+    </TouchableOpacity>
+  );
+}
+
+/* ---- Escrow Detail Modal ---- */
+function EscrowDetailModal({ visible, onClose, C, item }) {
+  if (!item) return null;
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const storeOrder = item.store_order || {};
+  const order = item.order || {};
+  const user = order.user || {};
+  const items = storeOrder.items || [];
+  const productImg = require("../../../assets/Frame 314.png");
+
+  const currency = (n) => `₦${Number(n).toLocaleString()}`;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+        {/* Header */}
+        <View
+          style={[
+            styles.modalHeader,
+            { borderBottomColor: C.line, backgroundColor: C.card },
+          ]}
+        >
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.modalCloseBtn, { borderColor: C.line }]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close" size={24} color={C.text} />
+          </TouchableOpacity>
+          <ThemedText style={[styles.modalTitle, { color: C.text }]}>
+            Escrow Details
+          </ThemedText>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Order Info Card */}
+          <View style={[styles.detailCard, { backgroundColor: C.card, borderColor: C.line }]}>
+            <View style={styles.detailRow}>
+              <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Order Number</ThemedText>
+              <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                {order.order_no || 'N/A'}
+              </ThemedText>
+            </View>
+            <View style={[styles.detailRow, { marginTop: 12 }]}>
+              <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Status</ThemedText>
+              <View style={[styles.statusBadge, { backgroundColor: `${C.primary}15` }]}>
+                <ThemedText style={[styles.statusText, { color: C.primary }]}>
+                  {item.status?.toUpperCase() || 'N/A'}
+                </ThemedText>
+              </View>
+            </View>
+            <View style={[styles.detailRow, { marginTop: 12 }]}>
+              <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Date</ThemedText>
+              <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                {formatDate(item.created_at)}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Buyer Info */}
+          {user && (
+            <View style={[styles.detailCard, { backgroundColor: C.card, borderColor: C.line, marginTop: 16 }]}>
+              <ThemedText style={[styles.cardTitle, { color: C.text }]}>Buyer Information</ThemedText>
+              {user.profile_picture && (
+                <Image
+                  source={{ uri: `https://colala.hmstech.xyz/storage/${user.profile_picture}` }}
+                  style={styles.avatar}
+                />
+              )}
+              <View style={styles.detailRow}>
+                <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Name</ThemedText>
+                <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                  {user.full_name || 'N/A'}
+                </ThemedText>
+              </View>
+              <View style={[styles.detailRow, { marginTop: 8 }]}>
+                <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Email</ThemedText>
+                <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                  {user.email || 'N/A'}
+                </ThemedText>
+              </View>
+              <View style={[styles.detailRow, { marginTop: 8 }]}>
+                <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Phone</ThemedText>
+                <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                  {user.phone || 'N/A'}
+                </ThemedText>
+              </View>
+            </View>
+          )}
+
+          {/* Order Items */}
+          {items.length > 0 && (
+            <View style={[styles.detailCard, { backgroundColor: C.card, borderColor: C.line, marginTop: 16 }]}>
+              <ThemedText style={[styles.cardTitle, { color: C.text }]}>Order Items</ThemedText>
+              {items.map((orderItem, idx) => {
+                const productImage = orderItem.product?.images?.[0]?.path
+                  ? { uri: `https://colala.hmstech.xyz/storage/${orderItem.product.images[0].path}` }
+                  : productImg;
+                
+                return (
+                  <View key={idx} style={[styles.itemRow, idx > 0 && { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line }]}>
+                    <Image source={productImage} style={styles.itemImage} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <ThemedText style={[styles.itemName, { color: C.text }]} numberOfLines={2}>
+                        {orderItem.name || 'Product'}
+                      </ThemedText>
+                      <ThemedText style={[styles.itemPrice, { color: C.primary }]}>
+                        {currency(orderItem.unit_price || 0)}
+                      </ThemedText>
+                      <ThemedText style={[styles.itemQty, { color: C.sub }]}>
+                        Qty: {orderItem.qty || 0}
+                      </ThemedText>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Amount Details */}
+          <View style={[styles.detailCard, { backgroundColor: C.card, borderColor: C.line, marginTop: 16 }]}>
+            <ThemedText style={[styles.cardTitle, { color: C.text }]}>Amount Breakdown</ThemedText>
+            <View style={styles.detailRow}>
+              <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Items Subtotal</ThemedText>
+              <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                {currency(storeOrder.items_subtotal || 0)}
+              </ThemedText>
+            </View>
+            <View style={[styles.detailRow, { marginTop: 8 }]}>
+              <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Shipping Fee</ThemedText>
+              <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                {currency(item.shipping_fee || storeOrder.shipping_fee || 0)}
+              </ThemedText>
+            </View>
+            <View style={[styles.detailRow, { marginTop: 8 }]}>
+              <ThemedText style={[styles.detailLabel, { color: C.sub }]}>Discount</ThemedText>
+              <ThemedText style={[styles.detailValue, { color: C.text }]}>
+                -{currency(storeOrder.discount || 0)}
+              </ThemedText>
+            </View>
+            <View style={[styles.detailRow, { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line }]}>
+              <ThemedText style={[styles.detailLabel, { color: C.text, fontWeight: '700' }]}>Locked Amount</ThemedText>
+              <ThemedText style={[styles.detailValue, { color: C.primary, fontWeight: '800', fontSize: 18 }]}>
+                {currency(item.amount || 0)}
+              </ThemedText>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
 /* ---- Screen ---- */
 export default function EscrowWalletScreen() {
   const navigation = useNavigation();
-  // const { theme } = useTheme();
   const [authToken, setAuthToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // const C = useMemo(
 
@@ -300,8 +480,8 @@ export default function EscrowWalletScreen() {
             C={C}
             item={item}
             onPressLink={() => {
-              // navigation.navigate("OrderDetails", { id: item.order_id })
-              Alert.alert("Order Details", `Order: ${item.order?.order_no || 'N/A'}`);
+              setSelectedItem(item);
+              setModalVisible(true);
             }}
           />
         )}
@@ -345,6 +525,17 @@ export default function EscrowWalletScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Escrow Detail Modal */}
+      <EscrowDetailModal
+        visible={modalVisible}
+        onClose={() => {
+          setModalVisible(false);
+          setSelectedItem(null);
+        }}
+        C={C}
+        item={selectedItem}
+      />
     </SafeAreaView>
   );
 }
@@ -507,5 +698,97 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     lineHeight: 20,
+  },
+
+  // Modal styles
+  modalHeader: {
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "center",
+  },
+
+  // Detail card styles
+  detailCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    ...shadow(4),
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  detailLabel: {
+    fontSize: 14,
+    flex: 1,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "right",
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
+    alignSelf: "center",
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  itemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  itemPrice: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  itemQty: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });

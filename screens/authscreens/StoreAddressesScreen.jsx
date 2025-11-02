@@ -120,6 +120,12 @@ function OpeningHours({ hours }) {
 
 function AddressCard({ index, item, onEdit, onDelete, onMap }) {
   const { theme } = useTheme();
+  
+  // Check if coordinates are valid
+  const hasValidCoordinates = item?.latitude && item?.longitude && 
+    typeof item.latitude === 'number' && typeof item.longitude === 'number' &&
+    !isNaN(item.latitude) && !isNaN(item.longitude);
+  
   return (
     <View style={styles.card}>
       {/* RED HEADER */}
@@ -144,17 +150,20 @@ function AddressCard({ index, item, onEdit, onDelete, onMap }) {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.mapBtn}
-            onPress={onMap}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={require("../../assets/home.png")}
-              style={{ width: 14, height: 14, marginRight: 6, tintColor: "#E53E3E" }}
-            />
-            <ThemedText style={styles.mapBtnText}>View on Map</ThemedText>
-          </TouchableOpacity>
+          {/* Only show "View on Map" button if coordinates are valid */}
+          {hasValidCoordinates && (
+            <TouchableOpacity
+              style={styles.mapBtn}
+              onPress={onMap}
+              activeOpacity={0.9}
+            >
+              <Image
+                source={require("../../assets/home.png")}
+                style={{ width: 14, height: 14, marginRight: 6, tintColor: "#E53E3E" }}
+              />
+              <ThemedText style={styles.mapBtnText}>View on Map</ThemedText>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -655,24 +664,24 @@ const styles = StyleSheet.create({
   },
   mainBadgeText: { color: "#E03535", fontSize: 11, fontWeight: "700" },
 
-  /* OPENING HOURS PANEL — matches mock */
+  /* OPENING HOURS PANEL — grey background instead of red */
   ohWrap: {
-    backgroundColor: "#FFE7E7",
+    backgroundColor: "#F5F6F8",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#F8C5C5",
+    borderColor: "#E5E7EB",
     padding: 12,
     marginTop: 12,
   },
   ohHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  ohTitle: { color: "#CC4B4B", fontWeight: "700" },
+  ohTitle: { color: "#6C727A", fontWeight: "700" },
   ohRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 3,
   },
-  ohDay: { color: "#D06B6B", width: 92, fontSize: 12 },
-  ohTime: { color: "#C73F3F", fontSize: 12, fontWeight: "600" },
+  ohDay: { color: "#9AA0A6", width: 92, fontSize: 12 },
+  ohTime: { color: "#6C727A", fontSize: 12, fontWeight: "600" },
 
   /* CTA */
   cta: {

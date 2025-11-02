@@ -39,6 +39,7 @@ const ASSETS = {
   tile_my_ps: require("../../assets/Vector (27).png"),
   tile_stats: require("../../assets/Vector (28).png"),
   tile_sub: require("../../assets/Vector (29).png"),
+  tile_inventory: require("../../assets/Vector (30).png"),
 };
 
 /* helpers */
@@ -609,6 +610,18 @@ export default function StoreHomeScreen() {
             onPress={() =>
               navigation.navigate("ChatNavigator", {
                 screen: "Subscription",
+              })
+            }
+          />
+
+          <MenuTile
+            img={ASSETS.tile_inventory}
+            title="Inventory"
+            subtitle={"Track and manage your product inventory"}
+            color={theme.colors.primary}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Inventory",
               })
             }
           />

@@ -190,15 +190,13 @@ export default function ServiceDetailsScreen({ route, navigation }) {
       }
     : null; // No dummy data - show empty state instead
 
-  // Price range from API data or fallback
+  // Price from API data or fallback - show "Starting from" with only from price
   const priceRange =
-    serviceData?.price_from && serviceData?.price_to
-      ? `₦${Number(serviceData.price_from).toLocaleString()} - ₦${Number(
-          serviceData.price_to
-        ).toLocaleString()}`
-      : `₦${Number(item?.minPrice || 0).toLocaleString()} - ₦${Number(
-          item?.maxPrice || 0
-        ).toLocaleString()}`;
+    serviceData?.price_from
+      ? `Starting from ₦${Number(serviceData.price_from).toLocaleString()}`
+      : item?.minPrice
+      ? `Starting from ₦${Number(item.minPrice).toLocaleString()}`
+      : `Starting from ₦0`;
 
   // Handle delete service
   const handleDeleteService = () => {
@@ -293,11 +291,20 @@ export default function ServiceDetailsScreen({ route, navigation }) {
               >
                 {serviceData?.name || item.title || "Service Name"}
               </ThemedText>
-              <ThemedText
-                style={{ color: C.primary, fontWeight: "800", marginTop: 4 }}
-              >
-                {priceRange}
-              </ThemedText>
+              <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 4 }}>
+                <ThemedText
+                  style={{ color: C.primary, fontWeight: "600", fontSize: 12 }}
+                >
+                  Starting from{" "}
+                </ThemedText>
+                <ThemedText
+                  style={{ color: C.primary, fontWeight: "800", fontSize: 16 }}
+                >
+                  ₦{Number(
+                    serviceData?.price_from || item?.minPrice || 0
+                  ).toLocaleString()}
+                </ThemedText>
+              </View>
               <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 4 }}>
                 07-10-25
               </ThemedText>
@@ -857,16 +864,26 @@ function ViewServiceModal({
               </View>
             </View>
 
-            <ThemedText
-              style={{
-                color: "#E53E3E",
-                fontSize: 16,
-                fontWeight: "bold",
-                marginVertical: 8,
-              }}
-            >
-              {store.price}
-            </ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "baseline", marginVertical: 8 }}>
+              <ThemedText
+                style={{
+                  color: "#E53E3E",
+                  fontSize: 12,
+                  fontWeight: "600",
+                }}
+              >
+                Starting from{" "}
+              </ThemedText>
+              <ThemedText
+                style={{
+                  color: "#E53E3E",
+                  fontSize: 16,
+                  fontWeight: "bold",
+                }}
+              >
+                ₦{Number(serviceData?.price_from || 0).toLocaleString()}
+              </ThemedText>
+            </View>
 
             <View style={styles.divider} />
 
@@ -892,10 +909,14 @@ function ViewServiceModal({
                   <ThemedText style={styles.breakdownLabel}>
                     {subService.name}
                   </ThemedText>
-                  <ThemedText style={styles.breakdownPrice}>
-                    ₦{Number(subService.price_from).toLocaleString()} - ₦
-                    {Number(subService.price_to).toLocaleString()}
-                  </ThemedText>
+                  <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+                    <ThemedText style={[styles.breakdownPrice, { fontSize: 12, fontWeight: "500" }]}>
+                      Starting from{" "}
+                    </ThemedText>
+                    <ThemedText style={styles.breakdownPrice}>
+                      ₦{Number(subService.price_from || 0).toLocaleString()}
+                    </ThemedText>
+                  </View>
                 </View>
               ))
             ) : (

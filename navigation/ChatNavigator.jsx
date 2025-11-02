@@ -30,6 +30,7 @@ import OrdersScreen from "../screens/mainscreens/orderscreen/OrdersScreen";
 import TransactionDetailScreen from "../screens/mainscreens/settingsscreens/TransactionDetailScreen";
 import VisitorsScreen from "../screens/mainscreens/settingsscreens/VisitorsScreen";
 import PhoneRequestsScreen from "../screens/mainscreens/settingsscreens/PhoneRequestsScreen";
+import InventoryScreen from "../screens/mainscreens/settingsscreens/InventoryScreen";
 
 // import RegisterScreen from "../screens/RegisterScreen";
 
@@ -69,6 +70,7 @@ export default function ChatNavigator() {
       <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
       <Stack.Screen name="Visitors" component={VisitorsScreen} />
       <Stack.Screen name="PhoneRequests" component={PhoneRequestsScreen} />
+      <Stack.Screen name="Inventory" component={InventoryScreen} />
 
 
 

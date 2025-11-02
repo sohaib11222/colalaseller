@@ -536,6 +536,12 @@ function AnnouncementCard({ C, data, onEdit, onDelete }) {
         <ThemedText style={styles.kvValue}>{data.impressions}</ThemedText>
       </View>
       <View style={{ flexDirection: "row", gap: 8 }}>
+        <SmallIconBtn 
+          C={C} 
+          icon="rocket-outline" 
+          onPress={() => Linking.openURL("https://ads.colalamall.com/")}
+          boost
+        />
         <SmallIconBtn C={C} icon="create-outline" onPress={onEdit} />
         <SmallIconBtn C={C} icon="trash-outline" danger onPress={onDelete} />
       </View>
@@ -647,6 +653,12 @@ function BannerCard({ C, data, onEdit, onDelete }) {
       </View>
 
       <View style={{ flexDirection: "row", gap: 8 }}>
+        <SmallIconBtn 
+          C={C} 
+          icon="rocket-outline" 
+          onPress={() => Linking.openURL("https://ads.colalamall.com/")}
+          boost
+        />
         <SmallIconBtn C={C} icon="create-outline" onPress={onEdit} />
         <SmallIconBtn C={C} icon="trash-outline" danger onPress={onDelete} />
       </View>
@@ -771,16 +783,23 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C, isLoading
 }
 
 /* ───────────── Shared bits ───────────── */
-function SmallIconBtn({ C, icon, onPress, danger }) {
+function SmallIconBtn({ C, icon, onPress, danger, boost }) {
   return (
     <TouchableOpacity
       onPress={onPress}
       style={[
         styles.smallBtn,
-        { borderColor: danger ? "#FEE2E2" : C.line, backgroundColor: danger ? "#FFF1F2" : "#fff" },
+        { 
+          borderColor: danger ? "#FEE2E2" : boost ? "#DBEAFE" : C.line, 
+          backgroundColor: danger ? "#FFF1F2" : boost ? "#EFF6FF" : "#fff" 
+        },
       ]}
     >
-      <Ionicons name={icon} size={16} color={danger ? "#DC2626" : C.text} />
+      <Ionicons 
+        name={icon} 
+        size={16} 
+        color={danger ? "#DC2626" : boost ? "#2563EB" : C.text} 
+      />
     </TouchableOpacity>
   );
 }

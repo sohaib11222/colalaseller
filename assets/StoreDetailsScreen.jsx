@@ -1034,11 +1034,6 @@ export default function StoreDetailsScreen() {
 
         {/* Action buttons (below promo) */}
         <View style={styles.buttonStack}>
-          <TouchableOpacity style={[styles.bigBtn, styles.bigBtnRed]}>
-            <Ionicons name="call-outline" size={18} color="#fff" style={styles.bigBtnIcon} />
-            <ThemedText style={styles.bigBtnTxt}>Call</ThemedText>
-          </TouchableOpacity>
-
           {/* Chat button (below the promo) */}
           <TouchableOpacity
             style={[styles.bigBtn, styles.bigBtnBlack]}

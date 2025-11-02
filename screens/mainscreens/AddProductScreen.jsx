@@ -274,6 +274,9 @@ export default function AddProductScreen({ navigation, route }) {
   const [fullDesc, setFullDesc] = useState("");
   const [price, setPrice] = useState("");
   const [discountPrice, setDiscountPrice] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [referralFee, setReferralFee] = useState("");
+  const [referralPersonLimit, setReferralPersonLimit] = useState("");
 
   // Pre-fill form when in edit mode
   useEffect(() => {
@@ -285,6 +288,9 @@ export default function AddProductScreen({ navigation, route }) {
       setFullDesc(productData.description || "");
       setPrice(productData.price || "");
       setDiscountPrice(productData.discount_price || "");
+      setQuantity(productData.quantity?.toString() || "");
+      setReferralFee(productData.referral_fee?.toString() || "");
+      setReferralPersonLimit(productData.referral_person_limit?.toString() || "");
 
       // Handle images
       if (productData.images && productData.images.length > 0) {
@@ -643,6 +649,17 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
 
+    // Add optional fields
+    if (quantity && quantity.trim() !== "") {
+      formData.append("quantity", parseInt(quantity) || 0);
+    }
+    if (referralFee && referralFee.trim() !== "") {
+      formData.append("referral_fee", parseFloat(referralFee) || 0);
+    }
+    if (referralPersonLimit && referralPersonLimit.trim() !== "") {
+      formData.append("referral_person_limit", parseInt(referralPersonLimit) || 1);
+    }
+
     // Add loyalty points if applicable
     if (usePoints) {
       formData.append("loyality_points_applicable", "1");
@@ -792,6 +809,17 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("discount_price", discountPrice ? discountPrice.toString() : "");
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
+
+    // Add optional fields
+    if (quantity && quantity.trim() !== "") {
+      formData.append("quantity", parseInt(quantity) || 0);
+    }
+    if (referralFee && referralFee.trim() !== "") {
+      formData.append("referral_fee", parseFloat(referralFee) || 0);
+    }
+    if (referralPersonLimit && referralPersonLimit.trim() !== "") {
+      formData.append("referral_person_limit", parseInt(referralPersonLimit) || 1);
+    }
 
     // Add loyalty points if applicable
     if (usePoints) {
@@ -1413,6 +1441,33 @@ export default function AddProductScreen({ navigation, route }) {
           value={discountPrice}
           onChangeText={setDiscountPrice}
           placeholder="Discount Price"
+          C={C}
+          style={{ marginTop: 10 }}
+          keyboardType="numeric"
+        />
+
+        <Field
+          value={quantity}
+          onChangeText={setQuantity}
+          placeholder="Quantity (Optional)"
+          C={C}
+          style={{ marginTop: 10 }}
+          keyboardType="numeric"
+        />
+
+        <Field
+          value={referralFee}
+          onChangeText={setReferralFee}
+          placeholder="Referral Fee (Optional)"
+          C={C}
+          style={{ marginTop: 10 }}
+          keyboardType="numeric"
+        />
+
+        <Field
+          value={referralPersonLimit}
+          onChangeText={setReferralPersonLimit}
+          placeholder="Referral Person Limit (Optional)"
           C={C}
           style={{ marginTop: 10 }}
           keyboardType="numeric"

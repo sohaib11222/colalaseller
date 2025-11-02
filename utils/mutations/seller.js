@@ -69,6 +69,11 @@ export const setDeliveryPricing = async (payload, token) =>
 export const setTheme = async (payload, token) =>
   await apiCall(API_ENDPOINTS.SELLER.Theme, "POST", payload, token);
 
+// Help Request
+// payload = { service_type: "store_setup", email: "seller@example.com", phone: "+2348012345678", full_name: "John Doe", fee: 5000, notes: "I need help..." }
+export const submitHelpRequest = async (payload, token) =>
+  await apiCall(API_ENDPOINTS.SELLER.Help_Request, "POST", payload, token);
+
 // Submit Onboarding (no body)
 export const submitOnboarding = async (token) =>
   await apiCall(API_ENDPOINTS.SELLER.Submit, "POST", undefined, token);

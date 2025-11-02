@@ -10,19 +10,20 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { Video, ResizeMode } from "expo-av";
 import ThemedText from "../../../components/ThemedText";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 //Code Related to the integration
-import { getFAQs } from "../../../utils/queries/settings";
+import { getFAQs, getKnowledgeBase } from "../../../utils/queries/settings";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
+import VideoThumbnailExtractor from "../../../components/VideoThumbnailExtractor";
 
 
 export default function FAQsScreen() {
@@ -66,16 +67,32 @@ export default function FAQsScreen() {
     enabled: !!token, // Only run query when token is available
   });
 
+  // Fetch Knowledge Base videos (for seller type)
+  const { 
+    data: knowledgeBaseData, 
+    isLoading: knowledgeBaseLoading, 
+    error: knowledgeBaseError, 
+    refetch: refetchKnowledgeBase 
+  } = useQuery({
+    queryKey: ['knowledgeBase', token],
+    queryFn: () => getKnowledgeBase(token, { type: 'seller' }),
+    enabled: !!token,
+  });
+
+  const knowledgeBaseVideos = knowledgeBaseData?.data?.knowledge_base || [];
+
   const [openId, setOpenId] = useState(null);
+  const [expandedVideoId, setExpandedVideoId] = useState(null);
+  const [videoThumbnails, setVideoThumbnails] = useState({});
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refetch();
-      console.log("FAQs refreshed successfully");
+      await Promise.all([refetch(), refetchKnowledgeBase()]);
+      console.log("FAQs and Knowledge Base refreshed successfully");
     } catch (error) {
-      console.error("Error refreshing FAQs:", error);
+      console.error("Error refreshing:", error);
     } finally {
       setRefreshing(false);
     }
@@ -85,14 +102,28 @@ export default function FAQsScreen() {
   const categoryData = faqsData?.data?.category;
   const faqsList = faqsData?.data?.faqs || [];
 
-  // Extract YouTube video ID from URL
+  // Extract YouTube video ID from URL (handles various YouTube URL formats)
   const extractYouTubeId = (url) => {
     if (!url) return null;
-    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
-    return match ? match[1] : null;
+    // Handle various YouTube URL formats:
+    // - youtube.com/watch?v=VIDEO_ID
+    // - youtu.be/VIDEO_ID
+    // - youtube.com/embed/VIDEO_ID
+    // - youtube.com/watch?v=VIDEO_ID&list=...
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
   };
 
-  // Get YouTube thumbnail URL
+  // Get YouTube thumbnail URL with fallback
   const getYouTubeThumbnail = (url) => {
     const videoId = extractYouTubeId(url);
     if (videoId) {
@@ -101,26 +132,71 @@ export default function FAQsScreen() {
     return null;
   };
 
+  // Normalize video URL for direct video files
+  const getFullVideoUrl = (mediaUrl) => {
+    if (!mediaUrl) return null;
+    
+    // If it's already a full URL, return it
+    if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+      return mediaUrl;
+    }
+    
+    // It's a relative path, prepend the storage base URL
+    const baseUrl = 'http://colala.hmstech.xyz/storage';
+    const cleanPath = mediaUrl.startsWith('/') ? mediaUrl.substring(1) : mediaUrl;
+    return `${baseUrl}/${cleanPath}`;
+  };
+
+  // Get video thumbnail - handles both YouTube and direct video URLs
+  const getVideoThumbnail = (mediaUrl, videoId) => {
+    if (!mediaUrl) return null;
+    
+    // Check if it's a YouTube URL
+    const youtubeThumbnail = getYouTubeThumbnail(mediaUrl);
+    if (youtubeThumbnail) {
+      return youtubeThumbnail;
+    }
+    
+    // Check if we have a cached thumbnail for this video
+    if (videoId && videoThumbnails[videoId]) {
+      return videoThumbnails[videoId];
+    }
+    
+    // For direct video files, we'll extract thumbnail (handled in useEffect)
+    return null;
+  };
+
+  // Handle thumbnail extraction callback
+  const handleThumbnailExtracted = (videoId, thumbnailUri) => {
+    if (videoId && thumbnailUri) {
+      setVideoThumbnails(prev => {
+        if (prev[videoId]) return prev; // Already have thumbnail
+        return { ...prev, [videoId]: thumbnailUri };
+      });
+    }
+  };
+
+  // Check if URL is a direct video file
+  const isDirectVideoFile = (url) => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.mov', '.webm', '.avi', '.mkv'];
+    const lowerUrl = url.toLowerCase();
+    return videoExtensions.some(ext => lowerUrl.includes(ext));
+  };
+
   // Check if URL is a YouTube video
   const isYouTubeVideo = (url) => {
     return extractYouTubeId(url) !== null;
   };
 
-  // Handle video play - opens in YouTube app or browser
-  const handleVideoPlay = async (videoUrl) => {
+  // Handle video play - opens in-app video player
+  const handleVideoPlay = (videoUrl, videoTitle = "Video Tutorial") => {
     try {
-      console.log("Opening video:", videoUrl);
-      const supported = await Linking.canOpenURL(videoUrl);
-      
-      if (supported) {
-        await Linking.openURL(videoUrl);
-      } else {
-        Alert.alert(
-          "Cannot Open Video",
-          "Unable to open the video. Please try again later.",
-          [{ text: "OK" }]
-        );
-      }
+      console.log("Opening video in app:", videoUrl);
+      navigation.navigate("VideoPlayerWebView", {
+        videoUrl: videoUrl,
+        title: videoTitle,
+      });
     } catch (error) {
       console.error("Error opening video:", error);
       Alert.alert(
@@ -265,40 +341,138 @@ export default function FAQsScreen() {
         {/* Video FAQs Tab Content */}
         {selectedTab === "video" && (
           <View style={{ marginTop: 12 }}>
-            {categoryData?.video ? (
-              <TouchableOpacity 
-                style={[styles.videoCard, shadow(4)]}
-                onPress={() => handleVideoPlay(categoryData.video)}
-                activeOpacity={0.9}
-              >
-                <Image
-                  source={{
-                    uri: getYouTubeThumbnail(categoryData.video) || categoryData.video,
-                  }}
-                  style={styles.videoImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.playOverlay}>
-                  <Ionicons name="play" size={26} color="#fff" />
-                </View>
-                {isYouTubeVideo(categoryData.video) && (
-                  <View style={styles.youtubeIndicator}>
-                    <Ionicons name="logo-youtube" size={20} color="#fff" />
+            {knowledgeBaseLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={C.primary} />
+                <ThemedText style={[styles.loadingText, { color: C.sub }]}>
+                  Loading videos...
+                </ThemedText>
+              </View>
+            ) : knowledgeBaseError ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color={C.sub} />
+                <ThemedText style={[styles.errorTitle, { color: C.text }]}>
+                  Failed to load videos
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => refetchKnowledgeBase()}
+                  style={[styles.retryButton, { backgroundColor: C.primary }]}
+                >
+                  <ThemedText style={[styles.retryButtonText, { color: C.card }]}>
+                    Try Again
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            ) : knowledgeBaseVideos.length > 0 ? (
+              <>
+                {/* Hidden thumbnail extractors for direct video files */}
+                {knowledgeBaseVideos
+                  .filter(video => !isYouTubeVideo(video.media_url) && !videoThumbnails[video.id])
+                  .map((video) => {
+                    const fullVideoUrl = getFullVideoUrl(video.media_url);
+                    return fullVideoUrl ? (
+                      <VideoThumbnailExtractor
+                        key={`extractor-${video.id}`}
+                        videoUrl={fullVideoUrl}
+                        videoId={video.id}
+                        onThumbnailExtracted={handleThumbnailExtracted}
+                      />
+                    ) : null;
+                  })}
+                
+                {/* Video Cards */}
+                {knowledgeBaseVideos.map((video) => {
+                  const isExpanded = expandedVideoId === video.id;
+                  return (
+                    <View 
+                      key={video.id}
+                      style={[styles.videoAccordionCard, shadow(4), { marginBottom: 16 }]}
+                    >
+                      {/* Video Thumbnail */}
+                      <TouchableOpacity 
+                        style={styles.videoThumbnailContainer}
+                        onPress={() => handleVideoPlay(video.media_url, video.title)}
+                        activeOpacity={0.9}
+                      >
+                        {getVideoThumbnail(video.media_url, video.id) ? (
+                          <Image
+                            source={{
+                              uri: getVideoThumbnail(video.media_url, video.id),
+                            }}
+                            style={styles.videoImage}
+                            resizeMode="cover"
+                            onError={() => {
+                              console.log("Error loading video thumbnail");
+                            }}
+                          />
+                        ) : (
+                          <View style={styles.videoPlaceholder}>
+                            <View style={styles.placeholderIconContainer}>
+                              <Ionicons name="videocam-outline" size={56} color={C.sub} />
+                              <ThemedText style={[styles.placeholderText, { color: C.sub, marginTop: 12 }]}>
+                                {isDirectVideoFile(video.media_url) ? "Loading Preview..." : "Video Preview"}
+                              </ThemedText>
+                            </View>
+                          </View>
+                        )}
+                      <View style={styles.playOverlay}>
+                        <Ionicons name="play" size={32} color="#fff" />
+                      </View>
+                      {isYouTubeVideo(video.media_url) && (
+                        <View style={styles.youtubeIndicator}>
+                          <Ionicons name="logo-youtube" size={20} color="#fff" />
+                        </View>
+                      )}
+                      {isDirectVideoFile(video.media_url) && (
+                        <View style={[styles.youtubeIndicator, { backgroundColor: "rgba(0, 122, 255, 0.8)" }]}>
+                          <Ionicons name="film" size={20} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Title - Clickable to expand/collapse */}
+                    <TouchableOpacity
+                      style={styles.videoTitleContainer}
+                      onPress={() => setExpandedVideoId(isExpanded ? null : video.id)}
+                      activeOpacity={0.7}
+                    >
+                      <ThemedText 
+                        style={[styles.videoAccordionTitle, { color: C.text }]} 
+                        numberOfLines={isExpanded ? 0 : 2}
+                      >
+                        {video.title}
+                      </ThemedText>
+                      <Ionicons 
+                        name={isExpanded ? "chevron-up" : "chevron-down"} 
+                        size={20} 
+                        color={C.sub} 
+                      />
+                    </TouchableOpacity>
+
+                    {/* Description - Shown when expanded */}
+                    {isExpanded && video.description && (
+                      <View style={styles.videoDescriptionContainer}>
+                        <ThemedText 
+                          style={[styles.videoAccordionDescription, { color: C.sub }]}
+                        >
+                          {video.description}
+                        </ThemedText>
+                      </View>
+                    )}
                   </View>
-                )}
-              </TouchableOpacity>
+                  );
+                })}
+              </>
             ) : (
-              !isLoading && !error && (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="videocam-off-outline" size={48} color={C.sub} style={{ marginBottom: 12 }} />
-                  <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
-                    No video FAQs available
-                  </ThemedText>
-                  <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
-                    Check back later for video tutorials.
-                  </ThemedText>
-                </View>
-              )
+              <View style={styles.emptyContainer}>
+                <Ionicons name="videocam-off-outline" size={48} color={C.sub} style={{ marginBottom: 12 }} />
+                <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+                  No video tutorials available
+                </ThemedText>
+                <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+                  Check back later for video tutorials.
+                </ThemedText>
+              </View>
             )}
           </View>
         )}
@@ -584,5 +758,86 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 0, 0, 0.8)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  videoInfoOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
+  },
+  videoTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  videoDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  // Accordion styles
+  videoAccordionCard: {
+    borderRadius: 15,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ECEEF2",
+  },
+  videoThumbnailContainer: {
+    position: "relative",
+    height: 220,
+    backgroundColor: "#eee",
+  },
+  videoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#F5F6F8",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  placeholderIconContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  videoTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#ECEEF2",
+  },
+  videoAccordionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
+    marginRight: 12,
+    lineHeight: 22,
+  },
+  videoDescriptionContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F5F6F8",
+    backgroundColor: "#FAFBFC",
+  },
+  videoAccordionDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 12,
   },
 });

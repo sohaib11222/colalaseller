@@ -61,8 +61,27 @@ export const getSupportDetail = async (token, id) =>
 export const getMyPoints = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.My_Points, "GET", undefined, token);
 
-export const getAnalytics = async (token) =>
-  await apiCall(API_ENDPOINTS.SETTINGS.Analytics, "GET", undefined, token);
+export const getAnalytics = async (token, params = {}) => {
+  let url = API_ENDPOINTS.SETTINGS.Analytics;
+  
+  // Build query string from params
+  const queryParams = [];
+  if (params.period) {
+    queryParams.push(`period=${params.period}`);
+  }
+  if (params.date_from) {
+    queryParams.push(`date_from=${params.date_from}`);
+  }
+  if (params.date_to) {
+    queryParams.push(`date_to=${params.date_to}`);
+  }
+  
+  if (queryParams.length > 0) {
+    url += `?${queryParams.join('&')}`;
+  }
+  
+  return await apiCall(url, "GET", undefined, token);
+};
 
 export const getLoyaltiyPoints = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.loyaltiyPoints, "GET", undefined, token);
@@ -85,4 +104,23 @@ export const getPhoneRequests = async (token) =>
 
 export const getPhoneVisibility = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Phone_Visibility, "GET", undefined, token);
+
+export const getKnowledgeBase = async (token, params = {}) => {
+  let url = API_ENDPOINTS.SETTINGS.Knowledge_Base;
+  
+  // Build query string from params (for pagination, filtering, etc.)
+  const queryParams = [];
+  if (params.page) {
+    queryParams.push(`page=${params.page}`);
+  }
+  if (params.type) {
+    queryParams.push(`type=${params.type}`);
+  }
+  
+  if (queryParams.length > 0) {
+    url += `?${queryParams.join('&')}`;
+  }
+  
+  return await apiCall(url, "GET", undefined, token);
+};
 

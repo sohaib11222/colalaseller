@@ -1310,11 +1310,11 @@ export default function StoreProfileModal({
 
     hoursBox: {
       marginTop: 6,
-      backgroundColor: "#E0E0E0",
+      backgroundColor: "#F5F6F8",
       borderRadius: 12,
       padding: 10,
       borderWidth: 1,
-      borderColor: "#FFE1E1",
+      borderColor: "#E5E7EB",
     },
     hoursRow: {
       flexDirection: "row",
@@ -2110,7 +2110,13 @@ export default function StoreProfileModal({
                 <TouchableOpacity
                   key={s.id}
                   style={styles.socialBtn}
-                  onPress={() => Linking.openURL(s.url)}
+                  onPress={() => {
+                    // Open in WebView instead of external browser
+                    navigation.navigate('SocialWebView', {
+                      url: s.url,
+                      title: s.type?.charAt(0).toUpperCase() + s.type?.slice(1) || 'Social Link'
+                    });
+                  }}
                 >
                   <Image source={{ uri: s.icon }} style={styles.socialImg} />
                 </TouchableOpacity>

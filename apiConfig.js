@@ -38,6 +38,9 @@ const API_ENDPOINTS = {
     CatalogCategories: `${API_DOMAIN}/seller/onboarding/catalog/categories`, // GET
     Delete_Address: (id) => `${API_DOMAIN}/seller/onboarding/level3/address/${id}`, // DELETE
     Update_Address: (id) => `${API_DOMAIN}/seller/onboarding/level3/address/${id}`, // PUT
+    Inventory: `${API_DOMAIN}/seller/inventory`, // GET
+    Help_Request: `${API_DOMAIN}/seller/help/request`, // POST
+
   },
 
   PRODUCTS: {
@@ -171,6 +174,7 @@ const API_ENDPOINTS = {
 
     My_Points: `${API_DOMAIN}/my-points`, // GET
     Analytics: `${API_DOMAIN}/seller/analytics`, // GET
+    Knowledge_Base: `${API_DOMAIN}/admin/knowledge-base`, // GET
     loyaltiyPoints: `${API_DOMAIN}/seller/loyalty/customers`, // GET
     Get_loyaltiy_Setting: `${API_DOMAIN}/seller/loyalty/settings`, // GET
     Update_loyaltiy_Setting: `${API_DOMAIN}/seller/loyalty/settings`, // POST

@@ -46,18 +46,35 @@ const LEGEND = [
   { key: "orders", label: "Orders", color: "#EF4444" },
 ];
 
+// Filter options for analytics period
+const PERIOD_OPTIONS = [
+  { label: "Today", value: "today" },
+  { label: "7 days", value: 7 },
+  { label: "30 days", value: 30 },
+  { label: "90 days", value: 90 },
+];
+
 /* ---------- small primitives ---------- */
-const FilterPill = ({ label = "Date", open, onToggle, C }) => (
+const FilterPill = ({ label = "Date", open, onToggle, C, options = [], selectedOption, onSelectOption }) => (
   <View style={{ alignSelf: "flex-start" }}>
     <TouchableOpacity onPress={onToggle} activeOpacity={0.9} style={[styles.filterPill, { backgroundColor: C.card, borderColor: C.line }]}>
-      <ThemedText style={{ color: C.text, fontSize: 12 }}>{label}</ThemedText>
+      <ThemedText style={{ color: C.text, fontSize: 12 }}>{selectedOption || label}</ThemedText>
       <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={C.text} />
     </TouchableOpacity>
     {open && (
       <View style={[styles.dropdown, { backgroundColor: C.card, borderColor: C.line }, shadow(12)]}>
-        {["Today", "7 days", "30 days", "This year"].map((opt, idx) => (
-          <TouchableOpacity key={opt} style={[styles.dropItem, idx === 3 && { borderBottomWidth: 0 }]}>
-            <ThemedText style={{ color: C.text, fontSize: 12 }}>{opt}</ThemedText>
+        {options.map((opt, idx) => (
+          <TouchableOpacity 
+            key={opt.value || opt} 
+            style={[styles.dropItem, idx === options.length - 1 && { borderBottomWidth: 0 }]}
+            onPress={() => {
+              onSelectOption?.(opt);
+              onToggle();
+            }}
+          >
+            <ThemedText style={{ color: selectedOption === (opt.label || opt) ? C.primary : C.text, fontSize: 12, fontWeight: selectedOption === (opt.label || opt) ? "600" : "400" }}>
+              {opt.label || opt}
+            </ThemedText>
           </TouchableOpacity>
         ))}
       </View>
@@ -149,6 +166,25 @@ export default function AnalyticsScreen() {
   const [f1Open, setF1Open] = useState(false);
   const [f2Open, setF2Open] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState(7); // Default to 7 days
+
+  // Get selected option label
+  const selectedOptionLabel = useMemo(() => {
+    const option = PERIOD_OPTIONS.find(opt => opt.value === selectedPeriod);
+    return option?.label || "7 days";
+  }, [selectedPeriod]);
+
+  // Calculate analytics params based on selected period
+  const analyticsParams = useMemo(() => {
+    if (selectedPeriod === "today") {
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+      return { date_from: dateStr, date_to: dateStr };
+    } else if (typeof selectedPeriod === "number") {
+      return { period: selectedPeriod };
+    }
+    return { period: 7 }; // Default to 7 days
+  }, [selectedPeriod]);
 
   // Fetch analytics data
   const {
@@ -157,8 +193,8 @@ export default function AnalyticsScreen() {
     isError: analyticsError,
     refetch: refetchAnalytics,
   } = useQuery({
-    queryKey: ["analytics"],
-    queryFn: () => getAnalytics(token),
+    queryKey: ["analytics", analyticsParams],
+    queryFn: () => getAnalytics(token, analyticsParams),
     enabled: !!token,
   });
 
@@ -234,7 +270,16 @@ export default function AnalyticsScreen() {
         }
       >
         {/* top filter + chart */}
-        <FilterPill C={C} open={f1Open} onToggle={() => setF1Open((p) => !p)} />
+        <FilterPill 
+          C={C} 
+          open={f1Open} 
+          onToggle={() => setF1Open((p) => !p)}
+          options={PERIOD_OPTIONS}
+          selectedOption={selectedOptionLabel}
+          onSelectOption={(option) => {
+            setSelectedPeriod(option.value);
+          }}
+        />
         <View style={{ height: 10 }} />
 
         {analyticsLoading ? (

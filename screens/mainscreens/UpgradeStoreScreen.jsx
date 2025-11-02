@@ -66,9 +66,17 @@ export default function UpgradeStoreScreen({ navigation }) {
 
   // Transform progress data to determine completion status
   const progressSteps = progressData?.steps || [];
-  const currentLevel = progressData?.level || 1;
+  let currentLevel = progressData?.level || 1;
   const currentPercent = progressData?.percent || 0;
   const statusLabel = progressData?.status_label || "draft";
+  
+  // Check if onboarding is complete
+  const isOnboardingComplete = progressSteps.every(step => step.status === "done");
+  
+  // If all levels are complete, show current level as 3
+  if (isOnboardingComplete) {
+    currentLevel = 3;
+  }
 
   // Determine which steps are completed
   const isStepCompleted = (stepKey) => {
@@ -87,9 +95,6 @@ export default function UpgradeStoreScreen({ navigation }) {
     const pendingSteps = progressSteps.filter(step => step.status === "pending");
     return pendingSteps[0]; // Return the first pending step
   };
-
-  // Check if onboarding is complete
-  const isOnboardingComplete = progressSteps.every(step => step.status === "done");
 
   // Calculate completion percentage for each level
   const calculateLevelCompletion = (level) => {
@@ -300,24 +305,7 @@ export default function UpgradeStoreScreen({ navigation }) {
                   <ThemedText
                     style={{ fontWeight: "800", color: C.text, fontSize: 15 }}
                   >{`Level ${lv.level}`}</ThemedText>
-                  {lv.current ? (
-                    <View
-                      style={[
-                        styles.badge,
-                        { backgroundColor: "#E53E3E", borderColor: C.primary },
-                      ]}
-                    >
-                      <ThemedText
-                        style={{
-                          color: "#fff",
-                          fontWeight: "800",
-                          fontSize: 10,
-                        }}
-                      >
-                        Current Level
-                      </ThemedText>
-                    </View>
-                  ) : null}
+                  
                 </View>
 
                 <View

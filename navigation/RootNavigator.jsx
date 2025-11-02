@@ -8,6 +8,8 @@ import MainNavigator from "./MainNavigator";
 import ChatNavigator from "./ChatNavigator";
 import SettingsNavigator from "./SettingsNavigator";
 import FlutterwaveWebView from "../components/FlutterwaveWebView";
+import SocialWebView from "../components/SocialWebView";
+import VideoPlayerWebView from "../components/VideoPlayerWebView";
 
 // Error Boundary Component
 class NavigationErrorBoundary extends React.Component {
@@ -71,6 +73,8 @@ export default function RootNavigator() {
             <Stack.Screen name="ChatNavigator" component={ChatNavigator} />
             <Stack.Screen name="SettingsNavigator" component={SettingsNavigator} />
             <Stack.Screen name="FlutterwaveWebView" component={FlutterwaveWebView} />
+            <Stack.Screen name="SocialWebView" component={SocialWebView} />
+            <Stack.Screen name="VideoPlayerWebView" component={VideoPlayerWebView} />
           </>
         ) : (
           // User is not authenticated - show auth screens

@@ -337,6 +337,11 @@ export default function StoreBuilderScreen() {
           <ThemedText style={[styles.smallLabel, { color: C.sub }]}>
             Upload a logo for your store
           </ThemedText>
+          <ThemedText
+            style={[styles.dimensionLabel, { color: C.sub, marginTop: 2, marginBottom: 8 }]}
+          >
+            Logo: 200×200
+          </ThemedText>
 
           {/* logo uploader */}
           <TouchableOpacity
@@ -425,6 +430,11 @@ export default function StoreBuilderScreen() {
           >
             Upload profile banner for your store
           </ThemedText>
+          <ThemedText
+            style={[styles.dimensionLabel, { color: C.sub, marginTop: 2, marginBottom: 8 }]}
+          >
+            Banner: 400×200
+          </ThemedText>
           <UploadRect
             C={C}
             uri={profileBannerUri}
@@ -436,6 +446,11 @@ export default function StoreBuilderScreen() {
             style={[styles.smallLabel, { color: C.sub, marginTop: 10 }]}
           >
             Upload promotional banner for your store
+          </ThemedText>
+          <ThemedText
+            style={[styles.dimensionLabel, { color: C.sub, marginTop: 2, marginBottom: 8 }]}
+          >
+            Banner: 400×200
           </ThemedText>
           <UploadRect
             C={C}
@@ -508,7 +523,7 @@ export default function StoreBuilderScreen() {
             styleOverride={addressValue ? { backgroundColor: "#F0F9FF", borderColor: "#0369A1" } : {}}
           />
 
-          <SelectRow
+          {/* <SelectRow
             C={C}
             label={deliveryValue ? "Delivery pricing set" : "Add Delivery pricing"}
             rightIcon="chevron-forward"
@@ -521,7 +536,7 @@ export default function StoreBuilderScreen() {
               })
             }
             styleOverride={deliveryValue ? { backgroundColor: "#F0F9FF", borderColor: "#0369A1" } : {}}
-          />
+          /> */}
 
           {/* save */}
           <TouchableOpacity
@@ -1106,6 +1121,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  dimensionLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
   smallLabel: { marginTop: 8, marginBottom: 8, fontSize: 12 },
   logoWrap: {
     alignSelf: "center",

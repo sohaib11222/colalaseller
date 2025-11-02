@@ -181,7 +181,7 @@ const LoginScreen = () => {
           {/* Links */}
           <View style={styles.rowLinks}>
             <TouchableOpacity>
-              <ThemedText style={styles.linkText}>Continue as guest</ThemedText>
+              {/* <ThemedText style={styles.linkText}>Continue as guest</ThemedText> */}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate("ForgotPass")}>
               <ThemedText style={styles.linkText}>Forgot Password ?</ThemedText>
