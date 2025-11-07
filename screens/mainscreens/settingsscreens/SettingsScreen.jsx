@@ -31,6 +31,7 @@ const SettingsScreen = () => {
   const { user, token, logout } = useAuth();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [errorDismissed, setErrorDismissed] = useState(false);
 
   const C = useMemo(
     () => ({
@@ -220,6 +221,13 @@ const SettingsScreen = () => {
   // Combined loading and error states
   const isLoading = balanceLoading || escrowLoading;
   const error = balanceError || escrowError;
+
+  // Reset error dismissed state when error changes
+  useEffect(() => {
+    if (error) {
+      setErrorDismissed(false);
+    }
+  }, [error]);
 
   // Debug logging for balance data
   console.log("📊 Balance data:", balanceData);
@@ -510,6 +518,41 @@ const SettingsScreen = () => {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Error State - Non-blocking banner */}
+        {error && !isLoading && !errorDismissed && (
+          <View style={styles.errorBanner}>
+            <View style={styles.errorBannerContent}>
+              <Ionicons name="alert-circle-outline" size={20} color={C.danger} />
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <ThemedText style={[styles.errorBannerTitle, { color: C.text }]}>
+                  Failed to load wallet data
+                </ThemedText>
+                <ThemedText style={[styles.errorBannerMessage, { color: C.sub }]} numberOfLines={1}>
+                  {error.message ||
+                    "Unable to fetch wallet balance. Please check your connection."}
+                </ThemedText>
+              </View>
+              <TouchableOpacity
+                onPress={() => setErrorDismissed(true)}
+                style={styles.errorCloseButton}
+              >
+                <Ionicons name="close" size={20} color={C.sub} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                console.log("🔄 Retrying balance and escrow data fetch...");
+                Promise.all([refetchBalance(), refetchEscrow()]);
+              }}
+              style={[styles.errorRetryButton, { backgroundColor: C.primary }]}
+            >
+              <ThemedText style={[styles.errorRetryButtonText, { color: C.white }]}>
+                Try Again
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Shop Upgrade */}
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: C.primary }]}
@@ -629,31 +672,6 @@ const SettingsScreen = () => {
           <ThemedText style={[styles.loadingSubtext, { color: C.sub }]}>
             Fetching balance and transaction details
           </ThemedText>
-        </View>
-      )}
-
-      {/* Error State */}
-      {error && !isLoading && (
-        <View style={styles.errorOverlay}>
-          <Ionicons name="alert-circle-outline" size={48} color={C.primary} />
-          <ThemedText style={[styles.errorTitle, { color: C.text }]}>
-            Failed to load wallet data
-          </ThemedText>
-          <ThemedText style={[styles.errorMessage, { color: C.sub }]}>
-            {error.message ||
-              "Unable to fetch wallet balance. Please check your connection and try again."}
-          </ThemedText>
-          <TouchableOpacity
-            onPress={() => {
-              console.log("🔄 Retrying balance and escrow data fetch...");
-              Promise.all([refetchBalance(), refetchEscrow()]);
-            }}
-            style={[styles.retryButton, { backgroundColor: C.primary }]}
-          >
-            <ThemedText style={[styles.retryButtonText, { color: C.white }]}>
-              Try Again
-            </ThemedText>
-          </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
@@ -881,39 +899,43 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Error overlay styles
-  errorOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    justifyContent: "center",
+  // Error banner styles (non-blocking)
+  errorBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FEE2E2",
+    padding: 12,
+  },
+  errorBannerContent: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 32,
-    zIndex: 1000,
+    marginBottom: 8,
   },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 16,
-    textAlign: "center",
-  },
-  errorMessage: {
+  errorBannerTitle: {
     fontSize: 14,
-    marginTop: 8,
-    textAlign: "center",
-    lineHeight: 20,
+    fontWeight: "600",
+    marginBottom: 2,
   },
-  retryButton: {
-    marginTop: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  errorBannerMessage: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  errorCloseButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  errorRetryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
+    alignSelf: "flex-start",
   },
-  retryButtonText: {
-    fontSize: 16,
+  errorRetryButtonText: {
+    fontSize: 14,
     fontWeight: "600",
   },
   holdingBar: {

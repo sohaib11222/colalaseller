@@ -40,6 +40,7 @@ import {
   getOnboardingToken,
 } from "../../utils/tokenStorage";
 import { getProgress } from "../../utils/queries/seller";
+import { getCategories } from "../../utils/queries/general";
 
 export default function UpgradeStoreScreen({ navigation }) {
   const { theme } = useTheme();
@@ -484,6 +485,7 @@ export default function UpgradeStoreScreen({ navigation }) {
         C={C}
         token={token}
         refetchProgress={refetchProgress}
+        progressData={progressData}
       />
       <LevelTwoModal
         visible={lv2Open}
@@ -495,6 +497,7 @@ export default function UpgradeStoreScreen({ navigation }) {
         C={C}
         token={token}
         refetchProgress={refetchProgress}
+        progressData={progressData}
       />
       <LevelThreeModal
         visible={lv3Open}
@@ -511,9 +514,38 @@ export default function UpgradeStoreScreen({ navigation }) {
 /* ────────────────────────────────────────────────────────────────────────────
    LEVEL 1  (3 phases + change-password bottom sheets + category picker)
    ──────────────────────────────────────────────────────────────────────────── */
-function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgress }) {
+function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgress, progressData }) {
   const [showPhone, setShowPhone] = useState(true);
-  const [step, setStep] = useState(1); // 1=form, 2=uploads, 3=categories
+  const [isSavingAndExiting, setIsSavingAndExiting] = useState(false);
+  
+  // Determine initial step based on progress
+  const getInitialStep = useMemo(() => {
+    if (!progressData?.steps || progressData.steps.length === 0) {
+      return 1;
+    }
+
+    const steps = progressData.steps;
+    const level1Basic = steps.find(s => s.key === "level1.basic");
+    const level1Profile = steps.find(s => s.key === "level1.profile_media");
+    const level1Categories = steps.find(s => s.key === "level1.categories_social");
+
+    // If basic info is not done, start at step 1
+    if (level1Basic?.status !== "done") {
+      return 1;
+    }
+    // If profile media is not done, start at step 2
+    if (level1Profile?.status !== "done") {
+      return 2;
+    }
+    // If categories is not done, start at step 3
+    if (level1Categories?.status !== "done") {
+      return 3;
+    }
+    // All steps completed, start at step 3 (final step)
+    return 3;
+  }, [progressData]);
+
+  const [step, setStep] = useState(getInitialStep); // 1=form, 2=uploads, 3=categories
 
   // change-password flow (bottom sheets)
   const [cpEmail, setCpEmail] = useState(false);
@@ -521,16 +553,44 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
   const [cpNew, setCpNew] = useState(false);
 
   // uploads (phase 2)
-  const [avatar, setAvatar] = useState(
-    "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=60"
-  );
-  const [banner, setBanner] = useState(
-    "https://images.unsplash.com/photo-1521335629791-ce4aec67dd53?w=1200&q=60"
-  );
+  const [avatar, setAvatar] = useState("");
+  const [banner, setBanner] = useState("");
+  const [showBenefitsModal, setShowBenefitsModal] = useState(false);
 
   // Phase 3: categories + socials
-  const [selectedCats, setSelectedCats] = useState(["Electronics", "Phones"]);
+  const [selectedCats, setSelectedCats] = useState([]); // Store category IDs
   const [catPicker, setCatPicker] = useState(false);
+  
+  // Helper function to flatten nested categories
+  const flattenCategories = (categories, result = []) => {
+    if (!Array.isArray(categories)) return result;
+    categories.forEach(category => {
+      result.push(category);
+      if (category.children && category.children.length > 0) {
+        flattenCategories(category.children, result);
+      }
+    });
+    return result;
+  };
+
+  // Fetch categories for display
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories", token],
+    queryFn: () => getCategories(token),
+    enabled: !!token,
+  });
+  
+  // Extract and flatten categories from API response
+  const categoriesTree = categoriesData?.data || [];
+  const categories = useMemo(() => flattenCategories(categoriesTree), [categoriesTree]);
+  
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(c => {
+      const id = c.id ? Number(c.id) : null;
+      return id === categoryId || id === Number(categoryId);
+    });
+    return category?.title || `Category ${categoryId}`;
+  };
   const [links, setLinks] = useState({
     whatsapp: "",
     instagram: "",
@@ -558,9 +618,15 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
       if (data?.token) {
         storeOnboardingData(data.token);
       }
+      refetchProgress();
+      if (isSavingAndExiting) {
+        setIsSavingAndExiting(false);
+        onClose();
+      }
     },
     onError: (error) => {
       console.error("Start onboarding error:", error);
+      setIsSavingAndExiting(false);
     },
   });
 
@@ -569,9 +635,14 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
     onSuccess: (data) => {
       console.log("Profile media uploaded:", data);
       refetchProgress();
+      if (isSavingAndExiting) {
+        setIsSavingAndExiting(false);
+        onClose();
+      }
     },
     onError: (error) => {
       console.error("Upload profile media error:", error);
+      setIsSavingAndExiting(false);
     },
   });
 
@@ -580,9 +651,14 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
     onSuccess: (data) => {
       console.log("Categories and social set:", data);
       refetchProgress();
+      if (isSavingAndExiting) {
+        setIsSavingAndExiting(false);
+        onClose();
+      }
     },
     onError: (error) => {
       console.error("Set categories social error:", error);
+      setIsSavingAndExiting(false);
     },
   });
 
@@ -622,40 +698,59 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
   };
 
   const handleUploadProfileMedia = () => {
+    if (!avatar || !banner) {
+      Alert.alert("Error", "Please upload both profile image and banner image");
+      return;
+    }
+
     const formData = new FormData();
-    if (avatar && !avatar.includes('unsplash.com')) {
-      formData.append('profile_image', {
-        uri: avatar,
-        type: 'image/jpeg',
-        name: 'profile.jpg',
-      });
-    }
-    if (banner && !banner.includes('unsplash.com')) {
-      formData.append('banner_image', {
-        uri: banner,
-        type: 'image/jpeg',
-        name: 'banner.jpg',
-      });
-    }
+    formData.append('profile_image', {
+      uri: avatar,
+      type: 'image/jpeg',
+      name: 'profile.jpg',
+    });
+    formData.append('banner_image', {
+      uri: banner,
+      type: 'image/jpeg',
+      name: 'banner.jpg',
+    });
     uploadProfileMediaMutation.mutate(formData);
   };
 
   const handleSetCategoriesSocial = () => {
+    if (selectedCats.length === 0) {
+      Alert.alert("Error", "Please select at least one category");
+      return;
+    }
+
     const socialLinks = Object.entries(links)
       .filter(([key, value]) => value.trim())
-      .map(([type, url]) => ({ type, url }));
+      .map(([type, url]) => {
+        let formattedUrl = url.trim();
+        // Add protocol if missing
+        if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+          formattedUrl = 'https://' + formattedUrl;
+        }
+        return { type, url: formattedUrl };
+      });
     
     const payload = {
-      categories: [1, 2], // You might want to map selectedCats to IDs
+      categories: selectedCats.map(id => Number(id)), // Ensure IDs are numbers
       social_links: socialLinks,
     };
     
     setCategoriesSocialMutation.mutate(payload);
   };
 
+  // Update step when modal opens based on progress
   useEffect(() => {
-    if (!visible) setStep(1);
-  }, [visible]);
+    if (visible && progressData?.steps) {
+      setStep(getInitialStep);
+    } else if (!visible) {
+      // Reset to initial step when modal closes
+      setStep(getInitialStep);
+    }
+  }, [visible, progressData, getInitialStep]);
 
   const SmallStepDot = ({ n }) => {
     const active = n <= step;
@@ -725,7 +820,7 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
               <ThemedText style={{ color: C.text, fontWeight: "800" }}>
                 Level 1
               </ThemedText>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowBenefitsModal(true)}>
                 <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
                   View Benefits
                 </ThemedText>
@@ -804,7 +899,10 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
               <View style={{ flexDirection: "row", gap: 12, marginTop: 16 }}>
                 <TouchableOpacity
                   style={[styles.btnX, { backgroundColor: "#000" }]}
-                  onPress={handleStartOnboarding}
+                  onPress={() => {
+                    setIsSavingAndExiting(true);
+                    handleStartOnboarding();
+                  }}
                   disabled={startOnboardingMutation.isPending}
                 >
                   {startOnboardingMutation.isPending ? (
@@ -835,11 +933,31 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
               <TouchableOpacity
                 onPress={() => pickImage("avatar")}
                 style={{ alignSelf: "center", marginVertical: 12 }}
+                activeOpacity={0.9}
               >
-                <Image
-                  source={{ uri: avatar }}
-                  style={{ width: 120, height: 120, borderRadius: 60 }}
-                />
+                {avatar ? (
+                  <Image
+                    source={{ uri: avatar }}
+                    style={{ width: 120, height: 120, borderRadius: 60 }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 120,
+                      height: 120,
+                      borderRadius: 60,
+                      backgroundColor: "#EFEFEF",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons
+                      name="camera-outline"
+                      size={28}
+                      color="#8F8F8F"
+                    />
+                  </View>
+                )}
               </TouchableOpacity>
               <ThemedText style={{ color: C.text, marginTop: 6 }}>
                 Upload a banner for your store
@@ -847,12 +965,32 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
               <TouchableOpacity
                 onPress={() => pickImage("banner")}
                 activeOpacity={0.9}
-                style={{ marginTop: 10 }}
+                style={{
+                  backgroundColor: "#EFEFEF",
+                  borderRadius: 18,
+                  height: 130,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginTop: 10,
+                }}
               >
-                <Image
-                  source={{ uri: banner }}
-                  style={{ width: "100%", height: 140, borderRadius: 16 }}
-                />
+                {banner ? (
+                  <Image
+                    source={{ uri: banner }}
+                    style={{ width: "100%", height: "100%", borderRadius: 18 }}
+                  />
+                ) : (
+                  <View style={{ alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons
+                      name="camera-outline"
+                      size={26}
+                      color="#8F8F8F"
+                    />
+                    <ThemedText style={{ color: "#8F8F8F", marginTop: 6, fontSize: 12 }}>
+                      Upload Banner
+                    </ThemedText>
+                  </View>
+                )}
               </TouchableOpacity>
 
               <View
@@ -903,34 +1041,36 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
               </ThemedText>
               <SelectRow
                 C={C}
-                label="Select Category"
+                label={selectedCats.length > 0 ? `${selectedCats.length} selected` : "Select Category"}
                 onPress={() => setCatPicker(true)}
               />
               {/* chips */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  marginTop: 12,
-                }}
-              >
-                {selectedCats.map((c) => (
-                  <View
-                    key={c}
-                    style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      backgroundColor: "#FFE7E7",
-                    }}
-                  >
-                    <ThemedText style={{ color: C.primary, fontWeight: "700" }}>
-                      {c}
-                    </ThemedText>
-                  </View>
-                ))}
-              </View>
+              {selectedCats.length > 0 && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    marginTop: 12,
+                  }}
+                >
+                  {selectedCats.map((categoryId) => (
+                    <View
+                      key={categoryId}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        backgroundColor: "#FFE7E7",
+                      }}
+                    >
+                      <ThemedText style={{ color: C.primary, fontWeight: "700" }}>
+                        {getCategoryName(categoryId)}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               <ThemedText style={{ color: C.text, marginTop: 18 }}>
                 Add Social Links
@@ -1001,7 +1141,10 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.btnGrow, { backgroundColor: "#000" }]}
-                  onPress={handleSetCategoriesSocial}
+                  onPress={() => {
+                    setIsSavingAndExiting(true);
+                    handleSetCategoriesSocial();
+                  }}
                   disabled={setCategoriesSocialMutation.isPending}
                 >
                   {setCategoriesSocialMutation.isPending ? (
@@ -1023,6 +1166,7 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
                   setSelectedCats(arr);
                   setCatPicker(false);
                 }}
+                token={token}
               />
             </>
           )}
@@ -1054,6 +1198,14 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
         onClose={() => setCpNew(false)}
         onProceed={() => setCpNew(false)}
       />
+
+      {/* Level Benefits Modal */}
+      <LevelBenefitsModal
+        visible={showBenefitsModal}
+        onClose={() => setShowBenefitsModal(false)}
+        level={1}
+        theme={C}
+      />
     </Modal>
   );
 }
@@ -1061,10 +1213,34 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
 /* ────────────────────────────────────────────────────────────────────────────
    LEVEL 2  (2 phases + business type bottom sheet)
    ──────────────────────────────────────────────────────────────────────────── */
-function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgress }) {
-  const [step, setStep] = useState(1);
+function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgress, progressData }) {
+  // Determine initial step based on progress
+  const getInitialStep = useMemo(() => {
+    if (!progressData?.steps || progressData.steps.length === 0) {
+      return 1;
+    }
+
+    const steps = progressData.steps;
+    const level2Business = steps.find(s => s.key === "level2.business_details");
+    const level2Documents = steps.find(s => s.key === "level2.documents");
+
+    // If business details is not done, start at step 1
+    if (level2Business?.status !== "done") {
+      return 1;
+    }
+    // If documents is not done, start at step 2
+    if (level2Documents?.status !== "done") {
+      return 2;
+    }
+    // All steps completed, start at step 2 (final step)
+    return 2;
+  }, [progressData]);
+
+  const [step, setStep] = useState(getInitialStep);
   const [bizTypeOpen, setBizTypeOpen] = useState(false);
   const [bizType, setBizType] = useState("");
+  const [isSavingAndExiting, setIsSavingAndExiting] = useState(false);
+  const [showBenefitsModal, setShowBenefitsModal] = useState(false);
 
   // Form data for business details
   const [businessData, setBusinessData] = useState({
@@ -1085,9 +1261,14 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
     onSuccess: (data) => {
       console.log("Business details set:", data);
       refetchProgress();
+      if (isSavingAndExiting) {
+        setIsSavingAndExiting(false);
+        onClose();
+      }
     },
     onError: (error) => {
       console.error("Set business details error:", error);
+      setIsSavingAndExiting(false);
     },
   });
 
@@ -1096,9 +1277,14 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
     onSuccess: (data) => {
       console.log("Documents uploaded:", data);
       refetchProgress();
+      if (isSavingAndExiting) {
+        setIsSavingAndExiting(false);
+        onClose();
+      }
     },
     onError: (error) => {
       console.error("Upload documents error:", error);
+      setIsSavingAndExiting(false);
     },
   });
 
@@ -1136,8 +1322,15 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
       Alert.alert("Error", "NIN number is required");
       return;
     }
-    if (!businessData.cac_number.trim()) {
-      Alert.alert("Error", "CAC number is required");
+
+    // Validate based on business type
+    if (businessData.business_type === "BN" && !businessData.bn_number.trim()) {
+      Alert.alert("Error", "BN Number is required");
+      return;
+    }
+
+    if (businessData.business_type === "LTD" && !businessData.cac_number.trim()) {
+      Alert.alert("Error", "RC Number is required");
       return;
     }
     
@@ -1145,28 +1338,29 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
       registered_name: businessData.registered_name,
       business_type: businessData.business_type,
       nin_number: businessData.nin_number,
-      bn_number: businessData.bn_number,
-      cac_number: businessData.cac_number,
+      bn_number: businessData.business_type === "BN" ? businessData.bn_number : null,
+      cac_number: businessData.business_type === "LTD" ? businessData.cac_number : null,
     };
     setBusinessDetailsMutation.mutate(payload);
   };
 
   const handleUploadDocuments = () => {
+    if (!ninDocument || !cacDocument) {
+      Alert.alert("Error", "Please upload both NIN slip and CAC certificate");
+      return;
+    }
+
     const formData = new FormData();
-    if (ninDocument) {
-      formData.append('nin_document', {
-        uri: ninDocument,
-        type: 'image/jpeg',
-        name: 'nin_document.jpg',
-      });
-    }
-    if (cacDocument) {
-      formData.append('cac_document', {
-        uri: cacDocument,
-        type: 'image/jpeg',
-        name: 'cac_document.jpg',
-      });
-    }
+    formData.append('nin_document', {
+      uri: ninDocument,
+      type: 'image/jpeg',
+      name: 'nin_document.jpg',
+    });
+    formData.append('cac_document', {
+      uri: cacDocument,
+      type: 'image/jpeg',
+      name: 'cac_document.jpg',
+    });
     uploadDocumentsMutation.mutate(formData);
   };
 
@@ -1183,7 +1377,7 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
     } catch {}
   };
 
-  const UploadBox = ({ label, type }) => (
+  const UploadBox = ({ label, type, documentUri }) => (
     <TouchableOpacity
       activeOpacity={0.8}
       style={{
@@ -1194,22 +1388,43 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
         backgroundColor: "#fff",
         alignItems: "center",
         justifyContent: "center",
+        overflow: "hidden",
       }}
       onPress={() => pickDocument(type)}
     >
-      <Ionicons name="camera-outline" size={30} color="#C0C0C0" />
-      <ThemedText style={{ color: "#999", marginTop: 8, textAlign: "center" }}>
-        {`Upload a clear picture of your ${label}`}
-      </ThemedText>
+      {documentUri ? (
+        <Image
+          source={{ uri: documentUri }}
+          style={{ width: "100%", height: "100%", borderRadius: 16 }}
+        />
+      ) : (
+        <View style={{ alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name="camera-outline" size={28} color="#8F8F8F" />
+          <ThemedText style={{ color: "#8F8F8F", marginTop: 8, textAlign: "center", fontSize: 12 }}>
+            {`Upload a clear picture of your ${label}`}
+          </ThemedText>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
+  // Clear business number fields when business type changes
   useEffect(() => {
-    if (!visible) {
-      setStep(1);
+    if (bizType === "BN") {
+      setBusinessData(prev => ({ ...prev, cac_number: "" })); // Clear RC Number if switching to BN
+    } else if (bizType === "LTD") {
+      setBusinessData(prev => ({ ...prev, bn_number: "" })); // Clear BN Number if switching to LTD
+    }
+  }, [bizType]);
+
+  useEffect(() => {
+    if (visible && progressData?.steps) {
+      setStep(getInitialStep);
+    } else if (!visible) {
+      setStep(getInitialStep);
       setBizTypeOpen(false);
     }
-  }, [visible]);
+  }, [visible, progressData, getInitialStep]);
 
   return (
     <Modal
@@ -1259,7 +1474,7 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
               <ThemedText style={{ color: C.text, fontWeight: "800" }}>
                 Level 2
               </ThemedText>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowBenefitsModal(true)}>
                 <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
                   View Benefits
                 </ThemedText>
@@ -1309,18 +1524,22 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
                 value={businessData.nin_number}
                 onChangeText={(text) => setBusinessData(prev => ({ ...prev, nin_number: text }))}
               />
-              <ControlledInputBox 
-                C={C} 
-                placeholder="BN Number" 
-                value={businessData.bn_number}
-                onChangeText={(text) => setBusinessData(prev => ({ ...prev, bn_number: text }))}
-              />
-              <ControlledInputBox 
-                C={C} 
-                placeholder="CAC Number" 
-                value={businessData.cac_number}
-                onChangeText={(text) => setBusinessData(prev => ({ ...prev, cac_number: text }))}
-              />
+              {bizType === "BN" && (
+                <ControlledInputBox 
+                  C={C} 
+                  placeholder="BN Number" 
+                  value={businessData.bn_number}
+                  onChangeText={(text) => setBusinessData(prev => ({ ...prev, bn_number: text }))}
+                />
+              )}
+              {bizType === "LTD" && (
+                <ControlledInputBox 
+                  C={C} 
+                  placeholder="RC Number" 
+                  value={businessData.cac_number}
+                  onChangeText={(text) => setBusinessData(prev => ({ ...prev, cac_number: text }))}
+                />
+              )}
 
               <View
                 style={{
@@ -1361,7 +1580,10 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.btnGrow, { backgroundColor: "#000" }]}
-                  onPress={handleSetBusinessDetails}
+                  onPress={() => {
+                    setIsSavingAndExiting(true);
+                    handleSetBusinessDetails();
+                  }}
                   disabled={setBusinessDetailsMutation.isPending}
                 >
                   {setBusinessDetailsMutation.isPending ? (
@@ -1409,13 +1631,13 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
               <ThemedText style={{ color: C.text, marginBottom: 8 }}>
                 Upload a copy of your NIN Slip
               </ThemedText>
-              <UploadBox label="NIN Slip" type="nin" />
+              <UploadBox label="NIN Slip" type="nin" documentUri={ninDocument} />
               <ThemedText
                 style={{ color: C.text, marginTop: 16, marginBottom: 8 }}
               >
                 Upload a copy of your CAC Certificate
               </ThemedText>
-              <UploadBox label="CAC Certificate" type="cac" />
+              <UploadBox label="CAC Certificate" type="cac" documentUri={cacDocument} />
 
               <View
                 style={{
@@ -1456,7 +1678,10 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.btnGrow, { backgroundColor: "#000" }]}
-                  onPress={handleUploadDocuments}
+                  onPress={() => {
+                    setIsSavingAndExiting(true);
+                    handleUploadDocuments();
+                  }}
                   disabled={uploadDocumentsMutation.isPending}
                 >
                   {uploadDocumentsMutation.isPending ? (
@@ -1472,6 +1697,14 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {/* Level Benefits Modal */}
+      <LevelBenefitsModal
+        visible={showBenefitsModal}
+        onClose={() => setShowBenefitsModal(false)}
+        level={2}
+        theme={C}
+      />
     </Modal>
   );
 }
@@ -1483,6 +1716,7 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
   const [physicalOpen, setPhysicalOpen] = useState(false);
   const [physicalAns, setPhysicalAns] = useState("");
   const [videoUri, setVideoUri] = useState("");
+  const [showBenefitsModal, setShowBenefitsModal] = useState(false);
 
   // Mutations
   const uploadPhysicalStoreMutation = useMutation({
@@ -1583,6 +1817,11 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
               <ThemedText style={{ color: C.text, fontWeight: "800" }}>
                 Level 3 - Final Step
               </ThemedText>
+              <TouchableOpacity onPress={() => setShowBenefitsModal(true)}>
+                <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
+                  View Benefits
+                </ThemedText>
+              </TouchableOpacity>
             </View>
             <View style={{ height: 30, justifyContent: "center" }}>
               <View
@@ -1604,7 +1843,7 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
           />
 
           <ThemedText style={{ color: C.text, marginTop: 10 }}>
-            Upload a 1 minute video of your store
+          Upload a 1 minute video of your place of business
           </ThemedText>
           <TouchableOpacity
             style={{
@@ -1710,6 +1949,14 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
           </BottomSheet>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Level Benefits Modal */}
+      <LevelBenefitsModal
+        visible={showBenefitsModal}
+        onClose={() => setShowBenefitsModal(false)}
+        level={3}
+        theme={C}
+      />
     </Modal>
   );
 }
@@ -1768,27 +2015,48 @@ function BottomSheet({ C, visible, onClose, title, children }) {
   );
 }
 
-function CategoryPickerSheet({ C, visible, onClose, selected, onApply }) {
-  const ALL = [
-    "Electronics",
-    "Phones",
-    "Category 2",
-    "Category 2",
-    "Category 2",
-    "Category 2",
-    "Category 2",
-    "Category 2",
-    "Category 2",
-  ];
+function CategoryPickerSheet({ C, visible, onClose, selected, onApply, token }) {
+  // Helper function to flatten nested categories
+  const flattenCategories = (categories, result = []) => {
+    if (!Array.isArray(categories)) return result;
+    categories.forEach(category => {
+      result.push(category);
+      if (category.children && category.children.length > 0) {
+        flattenCategories(category.children, result);
+      }
+    });
+    return result;
+  };
+
+  // Fetch categories
+  const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["categories", token],
+    queryFn: () => getCategories(token),
+    enabled: !!token && visible,
+  });
+
+  // Extract and flatten categories from API response
+  const categoriesTree = categoriesData?.data || [];
+  const categories = useMemo(() => flattenCategories(categoriesTree), [categoriesTree]);
+  
   const [local, setLocal] = useState(selected || []);
   useEffect(() => {
     if (visible) setLocal(selected || []);
   }, [visible, selected]);
-  const toggle = (label) => {
-    const exists = local.includes(label);
-    if (exists) return setLocal(local.filter((x) => x !== label));
+  
+  const toggle = (categoryId) => {
+    const exists = local.includes(categoryId);
+    if (exists) return setLocal(local.filter((x) => x !== categoryId));
     if (local.length >= 5) return;
-    setLocal([...local, label]);
+    setLocal([...local, categoryId]);
+  };
+  
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(c => {
+      const id = c.id ? Number(c.id) : null;
+      return id === categoryId || id === Number(categoryId);
+    });
+    return category?.title || `Category ${categoryId}`;
   };
   return (
     <BottomSheet
@@ -1808,9 +2076,9 @@ function CategoryPickerSheet({ C, visible, onClose, selected, onApply }) {
           marginBottom: 10,
         }}
       >
-        {local.map((c) => (
+        {local.map((categoryId) => (
           <View
-            key={c}
+            key={categoryId}
             style={{
               paddingHorizontal: 12,
               paddingVertical: 6,
@@ -1819,53 +2087,73 @@ function CategoryPickerSheet({ C, visible, onClose, selected, onApply }) {
             }}
           >
             <ThemedText style={{ color: C.primary, fontWeight: "800" }}>
-              {c}
+              {getCategoryName(categoryId)}
             </ThemedText>
           </View>
         ))}
       </View>
-      <ScrollView style={{ maxHeight: 380 }}>
-        {ALL.map((label, i) => {
-          const s = local.includes(label);
-          return (
-            <TouchableOpacity
-              key={`${label}-${i}`}
-              onPress={() => toggle(label)}
-              activeOpacity={0.8}
-              style={{
-                height: 54,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                paddingHorizontal: 12,
-                marginBottom: 10,
-                backgroundColor: s ? "#F8F8F8" : "#fff",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <ThemedText style={{ color: "#111" }}>{label}</ThemedText>
-              <View
+      {categoriesLoading ? (
+        <View style={{ alignItems: "center", paddingVertical: 40 }}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <ThemedText style={{ color: C.sub, marginTop: 12 }}>
+            Loading categories...
+          </ThemedText>
+        </View>
+      ) : categories.length === 0 ? (
+        <View style={{ alignItems: "center", paddingVertical: 40 }}>
+          <ThemedText style={{ color: C.sub }}>
+            No categories available
+          </ThemedText>
+        </View>
+      ) : (
+        <ScrollView style={{ maxHeight: 380 }}>
+          {categories.map((category, index) => {
+            const categoryId = category.id ? Number(category.id) : null;
+            if (!categoryId) {
+              return null;
+            }
+            const s = local.includes(categoryId);
+            const categoryName = category.title || `Category ${categoryId}`;
+            return (
+              <TouchableOpacity
+                key={categoryId}
+                onPress={() => toggle(categoryId)}
+                activeOpacity={0.8}
                 style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 4,
-                  borderWidth: 2,
-                  borderColor: s ? C.primary : "#CFCFCF",
+                  height: 54,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  paddingHorizontal: 12,
+                  marginBottom: 10,
+                  backgroundColor: s ? "#F8F8F8" : "#fff",
+                  flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: s ? C.primary : "transparent",
+                  justifyContent: "space-between",
                 }}
               >
-                {s ? (
-                  <Ionicons name="checkmark" size={14} color="#fff" />
-                ) : null}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+                <ThemedText style={{ color: "#111" }}>{categoryName}</ThemedText>
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    borderWidth: 2,
+                    borderColor: s ? C.primary : "#CFCFCF",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: s ? C.primary : "transparent",
+                  }}
+                >
+                  {s ? (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
       <TouchableOpacity
         onPress={() => onApply(local)}
         style={[
@@ -2119,6 +2407,94 @@ const VerifyPill = ({ C }) => (
 );
 
 /* ────────────────────────────────────────────────────────────────────────────
+   LEVEL BENEFITS MODAL
+   ──────────────────────────────────────────────────────────────────────────── */
+function LevelBenefitsModal({ visible, onClose, level, theme }) {
+  // Define benefits for each level
+  const levelBenefits = {
+    1: [
+      "Store Setup - Create your store profile with basic information",
+      "Basic Features - Access essential store management tools",
+      "Profile Customization - Add logo, banner, and store details",
+      "Category Selection - Choose your product categories",
+      "Social Media Links - Connect your social media profiles",
+    ],
+    2: [
+      "Business Verification - Verify your business credentials",
+      "Enhanced Features - Access advanced store management tools",
+      "Trust Badge - Display verified badge on your store",
+      "Document Upload - Secure document management",
+      "Business Credibility - Build customer trust",
+    ],
+    3: [
+      "Full Store Features - Access all platform features",
+      "Advanced Analytics - Track your store performance",
+      "Premium Support - Priority customer support",
+      "Physical Store Verification - Verify store location",
+      "Complete Store Setup - Fully functional store ready to sell",
+    ],
+  };
+
+  const benefits = levelBenefits[level] || levelBenefits[1];
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.benefitsModalOverlay}>
+        <View style={styles.benefitsModalContent}>
+          <View style={styles.benefitsModalHeader}>
+            <ThemedText style={[styles.benefitsModalTitle, { color: theme.primary }]}>
+              Level {level} Benefits
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} style={styles.benefitsModalClose}>
+              <Ionicons name="close" size={24} color="#101318" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            style={{ maxHeight: 500 }}
+            contentContainerStyle={styles.benefitsList}
+          >
+            <ThemedText 
+              style={{ 
+                fontSize: 14, 
+                color: "#6C727A", 
+                marginBottom: 16,
+                lineHeight: 20 
+              }}
+            >
+              Complete Level {level} to unlock these benefits:
+            </ThemedText>
+
+            {benefits.map((benefit, index) => (
+              <View key={index} style={styles.benefitItem}>
+                <View style={styles.benefitIcon}>
+                  <Ionicons 
+                    name="checkmark-circle" 
+                    size={20} 
+                    color={theme.primary} 
+                  />
+                </View>
+                <ThemedText style={styles.benefitText}>
+                  {benefit}
+                </ThemedText>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    STYLES
    ──────────────────────────────────────────────────────────────────────────── */
 const DOT = 36;
@@ -2267,5 +2643,55 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
+  },
+
+  /* Benefits Modal Styles */
+  benefitsModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  benefitsModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    paddingBottom: 20,
+  },
+  benefitsModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECEEF2",
+  },
+  benefitsModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#101318",
+  },
+  benefitsModalClose: {
+    padding: 4,
+  },
+  benefitsList: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  benefitItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  benefitIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  benefitText: {
+    flex: 1,
+    fontSize: 15,
+    color: "#101318",
+    lineHeight: 22,
   },
 });

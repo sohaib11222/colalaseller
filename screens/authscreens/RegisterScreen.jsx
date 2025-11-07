@@ -24,7 +24,7 @@ import { useTheme } from "../../components/ThemeProvider"; // << theme
 const { width, height } = Dimensions.get("window");
 
 //Code Related to the integration
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   startOnboarding,
   uploadProfileMedia,
@@ -41,29 +41,61 @@ import {
   storeOnboardingData,
   getOnboardingToken,
 } from "../../utils/tokenStorage";
+import { getProgress } from "../../utils/queries/seller";
+import { getCategories } from "../../utils/queries/general";
+import { useAuth } from "../../contexts/AuthContext";
 
+// Popular Nigerian states (most commonly used)
 const popularLocations = [
-  "Lagos, Nigeria",
-  "Abuja, Nigeria",
-  "Accra, Ghana",
-  "Cape Town, South Africa",
+  "Lagos State",
+  "FCT, Abuja",
+  "Rivers State",
+  "Kano State",
+  "Oyo State",
+  "Kaduna State",
 ];
+
+// Complete list of all Nigerian states
 const allLocations = [
-  "Ibadan, Nigeria",
-  "Kano, Nigeria",
-  "Kigali, Rwanda",
-  "Dubai, UAE",
-  "London, United Kingdom",
-  "Toronto, Canada",
+  "Abia State",
+  "Adamawa State",
+  "Akwa Ibom State",
+  "Anambra State",
+  "Bauchi State",
+  "Bayelsa State",
+  "Benue State",
+  "Borno State",
+  "Cross River State",
+  "Delta State",
+  "Ebonyi State",
+  "Edo State",
+  "Ekiti State",
+  "Enugu State",
+  "FCT, Abuja",
+  "Gombe State",
+  "Imo State",
+  "Jigawa State",
+  "Kaduna State",
+  "Kano State",
+  "Katsina State",
+  "Kebbi State",
+  "Kogi State",
+  "Kwara State",
+  "Lagos State",
+  "Nasarawa State",
+  "Niger State",
+  "Ogun State",
+  "Ondo State",
+  "Osun State",
+  "Oyo State",
+  "Plateau State",
+  "Rivers State",
+  "Sokoto State",
+  "Taraba State",
+  "Yobe State",
+  "Zamfara State",
 ];
-const CATEGORIES = [
-  "Electronics",
-  "Phones",
-  "Fashion",
-  "Groceries",
-  "Beauty",
-  "Home & Kitchen",
-];
+// Categories will be fetched from API
 const BUSINESS_TYPES = ["BN", "LTD"];
 const PHYSICAL_OPTIONS = [
   "Yes i have a physical store",
@@ -85,15 +117,99 @@ const BRAND_COLORS = [
 export default function RegisterStoreScreen() {
   const navigation = useNavigation();
   const { theme, setPrimary } = useTheme(); // << theme
+  const { token } = useAuth();
 
   // ------------ Token and Store Management ------------
   const [onboardingToken, setOnboardingToken] = useState(null);
   const [storeId, setStoreId] = useState(null);
 
+  // Helper function to flatten nested categories
+  const flattenCategories = (categories, result = []) => {
+    if (!Array.isArray(categories)) return result;
+    categories.forEach(category => {
+      result.push(category);
+      if (category.children && category.children.length > 0) {
+        flattenCategories(category.children, result);
+      }
+    });
+    return result;
+  };
+
+  // Fetch categories
+  const { data: categoriesData } = useQuery({
+    queryKey: ["categories", token],
+    queryFn: () => getCategories(token),
+    enabled: !!token,
+  });
+
+  // Extract and flatten categories from API response
+  const categoriesTree = categoriesData?.data || [];
+  const categories = React.useMemo(() => flattenCategories(categoriesTree), [categoriesTree]);
+
+  // Fetch onboarding progress to determine starting point
+  const { data: progressData, isLoading: progressLoading } = useQuery({
+    queryKey: ['onboardingProgress', token],
+    queryFn: () => getProgress(token),
+    enabled: !!token,
+  });
+
+  // Determine starting level and phase based on progress
+  const getInitialLevelAndPhase = () => {
+    if (!progressData?.steps || progressData.steps.length === 0) {
+      return { level: 1, phase: 1 };
+    }
+
+    const steps = progressData.steps;
+    
+    // Check Level 1 steps
+    const level1Basic = steps.find(s => s.key === "level1.basic");
+    const level1Profile = steps.find(s => s.key === "level1.profile_media");
+    const level1Categories = steps.find(s => s.key === "level1.categories_social");
+
+    if (level1Basic?.status !== "done") {
+      return { level: 1, phase: 1 };
+    }
+    if (level1Profile?.status !== "done") {
+      return { level: 1, phase: 2 };
+    }
+    if (level1Categories?.status !== "done") {
+      return { level: 1, phase: 3 };
+    }
+
+    // Check Level 2 steps
+    const level2Business = steps.find(s => s.key === "level2.business_details");
+    const level2Documents = steps.find(s => s.key === "level2.documents");
+
+    if (level2Business?.status !== "done") {
+      return { level: 2, phase: 1 };
+    }
+    if (level2Documents?.status !== "done") {
+      return { level: 2, phase: 2 };
+    }
+
+    // Check Level 3 steps
+    const level3Physical = steps.find(s => s.key === "level3.physical_store");
+    if (level3Physical?.status !== "done") {
+      return { level: 3, phase: 1 };
+    }
+
+    // All steps completed
+    return { level: 3, phase: 2 };
+  };
+
   // ------------ Wizard state (Level + Phase) ------------
   const [level, setLevel] = useState(1); // 1, 2, 3
   const [phase, setPhase] = useState(1); // per-level
   const stepsForLevel = level === 1 ? 3 : level === 2 ? 2 : 2;
+
+  // Update level and phase when progress data is loaded
+  useEffect(() => {
+    if (!progressLoading && progressData?.steps) {
+      const newState = getInitialLevelAndPhase();
+      setLevel(newState.level);
+      setPhase(newState.phase);
+    }
+  }, [progressData, progressLoading]);
 
   const goNext = () => {
     if (phase < stepsForLevel) setPhase((p) => p + 1);
@@ -175,6 +291,30 @@ export default function RegisterStoreScreen() {
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     })();
   }, []);
+
+  // Load stored onboarding token on mount
+  useEffect(() => {
+    const loadStoredToken = async () => {
+      try {
+        const storedToken = await getOnboardingToken();
+        if (storedToken) {
+          setOnboardingToken(storedToken);
+        }
+      } catch (error) {
+        console.error("Error loading stored onboarding token:", error);
+      }
+    };
+    loadStoredToken();
+  }, []);
+
+  // Clear business number fields when business type changes
+  useEffect(() => {
+    if (businessType === "BN") {
+      setCacNumber(""); // Clear RC Number if switching to BN
+    } else if (businessType === "LTD") {
+      setBnNumber(""); // Clear BN Number if switching to LTD
+    }
+  }, [businessType]);
 
   // ------------ Mutations ------------
 
@@ -495,17 +635,8 @@ export default function RegisterStoreScreen() {
       return;
     }
 
-    // Map category names to IDs
-    const categoryNameToId = {
-      "Electronics": 1,
-      "Phones": 2,
-      "Fashion": 3,
-      "Groceries": 4,
-      "Beauty": 5,
-      "Home & Kitchen": 6,
-    };
-
-    const categoryIds = selectedCategories.map(category => categoryNameToId[category]).filter(id => id !== undefined);
+    // selectedCategories already contains IDs
+    const categoryIds = selectedCategories.map(id => Number(id));
 
     const socialLinks = [];
     Object.entries(links).forEach(([type, url]) => {
@@ -533,12 +664,23 @@ export default function RegisterStoreScreen() {
       return;
     }
 
+    // Validate based on business type
+    if (businessType === "BN" && !bnNumber.trim()) {
+      Alert.alert("Error", "Please enter BN Number");
+      return;
+    }
+
+    if (businessType === "LTD" && !cacNumber.trim()) {
+      Alert.alert("Error", "Please enter RC Number");
+      return;
+    }
+
     setBusinessDetailsMutation.mutate({
       registered_name: businessName.trim(),
       business_type: businessType.trim(),
       nin_number: ninNumber.trim(),
-      bn_number: bnNumber.trim() || null,
-      cac_number: cacNumber.trim() || null,
+      bn_number: businessType === "BN" ? bnNumber.trim() : null,
+      cac_number: businessType === "LTD" ? cacNumber.trim() : null,
     });
   };
 
@@ -694,10 +836,26 @@ export default function RegisterStoreScreen() {
     }
   };
 
-  const toggleCategory = (c) => {
-    setSelectedCategories((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-    );
+  const toggleCategory = (categoryId) => {
+    setSelectedCategories((prev) => {
+      const id = Number(categoryId);
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id);
+      }
+      if (prev.length >= 5) {
+        Alert.alert("Limit Reached", "You can select a maximum of 5 categories");
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
+
+  const getCategoryName = (categoryId) => {
+    const category = categories.find(c => {
+      const id = c.id ? Number(c.id) : null;
+      return id === categoryId || id === Number(categoryId);
+    });
+    return category?.title || `Category ${categoryId}`;
   };
 
   // Helper function to get current mutation
@@ -919,14 +1077,14 @@ export default function RegisterStoreScreen() {
                   />
                   {!!selectedCategories.length && (
                     <View style={styles.chipsRow}>
-                      {selectedCategories.map((c) => (
+                      {selectedCategories.map((categoryId) => (
                         <TouchableOpacity
-                          key={c}
+                          key={categoryId}
                           style={[
                             styles.chip,
                             { backgroundColor: theme.colors.primary100 },
                           ]}
-                          onPress={() => toggleCategory(c)}
+                          onPress={() => toggleCategory(categoryId)}
                         >
                           <ThemedText
                             style={[
@@ -934,7 +1092,7 @@ export default function RegisterStoreScreen() {
                               { color: theme.colors.primary },
                             ]}
                           >
-                            {c}
+                            {getCategoryName(categoryId)}
                           </ThemedText>
                         </TouchableOpacity>
                       ))}
@@ -999,11 +1157,20 @@ export default function RegisterStoreScreen() {
                     value={ninNumber}
                     onChangeText={setNinNumber}
                   />
-                  <Field
-                    placeholder="BN Number"
-                    value={bnNumber}
-                    onChangeText={setBnNumber}
-                  />
+                  {businessType === "BN" && (
+                    <Field
+                      placeholder="BN Number"
+                      value={bnNumber}
+                      onChangeText={setBnNumber}
+                    />
+                  )}
+                  {businessType === "LTD" && (
+                    <Field
+                      placeholder="RC Number"
+                      value={cacNumber}
+                      onChangeText={setCacNumber}
+                    />
+                  )}
                 </>
               )}
 
@@ -1082,7 +1249,7 @@ export default function RegisterStoreScreen() {
                   />
 
                   <ThemedText style={[styles.sectionTitle, { marginTop: 10 }]}>
-                    Upload a 1 minute video of your store
+                    Upload a 1 minute video of your place of business
                   </ThemedText>
                   <TouchableOpacity
                     style={styles.docPicker}
@@ -1175,17 +1342,19 @@ export default function RegisterStoreScreen() {
 
           {/* Actions */}
           <View style={styles.actionRow}>
-            <RoundButton onPress={goPrev} disabled={level === 1 && phase === 1}>
-              <Ionicons
-                name="arrow-back"
-                size={20}
-                color={level === 1 && phase === 1 ? "#A8A8A8" : "#1A1A1A"}
-              />
-            </RoundButton>
+            {!(level === 1 && phase === 1) && (
+              <RoundButton onPress={goPrev} disabled={level === 1 && phase === 1}>
+                <Ionicons
+                  name="arrow-back"
+                  size={20}
+                  color={level === 1 && phase === 1 ? "#A8A8A8" : "#1A1A1A"}
+                />
+              </RoundButton>
+            )}
 
             <TouchableOpacity
               style={[
-                styles.proceedBtn,
+                level === 1 && phase === 1 ? styles.proceedBtnFull : styles.proceedBtn,
                 { backgroundColor: theme.colors.primary },
                 getCurrentMutation()?.isPending && styles.buttonDisabled,
               ]}
@@ -1197,13 +1366,13 @@ export default function RegisterStoreScreen() {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <ThemedText style={styles.proceedText}>
-                  {level === 1 && phase === 1 && "Start Registration"}
-                  {level === 1 && phase === 2 && "Upload Media"}
-                  {level === 1 && phase === 3 && "Save Categories"}
-                  {level === 2 && phase === 1 && "Save Business Details"}
-                  {level === 2 && phase === 2 && "Upload Documents"}
-                  {level === 3 && phase === 1 && "Save Store Info"}
-                  {level === 3 && phase === 2 && "Complete Registration"}
+                  {level === 1 && phase === 1 && "Create Store"}
+                  {level === 1 && phase === 2 && "Submit"}
+                  {level === 1 && phase === 3 && "Submit"}
+                  {level === 2 && phase === 1 && "Submit"}
+                  {level === 2 && phase === 2 && "Submit"}
+                  {level === 3 && phase === 1 && "Submit"}
+                  {level === 3 && phase === 2 && "Submit"}
                 </ThemedText>
               )}
             </TouchableOpacity>
@@ -1215,7 +1384,7 @@ export default function RegisterStoreScreen() {
                 onPress={() => navigation.replace("Login")}
               >
                 <ThemedText style={styles.saveSkipText}>
-                  Save &amp; Exit
+                Continue Later
                 </ThemedText>
               </TouchableOpacity>
             )}
@@ -1300,27 +1469,38 @@ export default function RegisterStoreScreen() {
           title="Select Category"
           onClose={() => setShowCategory(false)}
         >
-          <View style={{ paddingVertical: 6 }}>
-            {CATEGORIES.map((c) => {
-              const active = selectedCategories.includes(c);
-              return (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.modalItem,
-                    active && {
-                      backgroundColor: theme.colors.primary100,
-                      borderColor: theme.colors.primary,
-                      borderWidth: 1,
-                    },
-                  ]}
-                  onPress={() => toggleCategory(c)}
-                >
-                  <ThemedText>{c}</ThemedText>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {categories.length === 0 ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <ThemedText style={{ color: "#6C727A", marginTop: 12 }}>
+                Loading categories...
+              </ThemedText>
+            </View>
+          ) : (
+            <View style={{ paddingVertical: 6 }}>
+              {categories.map((category) => {
+                const categoryId = category.id ? Number(category.id) : null;
+                if (!categoryId) return null;
+                const active = selectedCategories.includes(categoryId);
+                return (
+                  <TouchableOpacity
+                    key={categoryId}
+                    style={[
+                      styles.modalItem,
+                      active && {
+                        backgroundColor: theme.colors.primary100,
+                        borderColor: theme.colors.primary,
+                        borderWidth: 1,
+                      },
+                    ]}
+                    onPress={() => toggleCategory(categoryId)}
+                  >
+                    <ThemedText>{category.title || `Category ${categoryId}`}</ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </BottomSheet>
 
         {/* Business Type (Level 2) */}
@@ -2146,6 +2326,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#EBEBEB",
   },
   proceedBtn: {
+    width: 80,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  proceedBtnFull: {
     flex: 1,
     paddingVertical: 14,
     paddingHorizontal: 10,
@@ -2155,14 +2342,15 @@ const styles = StyleSheet.create({
   buttonDisabled: { backgroundColor: "#ccc", opacity: 0.6 },
   proceedText: { color: "#fff", fontSize: 14, fontWeight: "600" },
   saveSkipBtn: {
-    width: 110,
+    flex: 1,
     backgroundColor: "#000",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
     paddingHorizontal: 15,
+    marginLeft: 5,
   },
-  saveSkipText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  saveSkipText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
   loginDisabled: {
     backgroundColor: "#EBEBEB",

@@ -49,6 +49,32 @@ const toSrc = (v) => {
   return undefined;
 };
 
+// Format number with thousand separators for display
+const formatNumberWithSeparator = (value) => {
+  if (!value && value !== 0) return "";
+  // Remove any existing separators and non-numeric characters except decimal point
+  const cleaned = String(value).replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+  
+  // Split by decimal point if exists
+  const parts = cleaned.split(".");
+  const integerPart = parts[0];
+  const decimalPart = parts[1];
+  
+  // Add thousand separators to integer part
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  
+  // Combine with decimal part if exists
+  return decimalPart !== undefined ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+};
+
+// Remove thousand separators to get raw number
+const removeNumberSeparators = (value) => {
+  if (!value) return "";
+  // Remove all commas and keep only numbers and decimal point
+  return String(value).replace(/[^\d.]/g, "");
+};
+
 // Build a flat list of rows to show in summaries
 const buildVariantSummary = (details, selectedColors, selectedSizes) => {
   const items = [];
@@ -644,8 +670,8 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("category_id", category); // Category ID
     formData.append("brand", brand); // Brand name (not brand_id)
     formData.append("description", fullDesc.trim());
-    formData.append("price", price.toString());
-    formData.append("discount_price", discountPrice ? discountPrice.toString() : "");
+    formData.append("price", removeNumberSeparators(price.toString()));
+    formData.append("discount_price", discountPrice ? removeNumberSeparators(discountPrice.toString()) : "");
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
 
@@ -654,7 +680,7 @@ export default function AddProductScreen({ navigation, route }) {
       formData.append("quantity", parseInt(quantity) || 0);
     }
     if (referralFee && referralFee.trim() !== "") {
-      formData.append("referral_fee", parseFloat(referralFee) || 0);
+      formData.append("referral_fee", parseFloat(removeNumberSeparators(referralFee.toString())) || 0);
     }
     if (referralPersonLimit && referralPersonLimit.trim() !== "") {
       formData.append("referral_person_limit", parseInt(referralPersonLimit) || 1);
@@ -805,8 +831,8 @@ export default function AddProductScreen({ navigation, route }) {
     formData.append("category_id", category); // Category ID
     formData.append("brand", brand); // Brand name (not brand_id)
     formData.append("description", fullDesc.trim());
-    formData.append("price", price.toString());
-    formData.append("discount_price", discountPrice ? discountPrice.toString() : "");
+    formData.append("price", removeNumberSeparators(price.toString()));
+    formData.append("discount_price", discountPrice ? removeNumberSeparators(discountPrice.toString()) : "");
     formData.append("has_variants", variantTypes.length > 0 ? "1" : "0");
     formData.append("status", "active"); // Default status
 
@@ -815,7 +841,7 @@ export default function AddProductScreen({ navigation, route }) {
       formData.append("quantity", parseInt(quantity) || 0);
     }
     if (referralFee && referralFee.trim() !== "") {
-      formData.append("referral_fee", parseFloat(referralFee) || 0);
+      formData.append("referral_fee", parseFloat(removeNumberSeparators(referralFee.toString())) || 0);
     }
     if (referralPersonLimit && referralPersonLimit.trim() !== "") {
       formData.append("referral_person_limit", parseInt(referralPersonLimit) || 1);
@@ -1430,16 +1456,22 @@ export default function AddProductScreen({ navigation, route }) {
         />
 
         <Field
-          value={price}
-          onChangeText={setPrice}
+          value={formatNumberWithSeparator(price)}
+          onChangeText={(text) => {
+            const rawValue = removeNumberSeparators(text);
+            setPrice(rawValue);
+          }}
           placeholder="Price"
           C={C}
           style={{ marginTop: 10 }}
           keyboardType="numeric"
         />
         <Field
-          value={discountPrice}
-          onChangeText={setDiscountPrice}
+          value={formatNumberWithSeparator(discountPrice)}
+          onChangeText={(text) => {
+            const rawValue = removeNumberSeparators(text);
+            setDiscountPrice(rawValue);
+          }}
           placeholder="Discount Price"
           C={C}
           style={{ marginTop: 10 }}
@@ -1456,8 +1488,11 @@ export default function AddProductScreen({ navigation, route }) {
         />
 
         <Field
-          value={referralFee}
-          onChangeText={setReferralFee}
+          value={formatNumberWithSeparator(referralFee)}
+          onChangeText={(text) => {
+            const rawValue = removeNumberSeparators(text);
+            setReferralFee(rawValue);
+          }}
           placeholder="Referral Fee (Optional)"
           C={C}
           style={{ marginTop: 10 }}
@@ -1533,8 +1568,11 @@ export default function AddProductScreen({ navigation, route }) {
                     C={C}
                   />
                   <MiniField
-                    value={t.price}
-                    onChangeText={(v) => editTier(t.id, "price", v)}
+                    value={formatNumberWithSeparator(t.price)}
+                    onChangeText={(v) => {
+                      const rawValue = removeNumberSeparators(v);
+                      editTier(t.id, "price", rawValue);
+                    }}
                     placeholder="₦ Price"
                     keyboardType="numeric"
                     C={C}
@@ -1624,7 +1662,7 @@ export default function AddProductScreen({ navigation, route }) {
             size={20}
             color={usePoints ? C.primary : C.sub}
           />
-          <ThemedText style={{ color: C.text, marginLeft: 10 }}>
+          <ThemedText style={{ color: C.text, marginLeft: 10,fontSize:1 }}>
             Buyers can use loyalty points during purchase
           </ThemedText>
         </TouchableOpacity>
@@ -1673,7 +1711,7 @@ export default function AddProductScreen({ navigation, route }) {
         />
 
         {/* Delivery locations */}
-        <PickerField
+        {/* <PickerField
           label="Delivery locations"
           subLabel={delivery.length ? `${delivery.length} Selected` : undefined}
           empty={delivery.length === 0}
@@ -1683,7 +1721,7 @@ export default function AddProductScreen({ navigation, route }) {
           }}
           C={C}
           style={{ marginTop: 10 }}
-        />
+        /> */}
 
         {/* Post button */}
         <TouchableOpacity
@@ -1884,13 +1922,7 @@ export default function AddProductScreen({ navigation, route }) {
         statesSource={
           availability.length
             ? availability
-            : [
-                "Lagos State",
-                "Oyo State",
-                "Abuja State",
-                "Rivers State",
-                "Kano State",
-              ]
+            : ALL_NIGERIAN_STATES
         }
         deliveriesData={deliveriesData}
         isLoading={deliveriesLoading}
@@ -1996,6 +2028,8 @@ function CategoriesSheet({
   isLoading,
   error,
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+
   console.log(
     "CategoriesSheet visible:",
     visible,
@@ -2084,6 +2118,18 @@ function CategoriesSheet({
   // Get categories from API data
   const categories = categoriesData?.data || [];
 
+  // Filter categories based on search query
+  const filteredCategories = categories.filter((category) =>
+    category.title?.toLowerCase().includes(searchQuery.toLowerCase().trim())
+  );
+
+  // Reset search when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setSearchQuery("");
+    }
+  }, [visible]);
+
   return (
     <Modal
       visible={visible}
@@ -2114,6 +2160,8 @@ function CategoriesSheet({
               placeholder="Search Category"
               placeholderTextColor="#9BA0A6"
               style={{ flex: 1, color: C.text }}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
           </View>
 
@@ -2121,18 +2169,18 @@ function CategoriesSheet({
             Categories
           </ThemedText>
 
-          {categories.length === 0 ? (
+          {filteredCategories.length === 0 ? (
             <View style={{ padding: 20, alignItems: "center" }}>
               <Ionicons name="folder-outline" size={48} color={C.sub} />
               <ThemedText
                 style={{ color: C.sub, marginTop: 10, textAlign: "center" }}
               >
-                No categories available
+                {searchQuery.trim() ? "No categories found" : "No categories available"}
               </ThemedText>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
-              {categories.map((category) => (
+              {filteredCategories.map((category) => (
                 <TouchableOpacity
                   key={category.id}
                   onPress={() => onSelect(category.id)}
@@ -2145,11 +2193,6 @@ function CategoriesSheet({
                   <ThemedText style={{ color: C.text }}>
                     {category.title}
                   </ThemedText>
-                  {category.products_count > 0 && (
-                    <ThemedText style={{ color: C.sub, fontSize: 12 }}>
-                      {category.products_count} products
-                    </ThemedText>
-                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -2355,6 +2398,47 @@ function Check({ checked, C }) {
 
 /* ───────────────────────── Available Locations Sheet ───────────────────────── */
 
+// Complete list of all Nigerian states
+const ALL_NIGERIAN_STATES = [
+  "Abia State",
+  "Adamawa State",
+  "Akwa Ibom State",
+  "Anambra State",
+  "Bauchi State",
+  "Bayelsa State",
+  "Benue State",
+  "Borno State",
+  "Cross River State",
+  "Delta State",
+  "Ebonyi State",
+  "Edo State",
+  "Ekiti State",
+  "Enugu State",
+  "FCT, Abuja",
+  "Gombe State",
+  "Imo State",
+  "Jigawa State",
+  "Kaduna State",
+  "Kano State",
+  "Katsina State",
+  "Kebbi State",
+  "Kogi State",
+  "Kwara State",
+  "Lagos State",
+  "Nasarawa State",
+  "Niger State",
+  "Ogun State",
+  "Ondo State",
+  "Osun State",
+  "Oyo State",
+  "Plateau State",
+  "Rivers State",
+  "Sokoto State",
+  "Taraba State",
+  "Yobe State",
+  "Zamfara State",
+];
+
 function AvailableLocationsSheet({
   visible,
   onClose,
@@ -2383,8 +2467,8 @@ function AvailableLocationsSheet({
     .map(addr => addr.state);
   const popular = [...new Set(popularStates)].sort(); // Remove duplicates and sort
   
-  // Get unique states for all states
-  const allStates = [...new Set(addresses.map(addr => addr.state))].sort(); // Remove duplicates and sort
+  // Use complete list of all Nigerian states
+  const allStates = ALL_NIGERIAN_STATES;
 
   const toggle = (opt) => {
     console.log("Location toggle clicked:", opt, "Current selected:", selected);
@@ -3907,26 +3991,28 @@ function VariantDetailsModal({
 
               <Field
                 C={C}
-                value={sizeMap[activeSize]?.price || ""}
-                onChangeText={(v) =>
+                value={formatNumberWithSeparator(sizeMap[activeSize]?.price || "")}
+                onChangeText={(v) => {
+                  const rawValue = removeNumberSeparators(v);
                   setSizeMap((m) => ({
                     ...m,
-                    [activeSize]: { ...m[activeSize], price: v },
-                  }))
-                }
+                    [activeSize]: { ...m[activeSize], price: rawValue },
+                  }));
+                }}
                 placeholder="₦600,000"
                 keyboardType="numeric"
                 style={{ marginTop: 10 }}
               />
               <Field
                 C={C}
-                value={sizeMap[activeSize]?.compare || ""}
-                onChangeText={(v) =>
+                value={formatNumberWithSeparator(sizeMap[activeSize]?.compare || "")}
+                onChangeText={(v) => {
+                  const rawValue = removeNumberSeparators(v);
                   setSizeMap((m) => ({
                     ...m,
-                    [activeSize]: { ...m[activeSize], compare: v },
-                  }))
-                }
+                    [activeSize]: { ...m[activeSize], compare: rawValue },
+                  }));
+                }}
                 placeholder="₦580,000"
                 keyboardType="numeric"
                 style={{ marginTop: 10 }}

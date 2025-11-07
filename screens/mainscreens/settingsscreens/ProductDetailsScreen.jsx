@@ -261,7 +261,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
 
   // Use real API data with N/A fallbacks
   const finalStats = {
-    orderId: product?.id ? `ORD-${product.id}` : "N/A",
+    orderId: product?.id ? `PROD-${product.id}` : "N/A",
     createdAt: product?.created_at
       ? new Date(product.created_at).toLocaleDateString()
       : "N/A",

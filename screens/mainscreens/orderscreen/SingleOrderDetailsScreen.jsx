@@ -2396,6 +2396,7 @@ function makeStyles(C) {
       gap: 12,
       marginTop: 16,
       paddingHorizontal: 12,
+      marginBottom: 30,
     },
     acceptBtn: {
       flex: 1,
