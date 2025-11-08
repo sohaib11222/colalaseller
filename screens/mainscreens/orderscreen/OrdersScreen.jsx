@@ -30,7 +30,7 @@ const OrdersScreen = ({ navigation }) => {
     card: "#fff",
   };
 
-  const [tab, setTab] = useState("pending"); // 'pending' | 'all'
+  const [tab, setTab] = useState("pending"); // 'pending' | 'all' | 'rejected'
   const [q, setQ] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -51,9 +51,19 @@ const OrdersScreen = ({ navigation }) => {
         const itemsCount = Array.isArray(it?.items) ? it.items.length : 0;
         const totalRaw = it?.subtotal_with_shipping ?? it?.items_subtotal ?? 0;
         
+        // Extract customer name from order.user (for pending orders)
+        const customerName = it?.order?.user?.full_name || 
+                            it?.order?.user?.user_name || 
+                            it?.customer?.name || 
+                            "Customer";
+        
+        // Extract order number
+        const orderNo = it?.order?.order_no || "";
+        
         return {
           id: String(it?.id ?? ""),
-          customer: it?.customer?.name ?? "Customer",
+          customer: customerName,
+          orderNo: orderNo,
           items: itemsCount,
           total: Number(totalRaw || 0),
           status: "pending",
@@ -61,7 +71,7 @@ const OrdersScreen = ({ navigation }) => {
         };
       });
     },
-    enabled: tab === "pending",
+    enabled: tab === "pending" || tab === "rejected",
     staleTime: 30_000,
   });
 
@@ -80,9 +90,6 @@ const OrdersScreen = ({ navigation }) => {
       const root = res?.data?.data ?? res?.data ?? res ?? {};
 
       const mapItem = (it, statusLabel) => {
-        // NOTE: Customer name IS NOT in list response (only user_id under order).
-        // Per your instruction, keep it hardcoded and notify:
-        // -> 'customer' stays "Customer" because API doesn't provide it in list.
         const itemsCount = Array.isArray(it?.items) ? it.items.length : 0;
 
         // Prefer store-order subtotal_with_shipping; fallback to order.grand_total; else 0
@@ -92,9 +99,18 @@ const OrdersScreen = ({ navigation }) => {
           it?.items_subtotal ??
           0;
 
+        // Extract customer name from order.user
+        const customerName = it?.order?.user?.full_name || 
+                            it?.order?.user?.user_name || 
+                            "Customer";
+        
+        // Extract order number
+        const orderNo = it?.order?.order_no || "";
+
         return {
           id: String(it?.id ?? ""), // store order id
-          customer: "Customer", // 🔔 NOT in response; kept hardcoded
+          customer: customerName,
+          orderNo: orderNo,
           items: itemsCount,
           total: Number(totalRaw || 0),
           status: statusLabel, // "new" or "completed" (derived from which list it belongs to)
@@ -111,9 +127,37 @@ const OrdersScreen = ({ navigation }) => {
         ? root.completed_orders.data.map((it) => mapItem(it, "completed"))
         : [];
 
-      return { newRows, completedRows };
+      // Handle rejected orders - check if there's a separate rejected_orders array
+      const rejectedRows = Array.isArray(root?.rejected_orders?.data)
+        ? root.rejected_orders.data.map((it) => mapItem(it, "rejected"))
+        : [];
+
+      // Also filter rejected orders from new_orders and completed_orders if they have status "rejected"
+      const rejectedFromNew = Array.isArray(root?.new_orders?.data)
+        ? root.new_orders.data
+            .filter((it) => it?.status === "rejected")
+            .map((it) => mapItem(it, "rejected"))
+        : [];
+
+      const rejectedFromCompleted = Array.isArray(root?.completed_orders?.data)
+        ? root.completed_orders.data
+            .filter((it) => it?.status === "rejected")
+            .map((it) => mapItem(it, "rejected"))
+        : [];
+
+      // Combine all rejected orders (avoid duplicates by id)
+      const allRejectedRows = [
+        ...rejectedRows,
+        ...rejectedFromNew,
+        ...rejectedFromCompleted,
+      ];
+      const uniqueRejectedRows = allRejectedRows.filter(
+        (order, index, self) => index === self.findIndex((o) => o.id === order.id)
+      );
+
+      return { newRows, completedRows, rejectedRows: uniqueRejectedRows };
     },
-    enabled: tab === "all",
+    enabled: tab === "all" || tab === "rejected",
     staleTime: 30_000,
   });
 
@@ -126,7 +170,10 @@ const OrdersScreen = ({ navigation }) => {
       if (tab === "pending") {
         await refetchPending();
       } else {
-      await refetch();
+        await refetch();
+        if (tab === "rejected") {
+          await refetchPending(); // Also refresh pending to get any rejected orders
+        }
       }
       console.log("✅ Orders data refreshed successfully");
     } catch (error) {
@@ -139,17 +186,24 @@ const OrdersScreen = ({ navigation }) => {
 
   const listNew = apiData?.newRows ?? [];
   const listCompleted = apiData?.completedRows ?? [];
+  const listRejected = apiData?.rejectedRows ?? [];
   const listPending = pendingData ?? [];
-  const allOrders = [...listNew, ...listCompleted];
+  const allOrders = [...listNew, ...listCompleted, ...listRejected];
 
-  // Keep the same search behavior: filter by "customer" (hardcoded) or id
-  const source = tab === "pending" ? listPending : allOrders;
+  // Search by customer name and order number
+  const source = tab === "pending" 
+    ? listPending 
+    : tab === "rejected" 
+    ? listRejected 
+    : allOrders;
   const orders = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (!term) return source;
     return source.filter(
       (o) =>
-        o.customer.toLowerCase().includes(term) || String(o.id).toLowerCase().includes(term)
+        o.customer.toLowerCase().includes(term) || 
+        (o.orderNo && o.orderNo.toLowerCase().includes(term)) ||
+        String(o.id).toLowerCase().includes(term)
     );
   }, [q, source]);
 
@@ -219,11 +273,18 @@ const OrdersScreen = ({ navigation }) => {
 
       <View style={{ flex: 1 }}>
         <ThemedText style={[styles.cust, { color: C.text }]} numberOfLines={1}>
-          {item.customer /* 🔔 hardcoded because API doesn't include customer name in list */}
+          {item.orderNo || `Order #${item.id}`}
         </ThemedText>
-        <ThemedText style={[styles.items, { color: C.sub }]}>
-          {item.items} items
-        </ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+          <ThemedText style={[styles.items, { color: C.sub, marginRight: 8 }]}>
+            {item.items} items
+          </ThemedText>
+          {item.customer && item.customer !== "Customer" && (
+            <ThemedText style={[styles.userName, { color: C.sub }]} numberOfLines={1}>
+              • {item.customer}
+            </ThemedText>
+          )}
+        </View>
       </View>
 
       <ThemedText style={[styles.amount, { color: C.primary }]}>
@@ -297,12 +358,24 @@ const OrdersScreen = ({ navigation }) => {
             All Orders
           </ThemedText>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setTab("rejected")}
+          style={[
+            styles.tabBtn,
+            tab === "rejected" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
+          ]}
+        >
+          <ThemedText style={[styles.tabTxt, { color: tab === "rejected" ? "#fff" : "#6B7280" }]}>
+            Rejected
+          </ThemedText>
+        </TouchableOpacity>
       </View>
 
       {/* List */}
-      {(tab === "pending" ? pendingLoading : isLoading) && !(tab === "pending" ? pendingData : apiData) ? (
+      {(tab === "pending" ? pendingLoading : tab === "rejected" ? isLoading : isLoading) && !(tab === "pending" ? pendingData : tab === "rejected" ? apiData : apiData) ? (
         <LoadingState />
-      ) : (tab === "pending" ? pendingError : error) ? (
+      ) : (tab === "pending" ? pendingError : tab === "rejected" ? error : error) ? (
         <ErrorState />
       ) : (
         <FlatList
@@ -331,6 +404,8 @@ const OrdersScreen = ({ navigation }) => {
               message={
                 tab === "pending" 
                   ? "No pending orders at the moment. Check back later!" 
+                  : tab === "rejected"
+                  ? "No rejected orders found."
                   : "No orders yet. Complete some orders to see them here!"
               }
             />
@@ -411,6 +486,7 @@ const styles = StyleSheet.create({
   },
   cust: { fontSize: 14, fontWeight: "700" },
   items: { fontSize: 10, marginTop: 2 },
+  userName: { fontSize: 9, fontStyle: "italic" },
   iconRow: { flexDirection: "row" },
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },

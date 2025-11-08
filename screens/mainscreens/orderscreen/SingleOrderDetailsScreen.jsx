@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1063,6 +1064,26 @@ function AcceptOrderModal({ visible, onClose, C, detail, onAccept, isLoading }) 
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  const formatDate = (date) => {
+    if (!date) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleDateChange = (event, date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+    if (date) {
+      setSelectedDate(date);
+      setDeliveryDate(formatDate(date));
+    }
+  };
 
   const handleAccept = () => {
     if (!deliveryFee) {
@@ -1126,13 +1147,45 @@ function AcceptOrderModal({ visible, onClose, C, detail, onAccept, isLoading }) 
                 <ThemedText style={[styles.inputLabel, { color: C.text }]}>
                   Estimated Delivery Date
                 </ThemedText>
-                <TextInput
-                  style={[styles.input, { borderColor: C.line, color: C.text }]}
-                  placeholder="YYYY-MM-DD (optional)"
-                  placeholderTextColor={C.sub}
-                  value={deliveryDate}
-                  onChangeText={setDeliveryDate}
-                />
+                <TouchableOpacity
+                  style={[styles.input, { borderColor: C.line, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <ThemedText style={{ color: deliveryDate ? C.text : C.sub }}>
+                    {deliveryDate || "Select date (optional)"}
+                  </ThemedText>
+                  <Ionicons name="calendar-outline" size={20} color={C.sub} />
+                </TouchableOpacity>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+                {Platform.OS === "ios" && showDatePicker && (
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8, gap: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowDatePicker(false);
+                        setDeliveryDate("");
+                        setSelectedDate(new Date());
+                      }}
+                      style={{ padding: 8 }}
+                    >
+                      <ThemedText style={{ color: C.sub }}>Clear</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setShowDatePicker(false)}
+                      style={{ padding: 8 }}
+                    >
+                      <ThemedText style={{ color: C.primary, fontWeight: "600" }}>Done</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               <View style={styles.inputGroup}>

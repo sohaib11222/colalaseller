@@ -41,8 +41,10 @@ const LoginScreen = () => {
       // Handle successful login
       if (data.status === "success") {
         try {
-          // Store token and user data using AuthContext
-          await authLogin(data.data.token, data.data.user);
+          // Store token, user data, and role using AuthContext
+          // Seller role means owner, so we use "owner" for role storage
+          const userRole = data.data.user?.role === "seller" ? "owner" : data.data.user?.role;
+          await authLogin(data.data.token, data.data.user, userRole);
           console.log("Login successful:", data.data);
           Alert.alert("Success", data.message || "Login successful!");
           navigation.replace("MainNavigator");

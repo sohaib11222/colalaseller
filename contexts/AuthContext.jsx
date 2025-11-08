@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { getToken, getUserData, storeAuthData, clearAuthData, isAuthenticated } from '../utils/tokenStorage';
+import { getToken, getUserData, getRole, storeAuthData, clearAuthData, isAuthenticated } from '../utils/tokenStorage';
 
 const AuthContext = createContext({
   user: null,
   token: null,
+  role: null,
   isLoading: true,
   isAuthenticated: false,
   login: () => {},
@@ -14,6 +15,7 @@ const AuthContext = createContext({
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [role, setRole] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Initialize auth state on app start
@@ -32,16 +34,18 @@ export const AuthProvider = ({ children }) => {
       
       const authPromise = Promise.all([
         getToken(),
-        getUserData()
+        getUserData(),
+        getRole()
       ]);
       
-      const [storedToken, storedUser] = await Promise.race([authPromise, timeout]);
+      const [storedToken, storedUser, storedRole] = await Promise.race([authPromise, timeout]);
 
-      console.log('Auth data retrieved:', { hasToken: !!storedToken, hasUser: !!storedUser });
+      console.log('Auth data retrieved:', { hasToken: !!storedToken, hasUser: !!storedUser, role: storedRole });
 
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(storedUser);
+        setRole(storedRole || storedUser?.role || null);
         console.log('User authenticated successfully');
       } else {
         console.log('No stored auth data found');
@@ -60,11 +64,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (token, userData) => {
+  const login = async (token, userData, role = null) => {
     try {
-      await storeAuthData(token, userData);
+      // Extract role from userData if not provided (seller role means owner)
+      const userRole = role || userData?.role || null;
+      await storeAuthData(token, userData, userRole);
       setToken(token);
       setUser(userData);
+      setRole(userRole);
     } catch (error) {
       console.error('Error during login:', error);
       throw error;
@@ -76,9 +83,9 @@ export const AuthProvider = ({ children }) => {
       await clearAuthData();
       setToken(null);
       setUser(null);
+      setRole(null);
     } catch (error) {
       console.error('Error during logout:', error);
-      throw error;
     }
   };
 
@@ -95,6 +102,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     token,
+    role,
     isLoading,
     isAuthenticated: !!token && !!user,
     login,

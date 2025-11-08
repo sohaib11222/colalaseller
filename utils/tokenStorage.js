@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = '@auth_token';
 const USER_KEY = '@user_data';
+const ROLE_KEY = '@user_role';
 const ONBOARDING_TOKEN_KEY = '@onboarding_token';
 const STORE_ID_KEY = '@store_id';
 
@@ -69,12 +70,47 @@ export const removeUserData = async () => {
   }
 };
 
-// Combined functions for login/logout
-export const storeAuthData = async (token, userData) => {
+// Role storage functions
+export const storeRole = async (role) => {
   try {
+    await AsyncStorage.setItem(ROLE_KEY, role);
+    console.log('Role stored successfully:', role);
+  } catch (error) {
+    console.error('Error storing role:', error);
+    throw error;
+  }
+};
+
+export const getRole = async () => {
+  try {
+    const role = await AsyncStorage.getItem(ROLE_KEY);
+    console.log('Role retrieved:', role);
+    return role;
+  } catch (error) {
+    console.error('Error getting role:', error);
+    return null;
+  }
+};
+
+export const removeRole = async () => {
+  try {
+    await AsyncStorage.removeItem(ROLE_KEY);
+    console.log('Role removed successfully');
+  } catch (error) {
+    console.error('Error removing role:', error);
+    throw error;
+  }
+};
+
+// Combined functions for login/logout
+export const storeAuthData = async (token, userData, role = null) => {
+  try {
+    // Extract role from userData if not provided
+    const userRole = role || userData?.role || null;
     await Promise.all([
       storeToken(token),
-      storeUserData(userData)
+      storeUserData(userData),
+      userRole ? storeRole(userRole) : Promise.resolve()
     ]);
     console.log('Auth data stored successfully');
   } catch (error) {
@@ -87,7 +123,8 @@ export const clearAuthData = async () => {
   try {
     await Promise.all([
       removeToken(),
-      removeUserData()
+      removeUserData(),
+      removeRole()
     ]);
     console.log('Auth data cleared successfully');
   } catch (error) {

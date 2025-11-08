@@ -306,7 +306,7 @@ export default function SupportScreen() {
               <View style={styles.ticketContent}>
                 <View style={styles.ticketLeft}>
                   <Image
-                    source={require("../../../assets/Ellipse 18.png")}
+                    source={require("../../../assets/image.png")}
                     style={styles.ticketAvatar}
                   />
                   <View style={styles.ticketInfo}>

@@ -36,6 +36,24 @@ const INITIAL = [
   { id: "3", email: "abcdef@gmail.com", role: "Admin", avatar: AV },
 ];
 
+/* ----------------------- HELPER FUNCTIONS ----------------------- */
+const formatRole = (role, isOwner) => {
+  if (isOwner) return "Owner";
+  if (!role) return "User";
+  
+  // Convert role values to display labels
+  const roleMap = {
+    "owner": "Owner",
+    "admin": "Admin",
+    "store_manager": "Store Manager",
+    "inventory": "Inventory",
+    "accountant": "Accountant",
+    "buyer": "Buyer"
+  };
+  
+  return roleMap[role] || role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, " ");
+};
+
 /* ----------------------- SCREEN ----------------------- */
 export default function AccessControlScreen() {
   const navigation = useNavigation();
@@ -256,7 +274,7 @@ export default function AccessControlScreen() {
                   {item.email}
                 </ThemedText>
                 <ThemedText style={{ color: C.primary, fontSize: 12, marginTop: 2 }}>
-                  {item.is_owner ? "Owner" : "User"}
+                  {formatRole(item.role, item.is_owner)}
                 </ThemedText>
               </View>
 
@@ -312,6 +330,18 @@ function AddUserModal({ visible, onClose, onSave, C, isLoading }) {
   const [pwd, setPwd] = useState("");
   const [role, setRole] = useState("");
   const [roleSheet, setRoleSheet] = useState(false);
+
+  const roles = [
+    { value: "admin", label: "Admin" },
+    { value: "store_manager", label: "Store Manager" },
+    { value: "inventory", label: "Inventory" },
+    { value: "accountant", label: "Accountant" }
+  ];
+
+  const getRoleLabel = (roleValue) => {
+    const roleObj = roles.find(r => r.value === roleValue);
+    return roleObj ? roleObj.label : roleValue;
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen">
@@ -370,7 +400,7 @@ function AddUserModal({ visible, onClose, onSave, C, isLoading }) {
               style={{ color: role ? C.text : C.sub, fontSize: 14 }}
               numberOfLines={1}
             >
-              {role || "Select Role"}
+              {role ? getRoleLabel(role) : "Select Role"}
             </ThemedText>
             <Ionicons name="chevron-forward" size={18} color={C.sub} />
           </TouchableOpacity>
@@ -379,13 +409,40 @@ function AddUserModal({ visible, onClose, onSave, C, isLoading }) {
           <RoleBlock
             title="Admin"
             desc="Anyone with the admin role has access to"
-            items={["Feature 1", "Feature 2", "Feature 3", "Feature 4"]}
+            items={["Full access as store owner"]}
             C={C}
           />
           <RoleBlock
-            title="Role 2"
-            desc="Anyone with the Role 2 role has access to"
-            items={["Feature 1", "Feature 2", "Feature 3", "Feature 4"]}
+            title="Store Manager"
+            desc="Anyone with the Store Manager role has access to"
+            items={[
+              "Manage Dm",
+              "Manage Socials",
+              "Manage Reviews",
+              "Update Order Status",
+              "Accept/Decline Orders"
+            ]}
+            C={C}
+          />
+          <RoleBlock
+            title="Inventory"
+            desc="Anyone with the Inventory role has access to"
+            items={[
+              "View Products/Services",
+              "Upload Products/Services",
+              "Manage Products/Services",
+              "Update stock Quantity"
+            ]}
+            C={C}
+          />
+          <RoleBlock
+            title="Accountant"
+            desc="Anyone with the Accountant role has access to"
+            items={[
+              "View Orders",
+              "View Analytics",
+              "Manage Subscriptions"
+            ]}
             C={C}
           />
         </ScrollView>
@@ -420,16 +477,16 @@ function AddUserModal({ visible, onClose, onSave, C, isLoading }) {
 
         {/* Role picker sheet */}
         <BottomSheet visible={roleSheet} onClose={() => setRoleSheet(false)} C={C} title="Select Role">
-          {["admin", "user"].map((r) => (
+          {roles.map((r) => (
             <TouchableOpacity
-              key={r}
+              key={r.value}
               style={[styles.sheetItem, { backgroundColor: "#EDEFF3" }]}
               onPress={() => {
-                setRole(r);
+                setRole(r.value);
                 setRoleSheet(false);
               }}
             >
-              <ThemedText style={{ color: C.text }}>{r.charAt(0).toUpperCase() + r.slice(1)}</ThemedText>
+              <ThemedText style={{ color: C.text }}>{r.label}</ThemedText>
             </TouchableOpacity>
           ))}
         </BottomSheet>

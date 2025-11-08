@@ -406,7 +406,7 @@ export default function SupportDetailsScreen() {
   }
 
   const ticket = ticketData.data;
-  const user = ticket.user || { full_name: "Support Team", profile_picture: null };
+  const user = ticket.user || { full_name: "Customer Support", profile_picture: null };
 
   return (
     <SafeAreaView
@@ -432,12 +432,12 @@ export default function SupportDetailsScreen() {
 
           <View style={styles.headerCenter}>
             <Image
-              source={require("../../../assets/Ellipse 18.png")}
+              source={require("../../../assets/image.png")}
               style={styles.avatar}
             />
             <View>
               <ThemedText style={[styles.storeName, { color: C.text }]}>
-                {user.full_name || "Support Team"}
+                Customer Support
               </ThemedText>
               <ThemedText style={[styles.lastSeen, { color: C.sub }]}>
                 {ticket.status === "open" ? "Active" : "Closed"}
