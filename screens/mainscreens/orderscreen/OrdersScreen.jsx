@@ -126,7 +126,7 @@ const OrdersScreen = ({ navigation }) => {
       if (tab === "pending") {
         await refetchPending();
       } else {
-        await refetch();
+      await refetch();
       }
       console.log("✅ Orders data refreshed successfully");
     } catch (error) {

@@ -108,11 +108,26 @@ export default function StoreBuilderScreen() {
     },
     staleTime: 60_000,
   });
-  const categories = Array.isArray((catsRes?.data ?? catsRes)?.data)
+  
+  // Flatten categories to include all nested subcategories
+  const flattenCategories = (categories, result = []) => {
+    if (!Array.isArray(categories)) return result;
+    categories.forEach(category => {
+      result.push(category);
+      if (category.children && category.children.length > 0) {
+        flattenCategories(category.children, result);
+      }
+    });
+    return result;
+  };
+  
+  const categoriesTree = Array.isArray((catsRes?.data ?? catsRes)?.data)
     ? (catsRes?.data ?? catsRes).data
     : Array.isArray(catsRes?.data ?? catsRes)
     ? catsRes?.data ?? catsRes
     : [];
+  
+  const categories = useMemo(() => flattenCategories(categoriesTree), [categoriesTree]);
 
   /* ---------- prefill store via Store Overview ---------- */
   const { data: overviewRes, isLoading: overviewLoading } = useQuery({
@@ -226,8 +241,12 @@ export default function StoreBuilderScreen() {
         fd.append("address", addressValue || "");
         fd.append("delivery_details", deliveryValue || "");
 
-        // categories[] -> Laravel friendly
-        selectedCatIds.forEach((id) => fd.append("categories[]", String(id)));
+        // category_ids[] -> Laravel friendly (backend expects 'category_ids', not 'categories')
+        console.log("📦 StoreBuilder - Sending category_ids (FormData):", selectedCatIds);
+        selectedCatIds.forEach((id) => {
+          console.log(`📦 Appending category ID: ${id} (type: ${typeof id})`);
+          fd.append("category_ids[]", String(id));
+        });
 
         // social_links[] -> Laravel friendly
         socialLinks.forEach((link, index) => {
@@ -259,15 +278,22 @@ export default function StoreBuilderScreen() {
           store_phone: phone || "",
           store_location: location || "",
           theme_color: brandColor || C.primary,
-          categories: selectedCatIds, // array of ids
+          category_ids: selectedCatIds, // array of ids (backend expects 'category_ids', not 'categories')
           social_links: socialLinks, // array of {type, url} objects
           address: addressValue || "",
           delivery_details: deliveryValue || "",
         };
+        console.log("📦 StoreBuilder - Sending payload (JSON):", JSON.stringify(payload, null, 2));
+        console.log("📦 StoreBuilder - Category IDs in payload:", payload.category_ids);
+        console.log("📦 StoreBuilder - Category IDs type:", typeof payload.category_ids, Array.isArray(payload.category_ids));
         return submitStoreBuilder(payload, token);
       }
     },
     onSuccess: (res) => {
+      console.log("✅ StoreBuilder - Save success response:", res);
+      console.log("✅ StoreBuilder - Response data:", res?.data);
+      console.log("✅ StoreBuilder - Store in response:", res?.data?.store);
+      console.log("✅ StoreBuilder - Categories in response:", res?.data?.store?.categories);
       queryClient.invalidateQueries({
         queryKey: ["seller", "store_overview_for_builder"],
       });
@@ -280,6 +306,9 @@ export default function StoreBuilderScreen() {
       setPrimary(themeColor);
     },
     onError: (err) => {
+      console.error("❌ StoreBuilder - Save error:", err);
+      console.error("❌ StoreBuilder - Error response:", err?.response?.data);
+      console.error("❌ StoreBuilder - Error message:", err?.message);
       const msg =
         err?.response?.data?.message ||
         err?.message ||
@@ -543,6 +572,9 @@ export default function StoreBuilderScreen() {
             activeOpacity={0.9}
             style={[styles.saveBtn, { backgroundColor: C.primary }, shadow(10)]}
             onPress={() => {
+              console.log("🔘 StoreBuilder - Save button pressed");
+              console.log("🔘 StoreBuilder - Selected category IDs:", selectedCatIds);
+              console.log("🔘 StoreBuilder - Selected category IDs type:", typeof selectedCatIds, Array.isArray(selectedCatIds));
               if (!name?.trim())
                 return Alert.alert("Missing", "Please enter a store name.");
               if (!email?.trim())

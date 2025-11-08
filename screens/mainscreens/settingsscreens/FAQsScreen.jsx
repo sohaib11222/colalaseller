@@ -389,18 +389,18 @@ export default function FAQsScreen() {
                       style={[styles.videoAccordionCard, shadow(4), { marginBottom: 16 }]}
                     >
                       {/* Video Thumbnail */}
-                      <TouchableOpacity 
+              <TouchableOpacity 
                         style={styles.videoThumbnailContainer}
                         onPress={() => handleVideoPlay(video.media_url, video.title)}
-                        activeOpacity={0.9}
-                      >
+                activeOpacity={0.9}
+              >
                         {getVideoThumbnail(video.media_url, video.id) ? (
-                          <Image
-                            source={{
+                <Image
+                  source={{
                               uri: getVideoThumbnail(video.media_url, video.id),
-                            }}
-                            style={styles.videoImage}
-                            resizeMode="cover"
+                  }}
+                  style={styles.videoImage}
+                  resizeMode="cover"
                             onError={() => {
                               console.log("Error loading video thumbnail");
                             }}
@@ -415,14 +415,14 @@ export default function FAQsScreen() {
                             </View>
                           </View>
                         )}
-                      <View style={styles.playOverlay}>
+                <View style={styles.playOverlay}>
                         <Ionicons name="play" size={32} color="#fff" />
-                      </View>
+                </View>
                       {isYouTubeVideo(video.media_url) && (
-                        <View style={styles.youtubeIndicator}>
-                          <Ionicons name="logo-youtube" size={20} color="#fff" />
-                        </View>
-                      )}
+                  <View style={styles.youtubeIndicator}>
+                    <Ionicons name="logo-youtube" size={20} color="#fff" />
+                  </View>
+                )}
                       {isDirectVideoFile(video.media_url) && (
                         <View style={[styles.youtubeIndicator, { backgroundColor: "rgba(0, 122, 255, 0.8)" }]}>
                           <Ionicons name="film" size={20} color="#fff" />
@@ -447,7 +447,7 @@ export default function FAQsScreen() {
                         size={20} 
                         color={C.sub} 
                       />
-                    </TouchableOpacity>
+              </TouchableOpacity>
 
                     {/* Description - Shown when expanded */}
                     {isExpanded && video.description && (
@@ -464,15 +464,15 @@ export default function FAQsScreen() {
                 })}
               </>
             ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="videocam-off-outline" size={48} color={C.sub} style={{ marginBottom: 12 }} />
-                <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="videocam-off-outline" size={48} color={C.sub} style={{ marginBottom: 12 }} />
+                  <ThemedText style={[styles.emptyTitle, { color: C.text }]}>
                   No video tutorials available
-                </ThemedText>
-                <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
-                  Check back later for video tutorials.
-                </ThemedText>
-              </View>
+                  </ThemedText>
+                  <ThemedText style={[styles.emptyMessage, { color: C.sub }]}>
+                    Check back later for video tutorials.
+                  </ThemedText>
+                </View>
             )}
           </View>
         )}

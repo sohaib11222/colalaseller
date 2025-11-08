@@ -1,202 +1,230 @@
 // screens/payments/SubscriptionScreen.jsx
-import React, { useState, useEffect, useRef } from "react";
-import { Animated } from "react-native";
+import React, { useState, useMemo } from "react";
 import {
   View,
   StyleSheet,
-  ImageBackground,
   TouchableOpacity,
   ScrollView,
-  Platform,
   Modal,
+  Dimensions,
   ActivityIndicator,
-  RefreshControl,
   Alert,
+  RefreshControl,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import MaskedView from "@react-native-masked-view/masked-view";
 import { useNavigation } from "@react-navigation/native";
 import ThemedText from "../../../components/ThemedText";
-import { useTheme } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
-
-//Code Related to the integration
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   getPlans,
   getSubscriptionStatus,
   getBalance,
+  getUserPlan,
 } from "../../../utils/queries/settings";
-import { useQuery } from "@tanstack/react-query";
-import { useMutation } from "@tanstack/react-query";
-import { useAuth } from "../../../contexts/AuthContext";
 import {
   addSubscription,
   cancelSubscription,
 } from "../../../utils/mutations/settings";
-import { getOnboardingToken } from "../../../utils/tokenStorage";
 
-/* ---------------- helpers ---------------- */
-const shadow = (e = 10) =>
-  Platform.select({
-    android: { elevation: e },
-    ios: {
-      shadowColor: "#000",
-      shadowOpacity: 0.08,
-      shadowRadius: e / 2,
-      shadowOffset: { width: 0, height: e / 3 },
-    },
-  });
+const { width } = Dimensions.get("window");
 
-/* gradient text */
-function GradientText({ text, colors, style }) {
-  return (
-    <MaskedView maskElement={<ThemedText style={style}>{text}</ThemedText>}>
-      <LinearGradient
-        colors={colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <ThemedText style={[style, { opacity: 0 }]}>{text}</ThemedText>
-      </LinearGradient>
-    </MaskedView>
-  );
-}
+// Feature definitions
+const FEATURES = [
+  { key: "monthly_price", label: "Monthly Price" },
+  { key: "annual_discount", label: "Annual Discount" },
+  { key: "product_listings", label: "Product Listings" },
+  { key: "search_category", label: "Search & Category Palcement" },
+  { key: "ad_credits", label: "Ad Credits (Monthly)" },
+  { key: "promoted_coupons", label: "Promoted listings/ Coupons" },
+  { key: "api_access", label: "API Access" },
+  { key: "bulk_product", label: "Bulk Product" },
+  { key: "analytics", label: "Analytics & BI Dashboard" },
+  { key: "priority_support", label: "Priority Support (SLA)" },
+  { key: "payment", label: "Payment" },
+  { key: "fraud_dispute", label: "Fraud & Dispute Handling" },
+  { key: "marketplace_events", label: "Exclusive Marketplace Events" },
+  { key: "training", label: "Training & Seller Academy" },
+  { key: "onboarding", label: "Onboarding & Verification" },
+  { key: "account_manager", label: "Account Manager" },
+];
 
-/* bullet row (white tick badge) */
-const Bullet = ({ label }) => (
-  <View style={styles.bulletRow}>
-    <View style={styles.tickBadge}>
-      <Ionicons name="checkmark" size={12} color="#121212" />
-    </View>
-    <ThemedText style={styles.bulletTxt}>{label}</ThemedText>
-  </View>
-);
+// Plan gradient colors
+const PLAN_GRADIENTS = {
+  Basic: ["#FF8A4C", "#FF6B9D"],
+  Pro: ["#9B59B6", "#6C5CE7"],
+  VIP: ["#00D2D3", "#01A3A4"],
+  "Gold Partner": ["#A8E063", "#FDD835"],
+};
 
-/* plan card */
-function PlanCard({ item, isActive, onPress, onCancel, billingPeriod = "monthly" }) {
-  // Map API data to display format
-  const planTitle = item.name;
-  
-  // Calculate price based on billing period
-  const basePrice = parseFloat(item.price || 0);
-  const calculatedPrice = billingPeriod === "yearly" ? basePrice * 12 : basePrice;
-  const planPrice = basePrice === 0 ? "Free" : `N${calculatedPrice.toLocaleString()}`;
-  
-  const planCurrency = item.currency;
-  const planDuration = billingPeriod === "yearly" ? 365 : item.duration_days;
-  const planDurationText = billingPeriod === "yearly" ? "365 days" : `${planDuration} days`;
+// Get feature value for a plan
+const getFeatureValue = (plan, featureKey) => {
+  if (!plan) return "";
+  const planName = plan?.name || "";
+  const isBasic = planName.toLowerCase().includes("basic");
+  const isPro = planName.toLowerCase().includes("pro");
+  const isVIP = planName.toLowerCase().includes("vip");
+  const isGold = planName.toLowerCase().includes("gold");
 
-  // Convert features object to array
-  const features = item.features ? Object.values(item.features) : [];
+  switch (featureKey) {
+    case "monthly_price":
+      if (isBasic) return plan?.price ? `N${Number(plan.price).toLocaleString()}` : "N5,000";
+      if (isPro) return "1 month free";
+      if (isVIP) return "2 month free";
+      if (isGold) return "Custom pricing & contract";
+      return plan?.price ? `N${Number(plan.price).toLocaleString()}` : "N5,000";
+    case "annual_discount":
+      if (isBasic) return null;
+      if (isPro) return "200";
+      if (isVIP) return "500";
+      if (isGold) return "Custom pricing & contract";
+      return null;
+    case "product_listings":
+      if (isBasic) return "25";
+      if (isPro) return "Advanced";
+      if (isVIP) return "Advanced +";
+      if (isGold) return "Unlimited";
+      return "25";
+    case "search_category":
+      if (isBasic) return "Basic";
+      if (isPro) return "Boosted";
+      if (isVIP) return "Featured on category pages";
+      if (isGold) return "Full white label options";
+      return "Basic";
+    case "ad_credits":
+      if (isBasic) return "0";
+      if (isPro) return "N5,000";
+      if (isVIP) return "N10,000";
+      if (isGold) return "Custom pricing & contract";
+      return "0";
+    case "promoted_coupons":
+      if (isBasic) return null;
+      if (isPro) return "Yes";
+      if (isVIP) return "Yes (priority)";
+      if (isGold) return "Yes + campaign management";
+      return null;
+    case "api_access":
+      if (isBasic) return null;
+      if (isPro) return null;
+      if (isVIP) return "Full API";
+      if (isGold) return "Full API +SLA";
+      return null;
+    case "bulk_product":
+      if (isBasic) return null;
+      if (isPro) return "Yes";
+      if (isVIP) return "Yes";
+      if (isGold) return "Yes + CSV Automation";
+      return null;
+    case "analytics":
+      if (isBasic) return "Basic";
+      if (isPro) return "Enhanced Sales & traffic";
+      if (isVIP) return "Advanced + Cohort analysis";
+      if (isGold) return "Full access + raw data exports";
+      return "Basic";
+    case "priority_support":
+      if (isBasic) return "Email (48-72h)";
+      if (isPro) return "Email + chat (24-48h)";
+      if (isVIP) return "Email + chat (4-412h)";
+      if (isGold) return "24/7 dedicated AM & technical support";
+      return "Email (48-72h)";
+    case "payment":
+      if (isBasic) return "3 Days";
+      if (isPro) return "2 Days";
+      if (isVIP) return "Same day";
+      if (isGold) return "Same day / Custom";
+      return "3 Days";
+    case "fraud_dispute":
+      if (isBasic) return "Platform basic rules";
+      if (isPro) return "Faster dispute handling";
+      if (isVIP) return "Proactive risk monitoring";
+      if (isGold) return "Custom SLA & Insurance options";
+      return "Platform basic rules";
+    case "marketplace_events":
+      if (isBasic) return null;
+      if (isPro) return "Invite to promos";
+      if (isVIP) return "Invite & Priority spots";
+      if (isGold) return "Co-sponsored campaigns";
+      return null;
+    case "training":
+      if (isBasic) return "Self help";
+      if (isPro) return "Live webinars";
+      if (isVIP) return "1:1 training sessions";
+      if (isGold) return "Custom workshops + audits";
+      return "Self help";
+    case "onboarding":
+      if (isBasic) return "Self Onboard";
+      if (isPro) return "Guided Onboarding";
+      if (isVIP) return "White glove onboarding";
+      if (isGold) return "White glove + business verification";
+      return "Self Onboard";
+    case "account_manager":
+      if (isBasic) return null;
+      if (isPro) return "Shared AM (auto)";
+      if (isVIP) return "Dedicated AM";
+      if (isGold) return "Senior dedicated AM +";
+      return null;
+    default:
+      return "";
+  }
+};
 
-  // Default gradients based on plan type
-  const getGradients = (planName) => {
-    if (planName.toLowerCase().includes('free')) {
-      return {
-        cardGrad: ["#FDB47D", "#FF7395"],
-        priceGrad: ["#F27E35", "#D44768"]
-      };
-    } else if (planName.toLowerCase().includes('premium')) {
-      return {
-        cardGrad: ["#E1729A", "#3056A9"],
-        priceGrad: ["#E54E9C", "#3657A8"]
-      };
-    } else {
-      return {
-        cardGrad: ["#00F3CF", "#007D83"],
-        priceGrad: ["#008085", "#3657A8"]
-      };
-    }
-  };
+// Get plan column width
+const getPlanColumnWidth = (planName) => {
+  const name = planName?.toLowerCase() || "";
+  if (name.includes("basic")) return 150;
+  if (name.includes("pro")) return 210;
+  if (name.includes("vip")) return 210;
+  if (name.includes("gold")) return 241;
+  return 150;
+};
 
-  const gradients = getGradients(planTitle);
+// Get plan gradient
+const getPlanGradient = (planName) => {
+  const name = planName?.toLowerCase() || "";
+  if (name.includes("basic")) return PLAN_GRADIENTS.Basic;
+  if (name.includes("pro")) return PLAN_GRADIENTS.Pro;
+  if (name.includes("vip")) return PLAN_GRADIENTS.VIP;
+  if (name.includes("gold")) return PLAN_GRADIENTS["Gold Partner"];
+  return PLAN_GRADIENTS.Basic;
+};
 
-  return (
-    <LinearGradient
-      colors={gradients.cardGrad}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={[styles.card, shadow(14)]}
-    >
-      <ThemedText font="oleo" style={styles.planTitle}>
-        {planTitle}
-      </ThemedText>
+// Get plan price display
+const getPlanPrice = (plan) => {
+  if (!plan) return "N5,000";
+  const price = parseFloat(plan.price || 0);
+  return price === 0 ? "Free" : `N${price.toLocaleString()}`;
+};
 
-      {/* price with gradient fill (EXTRA-BOLD) */}
-      <View style={[styles.priceWrap, { marginLeft: -16 }]}>
-        <GradientText
-          text={planPrice}
-          colors={gradients.priceGrad}
-          style={styles.priceTxt}
-        />
-        <ThemedText style={styles.perTxt}>/{planDurationText}</ThemedText>
-      </View>
+// Fallback Gold Partner plan (in case API doesn't return it)
+// Note: This is for display only. If user tries to subscribe, they'll get custom pricing alert.
+const FALLBACK_GOLD_PARTNER = {
+  id: null, // No real ID since it's not from backend
+  name: "Gold Partner",
+  price: "15000", // N15,000/month as shown in Figma
+  description: "Custom pricing & contract",
+};
 
-      {/* benefits */}
-      <View style={{ marginTop: 10, flex: 1, maxHeight: 200 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingRight: 4 }}
-          nestedScrollEnabled={true}
-        >
-          {features.length > 0 ? (
-            features.map((feature, i) => (
-              <Bullet key={`${item.id}-f${i}`} label={feature} />
-            ))
-          ) : (
-            <Bullet label="Basic features included" />
-          )}
-        </ScrollView>
-      </View>
-
-      {/* footer action */}
-      {isActive ? (
-        <View style={styles.activePill}>
-          <Ionicons name="checkmark-circle" size={16} color="#7A263A" />
-          <ThemedText style={styles.activeTxt}>Subscription Active</ThemedText>
-          {onCancel && (
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={onCancel}
-            >
-              <Ionicons name="close-circle" size={16} color="#EF4444" />
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : planPrice === "Free" ? (
-        <View style={styles.freePill}>
-          <Ionicons name="gift-outline" size={16} color="#7A263A" />
-          <ThemedText style={styles.freeTxt}>Free Plan</ThemedText>
-        </View>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={styles.upgradeBtn}
-          onPress={onPress}
-        >
-          <ThemedText style={styles.upgradeTxt}>Upgrade Now</ThemedText>
-        </TouchableOpacity>
-      )}
-    </LinearGradient>
-  );
-}
-
-/* -------- Payment Method (BOTTOM SHEET) -------- */
+/* -------- Payment Method Sheet -------- */
 function PaymentMethodSheet({
   visible,
   onClose,
   selectedPlan,
   onPaymentMethodSelect,
+  onFlutterwavePayment,
   onSubscribe,
   isLoading,
   walletAmount = 0,
   balanceLoading = false,
   onTopUp,
 }) {
-  const [selected, setSelected] = useState("wallet"); // 'flutterwave' | 'wallet' | 'card'
-  const [hasCard, setHasCard] = useState(false);
+  const [selected, setSelected] = useState("wallet");
+
+  const planPrice = selectedPlan ? parseFloat(selectedPlan.price || 0) : 0;
+  const hasEnoughBalance = walletAmount >= planPrice;
 
   return (
     <Modal
@@ -205,471 +233,578 @@ function PaymentMethodSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        {/* tap on dim area to close */}
+      <View style={styles.paymentModalOverlay}>
         <TouchableOpacity
-          style={{ flex: 1 }}
+          style={styles.paymentModalBackdrop}
           activeOpacity={1}
           onPress={onClose}
         />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <View style={styles.sheetHeader}>
-            <ThemedText font="oleo" style={styles.sheetTitle}>
-              Payment Method
-            </ThemedText>
-            <TouchableOpacity style={styles.sheetClose} onPress={onClose}>
-              <Ionicons name="close" size={18} color="#000" />
+        <View style={styles.paymentModalContent}>
+          <View style={styles.paymentModalHeader}>
+            <ThemedText style={styles.paymentModalTitle}>Select Payment Method</ThemedText>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#000" />
             </TouchableOpacity>
           </View>
 
-          {/* Wallet balance gradient card */}
-          <LinearGradient
-            colors={["#E90F0F", "#7B1FA2"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.walletCard}
-          >
-            <ThemedText style={styles.walletSmall}>Wallet Balance</ThemedText>
-
+          <ScrollView style={styles.paymentModalBody}>
+            {/* Wallet Balance */}
+            <View style={styles.walletBalanceContainer}>
+              <ThemedText style={styles.walletBalanceLabel}>Wallet Balance</ThemedText>
             {balanceLoading ? (
-              <ActivityIndicator size="small" color="#fff" style={{ marginTop: 6 }} />
+                <ActivityIndicator size="small" color="#E53E3E" />
             ) : (
-              <ThemedText style={styles.walletAmount}>
-                {`N${Number(walletAmount).toLocaleString()}`}
+                <ThemedText style={styles.walletBalanceAmount}>
+                  N{Number(walletAmount).toLocaleString()}
               </ThemedText>
             )}
+            </View>
 
+            {/* Payment Methods */}
             <TouchableOpacity 
-              style={styles.topUp}
-              onPress={onTopUp}
-            >
-              <ThemedText style={{ color: "#fff", fontSize: 12 }}>
-                Top Up
-              </ThemedText>
-            </TouchableOpacity>
-          </LinearGradient>
-
-
-          {/* Options */}
-          <ScrollView
-            contentContainerStyle={{
-              paddingHorizontal: 16,
-              gap: 10,
-              paddingBottom: 14,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-             <OptionRow
-              icon="color-filter-outline"
-              label="Flutterwave"
-              active={selected === "flutterwave"}
-              onPress={() => setSelected("flutterwave")}
-            />
-
-            <OptionRow
-              icon="card-outline"
-              label="My Wallet"
-              active={selected === "wallet"}
+              style={[
+                styles.paymentMethodOption,
+                selected === "wallet" && styles.paymentMethodOptionSelected,
+              ]}
               onPress={() => setSelected("wallet")}
-            />
-
-            {hasCard ? (
-              <OptionRow
-                icon="card-outline"
-                label="Paystack"
-                subLabel="Pay with card via Paystack"
-                subColor="#18A957"
-                active={selected === "paystack"}
-                onPress={() => setSelected("paystack")}
-              />
-            ) : (
-              <View style={styles.bindBox}>
-                <ThemedText style={styles.bindNote}>
-                  For recurrent payments where you will be debited automatically
-                  you can bind a card and it will show up here
-                </ThemedText>
-                <TouchableOpacity
-                  style={styles.bindBtn}
-                  onPress={() => setHasCard(true)}
+            >
+              <View style={styles.paymentMethodLeft}>
+                <Ionicons
+                  name="wallet"
+                  size={24}
+                  color={selected === "wallet" ? "#E53E3E" : "#6B7280"}
+                />
+                <ThemedText
+                  style={[
+                    styles.paymentMethodText,
+                    selected === "wallet" && styles.paymentMethodTextSelected,
+                  ]}
                 >
-                  <ThemedText style={{ color: "#fff" }}>Bind now</ThemedText>
-                </TouchableOpacity>
+                  Wallet
+              </ThemedText>
               </View>
+              {selected === "wallet" && (
+                <Ionicons name="checkmark-circle" size={24} color="#E53E3E" />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.paymentMethodOption,
+                selected === "flutterwave" && styles.paymentMethodOptionSelected,
+              ]}
+              onPress={() => setSelected("flutterwave")}
+            >
+              <View style={styles.paymentMethodLeft}>
+                <Ionicons
+                  name="card"
+                  size={24}
+                  color={selected === "flutterwave" ? "#E53E3E" : "#6B7280"}
+                />
+                <ThemedText
+                  style={[
+                    styles.paymentMethodText,
+                    selected === "flutterwave" && styles.paymentMethodTextSelected,
+                  ]}
+                >
+                  Flutterwave (Card/Bank)
+                </ThemedText>
+              </View>
+              {selected === "flutterwave" && (
+                <Ionicons name="checkmark-circle" size={24} color="#E53E3E" />
+              )}
+            </TouchableOpacity>
+
+            {/* Insufficient Balance Warning */}
+            {selected === "wallet" && !hasEnoughBalance && planPrice > 0 && (
+              <View style={styles.insufficientBalanceWarning}>
+                <Ionicons name="warning" size={20} color="#F59E0B" />
+                <ThemedText style={styles.insufficientBalanceText}>
+                  Insufficient balance. You need N{planPrice.toLocaleString()} but have N{Number(walletAmount).toLocaleString()}
+                </ThemedText>
+              </View>
+            )}
+
+            {/* Top Up Button */}
+            {selected === "wallet" && !hasEnoughBalance && planPrice > 0 && (
+                <TouchableOpacity
+                style={styles.topUpButton}
+                onPress={onTopUp}
+                >
+                <ThemedText style={styles.topUpButtonText}>Top Up Wallet</ThemedText>
+                </TouchableOpacity>
             )}
           </ScrollView>
 
-          {/* Proceed */}
+          {/* Subscribe Button */}
+          <View style={styles.paymentModalFooter}>
           <TouchableOpacity
             style={[
-              styles.proceedBtn,
-              { opacity: isLoading ? 0.6 : 1 }
+                styles.subscribeButton,
+                (!hasEnoughBalance && selected === "wallet" && planPrice > 0) && styles.subscribeButtonDisabled,
             ]}
-            activeOpacity={0.9}
             onPress={() => {
-              onPaymentMethodSelect(selected);
-              onSubscribe();
+                if (selected === "wallet" && !hasEnoughBalance && planPrice > 0) {
+                  Alert.alert("Insufficient Balance", "Please top up your wallet first.");
+                  return;
+                }
+              if (selected === "flutterwave") {
+                onFlutterwavePayment();
+              } else {
+                // Set payment method and subscribe with the selected method
+                onPaymentMethodSelect(selected);
+                if (onSubscribe) {
+                  onSubscribe(selected);
+                }
+              }
             }}
-            disabled={isLoading}
+              disabled={isLoading || (selected === "wallet" && !hasEnoughBalance && planPrice > 0)}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color="white" />
+                <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
-                Subscribe to {selectedPlan?.name || 'Plan'}
+                <ThemedText style={styles.subscribeButtonText}>
+                  Subscribe
               </ThemedText>
             )}
           </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
   );
 }
 
-const OptionRow = ({
-  icon,
-  label,
-  subLabel,
-  subColor = "#7F8A95",
-  active,
-  onPress,
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.9}
-    style={styles.optionRow}
-  >
-    <Ionicons name={icon} size={18} color="#E53E3E" />
-    <View style={{ flex: 1, marginLeft: 10 }}>
-      <ThemedText style={{ color: "#101318" }}>{label}</ThemedText>
-      {!!subLabel && (
-        <ThemedText style={{ color: subColor, fontSize: 12, marginTop: 2 }}>
-          {subLabel}
-        </ThemedText>
-      )}
-    </View>
-    <View style={[styles.radioOuter, active && { borderColor: "#E53E3E" }]}>
-      {active ? <View style={styles.radioInner} /> : null}
-    </View>
-  </TouchableOpacity>
-);
-
-/* ---------------- main screen ---------------- */
 export default function SubscriptionScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme();
-  const { user, token: authToken } = useAuth();
-  
-  // Debug navigation object creation
-  console.log("SubscriptionScreen - navigation object created:", navigation);
-  console.log("SubscriptionScreen - navigation type:", typeof navigation);
-  console.log("SubscriptionScreen - navigation.navigate:", navigation?.navigate);
-  const [onboardingToken, setOnboardingToken] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showPay, setShowPay] = useState(false);
+  const { token } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("wallet");
-  const [billingPeriod, setBillingPeriod] = useState("monthly"); // 'monthly' or 'yearly'
-  const toggleAnimation = useRef(new Animated.Value(0)).current;
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [showPay, setShowPay] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Animate toggle when billing period changes
-  useEffect(() => {
-    Animated.spring(toggleAnimation, {
-      toValue: billingPeriod === "yearly" ? 1 : 0,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 8,
-    }).start();
-  }, [billingPeriod]);
-
-  // Navigation handler for Flutterwave Top Up
-  const handleTopUpNavigation = () => {
-    console.log("handleTopUpNavigation called from SubscriptionScreen");
-    console.log("handleTopUpNavigation - navigation object:", navigation);
-    console.log("handleTopUpNavigation - navigation.navigate:", navigation?.navigate);
-    
-    if (navigation && navigation.navigate) {
-      console.log("handleTopUpNavigation - navigating to FlutterwaveWebView");
-      navigation.navigate('FlutterwaveWebView', {
-        amount: 1000,
-        order_id: `topup_${Date.now()}`,
-        isTopUp: true
-      });
-    } else {
-      console.error('Navigation not available in handleTopUpNavigation');
-      Alert.alert('Error', 'Navigation not available');
-    }
-  };
-
-  // choose which balance you want to show in the sheet:
-const walletAmount =
-  balanceData?.data?.escrow_balance ??
-  balanceData?.data?.shopping_balance ??
-  0;
-
-  const BG = require("../../../assets/baaloon.png");
-
-  // Get token for API calls
-  const token = authToken || onboardingToken;
-
-  // Load onboarding token on component mount
-  React.useEffect(() => {
-    const loadOnboardingToken = async () => {
-      try {
-        const token = await getOnboardingToken();
-        setOnboardingToken(token);
-      } catch (error) {
-        console.error("Error loading onboarding token:", error);
-      }
-    };
-
-    if (!authToken) {
-      loadOnboardingToken();
-    }
-  }, [authToken]);
-
-  // Fetch plans using React Query
+  // Fetch plans
   const {
     data: plansData,
     isLoading: plansLoading,
-    isError: plansError,
+    error: plansError,
     refetch: refetchPlans,
   } = useQuery({
     queryKey: ["plans", token],
     queryFn: () => getPlans(token),
     enabled: !!token,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Fetch subscription status using React Query
+  // Fetch user plan (includes subscription details)
+  const {
+    data: userPlanData,
+    isLoading: planLoading,
+    error: planError,
+    refetch: refetchUserPlan,
+  } = useQuery({
+    queryKey: ["userPlan", token],
+    queryFn: () => getUserPlan(token),
+    enabled: !!token,
+  });
+
+  // Fetch subscription status (fallback)
   const {
     data: subscriptionData,
     isLoading: subscriptionLoading,
-    isError: subscriptionError,
+    error: subscriptionError,
     refetch: refetchSubscription,
   } = useQuery({
     queryKey: ["subscription", token],
     queryFn: () => getSubscriptionStatus(token),
     enabled: !!token,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
   });
 
-
+  // Fetch wallet balance
   const {
     data: balanceData,
     isLoading: balanceLoading,
-    isError: balanceError,
     refetch: refetchBalance,
   } = useQuery({
-    queryKey: ["wallet-balance", token],
+    queryKey: ["balance", token],
     queryFn: () => getBalance(token),
     enabled: !!token,
-    staleTime: 2 * 60 * 1000,
   });
 
+  // Plans from API with fallback for Gold Partner
+  const plans = useMemo(() => {
+    // Handle different response structures
+    let plansArray = [];
+    if (plansData?.data) {
+      if (Array.isArray(plansData.data)) {
+        plansArray = plansData.data;
+      } else if (Array.isArray(plansData.data.plans)) {
+        plansArray = plansData.data.plans;
+      } else if (plansData.data && typeof plansData.data === 'object') {
+        // If data is an object, try to find plans array
+        plansArray = plansData.data.plans || Object.values(plansData.data).filter(Array.isArray)[0] || [];
+      }
+    }
+    
+    // Check if Gold Partner exists in the plans
+    const hasGoldPartner = plansArray.some(
+      (plan) => plan?.name?.toLowerCase().includes("gold")
+    );
+    
+    // If Gold Partner is missing, add it as fallback (display only)
+    // Note: Fallback won't have a real backend ID, so subscription will show custom pricing alert
+    if (!hasGoldPartner && plansArray.length > 0) {
+      plansArray = [...plansArray, FALLBACK_GOLD_PARTNER];
+    }
+    
+    // Debug: Log plans to see what we're getting
+    console.log('Plans from API:', plansArray);
+    console.log('Plans count:', plansArray.length);
+    plansArray.forEach((plan, idx) => {
+      console.log(`Plan ${idx}:`, plan.name, plan.id);
+    });
+    
+    return plansArray;
+  }, [plansData]);
 
+  // Current subscription - prefer userPlanData as it has more complete info
+  const currentSubscription = useMemo(() => {
+    // First try userPlanData (more complete)
+    if (userPlanData?.data?.subscription) {
+      return {
+        ...userPlanData.data.subscription,
+        plan_name: userPlanData.data.plan,
+        plan_id: userPlanData.data.subscription.plan_id,
+      };
+    }
+    // Fallback to subscriptionData
+    if (subscriptionData?.data) {
+      return subscriptionData.data;
+    }
+    return null;
+  }, [userPlanData, subscriptionData]);
 
-  // Extract data from API responses
-  const plans = plansData?.data || [];
-  const subscription = subscriptionData?.data?.[0] || null;
+  // Active subscription info for display
+  const activeSubscriptionInfo = useMemo(() => {
+    if (!userPlanData?.data) return null;
+    const data = userPlanData.data;
+    return {
+      planName: data.plan || "Unknown",
+      status: data.subscription?.status || "inactive",
+      isActive: data.subscription?.status === "active",
+      isExpired: data.is_expired || false,
+      needsRenewal: data.needs_renewal || false,
+      startDate: data.subscription?.start_date,
+      endDate: data.subscription?.end_date,
+      daysUntilExpiry: data.days_until_expiry || 0,
+      planId: data.subscription?.plan_id,
+    };
+  }, [userPlanData]);
 
-  // Subscription mutations
+  // Wallet amount - use shopping_balance like SettingsScreen
+  const walletAmount = useMemo(() => {
+    return Number(balanceData?.data?.shopping_balance || 0);
+  }, [balanceData]);
+
+  // Set initial selected plan
+  React.useEffect(() => {
+    if (plans.length > 0 && !selectedPlan) {
+      // If user has active subscription, select that plan
+      if (activeSubscriptionInfo?.planId) {
+        const activePlan = plans.find((p) => p.id === activeSubscriptionInfo.planId);
+        if (activePlan) {
+          setSelectedPlan(activePlan);
+          return;
+        }
+      }
+      // Fallback to currentSubscription
+      if (currentSubscription?.plan_id) {
+        const activePlan = plans.find((p) => p.id === currentSubscription.plan_id);
+        if (activePlan) {
+          setSelectedPlan(activePlan);
+          return;
+        }
+      }
+      // Otherwise select first plan
+      setSelectedPlan(plans[0]);
+    }
+  }, [plans, activeSubscriptionInfo, currentSubscription]);
+
+  // Add subscription mutation
   const addSubscriptionMutation = useMutation({
     mutationFn: ({ payload }) => addSubscription(payload, token),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      Alert.alert("Success", "Subscription activated successfully!");
       refetchSubscription();
+      refetchBalance();
       setShowPay(false);
-      setSelectedPlan(null);
-      Alert.alert('Success', 'Subscription added successfully!');
+      setSelectedPaymentMethod(null);
     },
     onError: (error) => {
-      console.error('Error adding subscription:', error);
-      Alert.alert('Error', 'Failed to add subscription');
+      Alert.alert("Error", error.message || "Failed to subscribe. Please try again.");
     },
   });
-
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: ({ id }) => cancelSubscription(id, token),
-    onSuccess: () => {
-      refetchSubscription();
-      Alert.alert('Success', 'Subscription cancelled successfully!');
-    },
-    onError: (error) => {
-      console.error('Error cancelling subscription:', error);
-      Alert.alert('Error', 'Failed to cancel subscription');
-    },
-  });
-
-  // Handle pull-to-refresh
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([refetchPlans(), refetchSubscription()]);
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const handlePlanSelect = (plan) => {
     setSelectedPlan(plan);
-    setShowPay(true);
+    setShowPlanPicker(false);
   };
 
   const handlePaymentMethodSelect = (paymentMethod) => {
     setSelectedPaymentMethod(paymentMethod);
   };
 
-  const handleSubscribe = () => {
-    if (selectedPlan && selectedPaymentMethod) {
+  const handleSubscribe = (paymentMethod = null) => {
+    // Use provided payment method or fallback to selectedPaymentMethod state
+    const method = paymentMethod || selectedPaymentMethod;
+    
+    if (selectedPlan && method) {
+      // Check if it's Gold Partner (custom pricing)
+      const isGoldPartner = selectedPlan.name?.toLowerCase().includes("gold");
+      
+      if (isGoldPartner) {
+        Alert.alert(
+          "Custom Pricing",
+          "Gold Partner plan requires custom pricing. Please contact our sales team to proceed with this plan.",
+          [
+            { text: "OK", style: "default" }
+          ]
+        );
+        setShowPay(false);
+        return;
+      }
+      
+      // Use the plan ID from API response
+      if (!selectedPlan.id) {
+        Alert.alert("Error", "Invalid plan selected. Please try again.");
+        return;
+      }
+      
       addSubscriptionMutation.mutate({
         payload: {
           plan_id: selectedPlan.id,
-          payment_method: selectedPaymentMethod
-        }
+          payment_method: method,
+        },
       });
     }
   };
 
-  const handleCancelSubscription = () => {
-    if (subscription) {
+  const handleFlutterwavePayment = () => {
+    if (!selectedPlan) {
+      Alert.alert("Error", "Please select a plan first.");
+      return;
+    }
+    
+    // Check if it's Gold Partner (custom pricing)
+    const isGoldPartner = selectedPlan.name?.toLowerCase().includes("gold");
+    
+    if (isGoldPartner) {
       Alert.alert(
-        'Cancel Subscription',
-        'Are you sure you want to cancel your subscription?',
+        "Custom Pricing",
+        "Gold Partner plan requires custom pricing. Please contact our sales team to proceed with this plan.",
         [
-          { text: 'No', style: 'cancel' },
-          {
-            text: 'Yes',
-            style: 'destructive',
-            onPress: () => cancelSubscriptionMutation.mutate({ id: subscription.id })
-          }
+          { text: "OK", style: "default" }
         ]
       );
+      setShowPay(false);
+      return;
+    }
+    
+    const planPrice = parseFloat(selectedPlan.price || 0);
+    if (planPrice <= 0) {
+      Alert.alert("Error", "Invalid plan price.");
+      return;
+    }
+
+    // Use the plan ID from API response
+    if (!selectedPlan.id) {
+      Alert.alert("Error", "Invalid plan selected. Please try again.");
+      return;
+    }
+    
+    // Navigate to Flutterwave payment
+    navigation.navigate("FlutterwaveWebView", {
+      amount: planPrice,
+      order_id: `subscription_${selectedPlan.id}_${Date.now()}`,
+      isTopUp: false,
+      isSubscription: true,
+      plan_id: selectedPlan.id,
+    });
+    
+    setShowPay(false);
+  };
+
+  const handleTopUpNavigation = () => {
+    if (navigation && navigation.navigate) {
+      navigation.navigate("FlutterwaveWebView", {
+        amount: 1000,
+        order_id: `topup_${Date.now()}`,
+        isTopUp: true,
+      });
+    } else {
+      Alert.alert("Error", "Navigation not available");
     }
   };
 
-  // Check if a plan is active
-  const isPlanActive = (planId) => {
-    return subscription && subscription.plan?.id === planId && subscription.status === 'active';
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchPlans(),
+        refetchSubscription(),
+        refetchBalance(),
+        refetchUserPlan(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
+  const isSubscriptionActive = activeSubscriptionInfo?.isActive || currentSubscription?.status === "active";
+  const activePlanId = activeSubscriptionInfo?.planId || currentSubscription?.plan_id;
+
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-      edges={[""]}
-    >
+    <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <ImageBackground
-        source={BG}
-        resizeMode="cover"
-        style={{ flex: 1 }}
-        imageStyle={{ width: "100%", height: "70%" }}
-      >
-        {/* header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.line }]}>
+      
+      {/* Header */}
+      <View style={styles.header}>
           <TouchableOpacity
             onPress={() =>
               navigation.canGoBack()
                 ? navigation.goBack()
                 : navigation.navigate("Home")
             }
-            style={[styles.backBtn, { borderColor: "#ccc" }]}
+          style={styles.backButton}
           >
-            <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+          <Ionicons name="chevron-back" size={20} color="#000" />
           </TouchableOpacity>
-          <ThemedText style={[styles.title, { color: theme.colors.text }]}>
-            Subscription
-          </ThemedText>
-          <View style={{ width: 40, height: 20 }} />
+        <ThemedText style={styles.headerTitle}>Subscription</ThemedText>
+        <View style={{ width: 40 }} />
         </View>
 
-        {/* Billing Period Toggle */}
-        <View style={styles.toggleContainer}>
-          <ThemedText style={[
-            styles.toggleLabel, 
-            { 
-              color: billingPeriod === "monthly" ? theme.colors.primary : theme.colors.muted,
-              fontWeight: billingPeriod === "monthly" ? "700" : "500",
-            }
-          ]}>
-            Monthly
-          </ThemedText>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => setBillingPeriod(billingPeriod === "monthly" ? "yearly" : "monthly")}
-            style={[
-              styles.toggleSwitch,
-              { borderColor: theme.colors.primary },
-            ]}
-          >
-            <Animated.View
-              style={[
-                styles.toggleThumb,
-                {
-                  transform: [
-                    {
-                      translateX: toggleAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [2, 22],
-                      }),
-                    },
-                  ],
-                },
-                billingPeriod === "yearly" && { backgroundColor: "#fff" },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.toggleBackground,
-                {
-                  opacity: toggleAnimation,
-                  backgroundColor: theme.colors.primary,
-                },
-              ]}
-            />
-          </TouchableOpacity>
-          <ThemedText style={[
-            styles.toggleLabel, 
-            { 
-              color: billingPeriod === "yearly" ? theme.colors.primary : theme.colors.muted,
-              fontWeight: billingPeriod === "yearly" ? "700" : "500",
-            }
-          ]}>
-            Yearly
-          </ThemedText>
-        </View>
-
-        {/* cards */}
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scroller}
-          style={styles.horizontalScrollView}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={[theme.colors.primary]}
-              tintColor={theme.colors.primary}
-            />
-          }
-        >
+            colors={["#E53E3E"]}
+            tintColor="#E53E3E"
+          />
+        }
+      >
+        {/* Active Subscription Banner */}
+        {activeSubscriptionInfo?.isActive && (
+          <View style={styles.activeSubscriptionBanner}>
+            <View style={styles.activeSubscriptionContent}>
+              <View style={styles.activeSubscriptionLeft}>
+                <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+                <View style={styles.activeSubscriptionTextContainer}>
+                  <ThemedText style={styles.activeSubscriptionTitle}>
+                    Active Subscription: {activeSubscriptionInfo.planName}
+                  </ThemedText>
+                  {activeSubscriptionInfo.endDate && (
+                    <ThemedText style={styles.activeSubscriptionSubtitle}>
+                      Expires: {new Date(activeSubscriptionInfo.endDate).toLocaleDateString()}
+                      {activeSubscriptionInfo.daysUntilExpiry > 0 && (
+                        ` • ${activeSubscriptionInfo.daysUntilExpiry} days remaining`
+                      )}
+                    </ThemedText>
+                  )}
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Main Title Section */}
+        <View style={styles.titleSection}>
+          <ThemedText style={styles.mainTitle}>Subscription</ThemedText>
+          <ThemedText style={styles.subtitle}>
+            {activeSubscriptionInfo?.isActive
+              ? "Manage your subscription or upgrade to a better plan"
+              : "Select the plan that best suits your needs"}
+          </ThemedText>
+        </View>
+
+        {/* Plan Selector and Headers Row */}
+        <View style={styles.planHeadersRowContainer}>
+          {/* Dropdown */}
+          <TouchableOpacity
+            style={styles.planPicker}
+            onPress={() => setShowPlanPicker(true)}
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.planPickerText}>
+              {selectedPlan?.name || "Select Plan"}
+            </ThemedText>
+            <Ionicons name="chevron-down" size={18} color="#9AA0A6" />
+          </TouchableOpacity>
+
+          {/* Title Box - Shows only selected plan (matches Figma) */}
+          {!plansLoading && !subscriptionLoading && selectedPlan && (
+            <View style={styles.planHeadersScroll}>
+              {(() => {
+                const plan = selectedPlan;
+                const isActive = isSubscriptionActive && activePlanId === plan.id;
+                const gradient = getPlanGradient(plan.name);
+                const columnWidth = getPlanColumnWidth(plan.name);
+
+                return (
+                  <View
+                    style={[
+                      styles.planHeaderCard,
+                      { width: columnWidth },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.planHeaderCardGradient}
+                    >
+                      <ThemedText style={styles.planHeaderCardTitle}>
+                        {plan.name || "Basic"}
+                      </ThemedText>
+                      {isActive && (
+                        <View style={styles.subscriptionActiveBadge}>
+                          <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                          <ThemedText style={styles.subscriptionActiveText}>
+                            Subscription Active
+                          </ThemedText>
+                        </View>
+                      )}
+                      <View style={styles.planHeaderCardPriceContainer}>
+                        <ThemedText style={styles.planHeaderCardPrice}>
+                          {getPlanPrice(plan)}
+                        </ThemedText>
+                        {plan.price && parseFloat(plan.price) > 0 && (
+                          <ThemedText style={styles.planHeaderCardPriceUnit}>/month</ThemedText>
+                        )}
+                      </View>
+                    </LinearGradient>
+                  </View>
+                );
+              })()}
+            </View>
+          )}
+        </View>
+
+        {/* Comparison Table */}
           {plansLoading || subscriptionLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
-              <ThemedText style={[styles.loadingText, { color: theme.colors.muted }]}>
-                Loading plans...
-              </ThemedText>
+            <ActivityIndicator size="large" color="#E53E3E" />
+            <ThemedText style={styles.loadingText}>Loading plans...</ThemedText>
             </View>
           ) : plansError || subscriptionError ? (
             <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={48} color={theme.colors.primary} />
-              <ThemedText style={[styles.errorText, { color: theme.colors.text }]}>
-                Failed to load plans
-              </ThemedText>
+            <Ionicons name="alert-circle-outline" size={48} color="#E53E3E" />
+            <ThemedText style={styles.errorText}>Failed to load plans</ThemedText>
               <TouchableOpacity
-                style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+              style={styles.retryButton}
                 onPress={() => {
                   refetchPlans();
                   refetchSubscription();
@@ -680,42 +815,192 @@ const walletAmount =
             </View>
           ) : plans.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="card-outline" size={48} color={theme.colors.muted} />
-              <ThemedText style={[styles.emptyText, { color: theme.colors.text }]}>
-                No plans available
-              </ThemedText>
-              <ThemedText style={[styles.emptySubtext, { color: theme.colors.muted }]}>
-                Please check back later
+            <Ionicons name="card-outline" size={48} color="#9AA0A6" />
+            <ThemedText style={styles.emptyText}>No plans available</ThemedText>
+          </View>
+        ) : (
+          <View style={styles.tableContainer}>
+            {/* Vertical ScrollView for Features */}
+            <ScrollView
+              vertical
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {/* Horizontal ScrollView for Plans */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+                nestedScrollEnabled={true}
+              >
+                <View style={styles.table}>
+                  {/* Features Column */}
+                  <View style={styles.featuresColumn}>
+                    <View style={styles.featuresHeader}>
+                      <ThemedText style={styles.featuresHeaderText}>Features</ThemedText>
+                    </View>
+                    {FEATURES.map((feature) => (
+                      <View key={feature.key} style={styles.featureRow}>
+                        <ThemedText style={styles.featureLabel}>{feature.label}</ThemedText>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Plan Columns - Show ALL plans */}
+                  {plans.map((plan) => {
+                    const isSelected = selectedPlan?.id === plan.id;
+                    const isActive = isSubscriptionActive && activePlanId === plan.id;
+                    const columnWidth = getPlanColumnWidth(plan.name);
+
+                    return (
+                      <View
+                        key={plan.id}
+                        style={[
+                          styles.planColumn,
+                          { width: columnWidth },
+                          isSelected && styles.planColumnSelected,
+                        ]}
+                      >
+                        {/* Plan Name Header Row */}
+                        <View style={styles.planPriceHeaderRow}>
+                          <ThemedText style={styles.planPriceHeaderText}>
+                            {plan.name || "Basic"}
+                          </ThemedText>
+                        </View>
+
+                        {/* Plan Features */}
+                        {FEATURES.map((feature) => {
+                          const value = getFeatureValue(plan, feature.key);
+                          const isLocked = value === null;
+
+                          return (
+                            <View
+                              key={feature.key}
+                              style={[
+                                styles.planFeatureRow,
+                                isSelected && styles.planFeatureRowSelected,
+                              ]}
+                            >
+                              {isLocked ? (
+                                <Ionicons name="lock-closed" size={24} color="#9AA0A6" />
+                              ) : value === "Yes" ? (
+                                <View style={styles.checkIcon}>
+                                  <Ionicons name="checkmark" size={12} color="#fff" />
+                                </View>
+                              ) : (
+                                <ThemedText style={styles.planFeatureValue}>
+                                  {value}
+                                </ThemedText>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* CTA Button */}
+        {selectedPlan && (
+          <TouchableOpacity
+            style={styles.ctaButton}
+            activeOpacity={0.8}
+            onPress={() => {
+              if (isSubscriptionActive && activePlanId === selectedPlan.id) {
+                Alert.alert(
+                  "Already Subscribed",
+                  "You are already subscribed to this plan.",
+                  [{ text: "OK" }]
+                );
+                return;
+              }
+              
+              // Check if it's Gold Partner (custom pricing)
+              const isGoldPartner = selectedPlan.name?.toLowerCase().includes("gold");
+              if (isGoldPartner) {
+                Alert.alert(
+                  "Custom Pricing",
+                  "Gold Partner plan requires custom pricing. Please contact our sales team to proceed with this plan.",
+                  [
+                    { text: "OK", style: "default" }
+                  ]
+                );
+                return;
+              }
+              
+              setShowPay(true);
+            }}
+          >
+            {isSubscriptionActive && activePlanId === selectedPlan.id ? (
+              <View style={styles.subscriptionActiveButtonContent}>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <ThemedText style={styles.ctaButtonText}>
+                  Subscription Active
               </ThemedText>
             </View>
           ) : (
-            <>
-              <View style={{ width: 18 }} />
-              {plans.map((plan) => (
-                <PlanCard
-                  key={plan.id}
-                  item={plan}
-                  isActive={isPlanActive(plan.id)}
-                  onPress={() => handlePlanSelect(plan)}
-                  onCancel={subscription && isPlanActive(plan.id) ? handleCancelSubscription : null}
-                  billingPeriod={billingPeriod}
-                />
-              ))}
-              <View style={{ width: 18 }} />
-            </>
-          )}
-        </ScrollView>
-      </ImageBackground>
+              <ThemedText style={styles.ctaButtonText}>
+                {selectedPlan.name} Plan - Subscribe for {getPlanPrice(selectedPlan)}
+                {selectedPlan.price && parseFloat(selectedPlan.price) > 0 && "/month"}
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+        )}
+      </ScrollView>
 
-      {/* bottom sheet */}
+      {/* Plan Picker Modal */}
+      <Modal
+        visible={showPlanPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPlanPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowPlanPicker(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Select Plan</ThemedText>
+              <TouchableOpacity onPress={() => setShowPlanPicker(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {plans.map((plan) => (
+                <TouchableOpacity
+                  key={plan.id}
+                  style={styles.modalOption}
+                  onPress={() => handlePlanSelect(plan)}
+                >
+                  <ThemedText style={styles.modalOptionText}>{plan.name}</ThemedText>
+                  <ThemedText style={styles.modalOptionPrice}>
+                    {getPlanPrice(plan)}
+                    {plan.price && parseFloat(plan.price) > 0 && "/month"}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+        </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Method Sheet */}
       <PaymentMethodSheet
         visible={showPay}
         onClose={() => {
           setShowPay(false);
-          setSelectedPlan(null);
+          setSelectedPaymentMethod(null);
         }}
         selectedPlan={selectedPlan}
         onPaymentMethodSelect={handlePaymentMethodSelect}
+        onFlutterwavePayment={handleFlutterwavePayment}
         onSubscribe={handleSubscribe}
         isLoading={addSubscriptionMutation.isPending}
         walletAmount={walletAmount}
@@ -727,347 +1012,517 @@ const walletAmount =
 }
 
 /* ---------------- styles ---------------- */
-const CARD_W = 350;
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
   header: {
-    backgroundColor: "rgba(255,255,255,0.96)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: -10,
-    paddingTop: 50,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
   },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 10,
-    gap: 12,
-  },
-  toggleLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    minWidth: 60,
-    textAlign: "center",
-  },
-  toggleSwitch: {
-    width: 56,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#E5E7EB",
-    borderWidth: 2,
-    justifyContent: "center",
-    paddingHorizontal: 2,
-    position: "relative",
-    overflow: "hidden",
-  },
-  toggleBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 14,
-  },
-  toggleThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    ...shadow(4),
-    zIndex: 10,
-  },
-  backBtn: {
-    width: 37,
-    height: 37,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginTop: 30,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "absolute",
-    left: 16,
-    top: 12,
-    zIndex: 2,
-  },
-  title: { textAlign: "center", fontSize: 18, fontWeight: "600" },
-
-  horizontalScrollView: {
-    flex: 1,
-  },
-  scroller: {
-    paddingVertical: 18,
-    alignItems: "flex-start",
-    gap: 16,
-    marginTop: 150,
-    paddingHorizontal: 0,
-  },
-
-  card: { 
-    width: CARD_W, 
-    borderRadius: 30, 
-    padding: 16, 
-    marginHorizontal: 8,
-    flexShrink: 0,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  planTitle: { color: "#2A1611", fontSize: 50, marginBottom: 8 },
-
-  priceWrap: {
-    backgroundColor: "#fff",
-    paddingVertical: 20,
-    borderBottomRightRadius: 100,
-    borderTopRightRadius: 100,
-    paddingHorizontal: 18,
-    alignSelf: "stretch",
-    marginBottom: 12,
-  },
-  priceTxt: { fontSize: 50, fontWeight: "900", letterSpacing: 0.2 }, // extra bold
-  perTxt: { color: "#444", marginTop: 6 },
-
-  bulletRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.18)",
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-  },
-  tickBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.55)",
-  },
-  bulletTxt: { color: "#fff", fontSize: 13 },
-
-  activePill: {
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: "#FAD2DA",
-    borderWidth: 1,
-    borderColor: "#F2A8B7",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 70,
-    paddingHorizontal: 14,
-  },
-  activeTxt: { color: "#7A263A", fontWeight: "600" },
-
-  freePill: {
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: "#E8F5E8",
-    borderWidth: 1,
-    borderColor: "#C8E6C8",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 70,
-    paddingHorizontal: 14,
-  },
-  freeTxt: { color: "#2E7D32", fontWeight: "600" },
-
-  upgradeBtn: {
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 70,
-  },
-  upgradeTxt: { color: "#111", fontWeight: "600" },
-
-  /* ---- bottom sheet ---- */
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    maxHeight: "85%",
-    paddingBottom: 12,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 130,
-    height: 7,
-    borderRadius: 99,
-    backgroundColor: "#DADDE2",
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  sheetHeader: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6,
-  },
-  sheetTitle: { fontSize: 20, fontWeight: "700" },
-  sheetClose: {
-    position: "absolute",
-    right: 16,
-    top: 6,
-    borderWidth: 1.2,
-    borderRadius: 18,
+  backButton: {
     padding: 4,
   },
-
-  walletCard: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-    ...shadow(6),
-  },
-  walletSmall: { color: "#fff", opacity: 0.9, fontSize: 12 },
-  walletAmount: {
-    color: "#fff",
-    fontSize: 28,
-    fontWeight: "900",
-    marginTop: 6,
-  }, // extra bold
-  topUp: {
-    position: "absolute",
-    right: 12,
-    top: 12,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.6)",
-  },
-
-  optionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ECEDEF",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#C7CCD4",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#E53E3E",
-  },
-
-  bindBox: {
-    borderWidth: 1,
-    borderColor: "#ECEDEF",
-    borderRadius: 14,
-    padding: 16,
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  bindNote: { color: "#525B66", textAlign: "center" },
-  bindBtn: {
-    marginTop: 10,
-    backgroundColor: "#E53E3E",
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-
-  proceedBtn: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: "#E53E3E",
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 16,
-    marginTop: 6,
-    ...shadow(10),
-  },
-
-  /* Loading and Error States */
-  loadingContainer: {
-    width: CARD_W,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 32,
-    marginHorizontal: 8,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  errorContainer: {
-    width: CARD_W,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 32,
-    marginHorizontal: 8,
-  },
-  errorText: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: "600",
+    color: "#000",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  activeSubscriptionBanner: {
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#22C55E",
+    borderRadius: 12,
+    marginHorizontal: 16,
     marginTop: 16,
+    marginBottom: 12,
+    padding: 16,
+  },
+  activeSubscriptionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  activeSubscriptionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+  },
+  activeSubscriptionTextContainer: {
+    flex: 1,
+  },
+  activeSubscriptionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#166534",
+    marginBottom: 4,
+  },
+  activeSubscriptionSubtitle: {
+    fontSize: 12,
+    color: "#15803D",
+    fontWeight: "500",
+  },
+  titleSection: {
+    backgroundColor: "#FFF5F5",
+    paddingTop: 20,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#E53E3E",
+    textAlign: "left",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: "rgba(0,0,0,0.5)",
+    textAlign: "left",
+  },
+  planHeadersRowContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingLeft: 13,
+    paddingRight: 13,
+    marginBottom: 12,
+    gap: 0,
+  },
+  planPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFF5F5",
+    borderWidth: 1,
+    borderColor: "#FFE5E5",
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: 160,
+    height: 44,
+    flexShrink: 0,
+  },
+  planHeadersScroll: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 0,
+  },
+  planHeadersContainer: {
+    flexDirection: "row",
+    gap: 0,
+  },
+  planHeaderCard: {
+    flexShrink: 0,
+    borderRadius: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: "hidden",
+    marginLeft: 0,
+    borderWidth: 2,
+    borderColor: "#fdb47d",
+    minWidth: 200,
+    flex: 1,
+  },
+  planHeaderCardSelected: {
+    borderWidth: 2,
+    borderColor: "#fdb47d",
+  },
+  planHeaderCardGradient: {
+    minHeight: 80,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  planHeaderCardTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "400",
+    fontStyle: "italic",
+    fontFamily: "oleo",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  planHeaderCardPriceContainer: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+  },
+  planHeaderCardPrice: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    fontFamily: "manrope",
+  },
+  planHeaderCardPriceUnit: {
+    fontSize: 10,
+    fontWeight: "400",
+    color: "#fff",
+    marginLeft: 4,
+    opacity: 0.9,
+    fontFamily: "manrope",
+  },
+  subscriptionActiveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+    gap: 4,
+  },
+  subscriptionActiveText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "400",
+  },
+  planPickerText: {
+    fontSize: 12,
+    color: "#000",
+    fontWeight: "400",
+  },
+  tableContainer: {
+    marginLeft: 15,
+    marginRight: 15,
+    marginBottom: 20,
+    borderRadius: 15,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    borderWidth: 0.3,
+    borderColor: "#cdcdcd",
+    maxHeight: 680,
+  },
+  horizontalScroll: {
+    flexGrow: 0,
+  },
+  table: {
+    flexDirection: "row",
+  },
+  featuresColumn: {
+    width: 229,
+    backgroundColor: "#fff",
+  },
+  featuresHeader: {
+    backgroundColor: "#E53E3E",
+    height: 40,
+    paddingHorizontal: 18,
+    justifyContent: "center",
+    borderTopLeftRadius: 15,
+  },
+  featuresHeaderText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  featureRow: {
+    minHeight: 40,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderBottomWidth: 0.3,
+    borderBottomColor: "#cdcdcd",
+    justifyContent: "center",
+  },
+  featureLabel: {
+    fontSize: 12,
+    color: "rgba(0,0,0,0.5)",
+  },
+  planColumn: {
+    backgroundColor: "#fff",
+    borderLeftWidth: 0.3,
+    borderLeftColor: "#cdcdcd",
+  },
+  planColumnSelected: {
+    backgroundColor: "#FFF5F5",
+  },
+  planPriceHeaderRow: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 0.3,
+    borderBottomColor: "#cdcdcd",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  planPriceHeaderText: {
+    fontSize: 14,
+    color: "#000",
+    fontWeight: "600",
+  },
+  planFeatureRow: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 0.3,
+    borderBottomColor: "#cdcdcd",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  planFeatureRowSelected: {
+    backgroundColor: "#FFF5F5",
+  },
+  planFeatureValue: {
+    fontSize: 11,
+    color: "#000",
+    textAlign: "center",
+  },
+  checkIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#10B981",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaButton: {
+    marginHorizontal: 15,
+    marginTop: 24,
+    marginBottom: 30,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    backgroundColor: "#E53E3E",
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 50,
+  },
+  subscriptionActiveButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  ctaButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "400",
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  errorContainer: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  errorText: {
+    marginTop: 12,
+    marginBottom: 20,
+    fontSize: 14,
+    color: "#6B7280",
     textAlign: "center",
   },
   retryButton: {
-    marginTop: 20,
+    backgroundColor: "#E53E3E",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: "white",
-    fontSize: 16,
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "600",
   },
   emptyContainer: {
-    width: CARD_W,
-    justifyContent: "center",
+    padding: 40,
     alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 32,
-    marginHorizontal: 8,
+    justifyContent: "center",
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 16,
-    textAlign: "center",
-  },
-  emptySubtext: {
+    marginTop: 12,
     fontSize: 14,
-    marginTop: 8,
-    textAlign: "center",
-    lineHeight: 20,
+    color: "#6B7280",
   },
-
-  /* Cancel Button */
-  cancelBtn: {
-    marginLeft: 8,
-    padding: 4,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#000",
+  },
+  modalOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: "#000",
+    fontWeight: "500",
+  },
+  modalOptionPrice: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  // Payment Method Sheet Styles
+  paymentModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  paymentModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  paymentModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+  },
+  paymentModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  paymentModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#000",
+  },
+  paymentModalBody: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  walletBalanceContainer: {
+    backgroundColor: "#F9FAFB",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  walletBalanceLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  walletBalanceAmount: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#000",
+  },
+  paymentMethodOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 12,
+  },
+  paymentMethodOptionSelected: {
+    borderColor: "#E53E3E",
+    backgroundColor: "#FFF5F5",
+  },
+  paymentMethodLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paymentMethodText: {
+    fontSize: 16,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  paymentMethodTextSelected: {
+    color: "#E53E3E",
+  },
+  insufficientBalanceWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  insufficientBalanceText: {
+    fontSize: 12,
+    color: "#92400E",
+    flex: 1,
+  },
+  topUpButton: {
+    backgroundColor: "#E53E3E",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  topUpButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  paymentModalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    ...Platform.select({
+      ios: {
+        paddingBottom: 40,
+      },
+    }),
+  },
+  subscribeButton: {
+    backgroundColor: "#E53E3E",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  subscribeButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+  },
+  subscribeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

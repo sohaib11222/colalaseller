@@ -3,9 +3,10 @@ import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAuth } from '../contexts/AuthContext';
 import { walletTopUp } from '../utils/queries/general';
+import { addSubscription } from '../utils/mutations/settings';
 
 const FlutterwaveWebView = ({ route, navigation }) => {
-    const { amount, order_id, isTopUp = false } = route.params;
+    const { amount, order_id, isTopUp = false, isSubscription = false, plan_id = null } = route.params || {};
     const { token } = useAuth();
 
     const handleWebViewMessage = async (event) => {
@@ -25,6 +26,23 @@ const FlutterwaveWebView = ({ route, navigation }) => {
                         responseData = await walletTopUp(1000, token);
                         console.log('✅ Top-up confirmation response:', responseData);
                         Alert.alert('Success', 'Wallet topped up successfully!');
+                    } else if (isSubscription && plan_id) {
+                        // For subscription, call the subscription API
+                        try {
+                            responseData = await addSubscription({
+                                plan_id: plan_id,
+                                payment_method: 'flutterwave',
+                            }, token);
+                            console.log('✅ Subscription confirmation response:', responseData);
+                            Alert.alert('Success', 'Subscription activated successfully!');
+                            // Navigate back to subscription screen
+                            navigation.navigate('SettingsNavigator', { 
+                                screen: 'Subscription' 
+                            });
+                        } catch (subError) {
+                            console.warn('⚠️ Subscription API error:', subError);
+                            Alert.alert('Payment Success', 'Payment was successful, but subscription activation failed. Please contact support.');
+                        }
                     } else {
                         // For regular payment - you might need to implement this endpoint
                         Alert.alert('Success', 'Payment confirmed!');

@@ -7,6 +7,7 @@ const API_ENDPOINTS = {
     VerifyOtp: `${API_DOMAIN}/auth/verify-otp`, // POST
     Login: `${API_DOMAIN}/auth/login`, // POST
     ResetPassword: `${API_DOMAIN}/auth/reset-password`, // POST
+    GetPlan: `${API_DOMAIN}/auth/plan`, // GET
   },
 
   SELLER: {
@@ -189,6 +190,7 @@ const API_ENDPOINTS = {
     Categories: `${API_DOMAIN}/categories`, // GET
     Brands: `${API_DOMAIN}/brands`, // GET
     Wallet_TopUp: `${API_DOMAIN}/wallet/top-up`, // POST
+    Wallet_Withdraw: `${API_DOMAIN}/wallet/withdraw`, // POST
   },
   ORDERS: {
     Get_All_Orders: `${API_DOMAIN}/seller/orders`, // GET

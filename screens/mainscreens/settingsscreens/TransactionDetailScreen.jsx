@@ -192,16 +192,28 @@ export default function TransactionDetailScreen() {
             />
             <DetailRow 
               label="Time" 
-              value={formatDate(transaction.created_at)} 
+              value={formatDate(transaction.created_at || transaction.when)} 
               C={C} 
             />
             
             {/* Additional fields based on transaction type */}
             {transaction.type === 'withdrawl' && (
               <>
-                <DetailRow label="Account Number" value="N/A" C={C} />
-                <DetailRow label="Account Name" value="N/A" C={C} />
-                <DetailRow label="Bank Name" value="N/A" C={C} />
+                <DetailRow 
+                  label="Account Number" 
+                  value={transaction.withdrawal_request?.account_number || 'N/A'} 
+                  C={C} 
+                />
+                <DetailRow 
+                  label="Account Name" 
+                  value={transaction.withdrawal_request?.account_name || 'N/A'} 
+                  C={C} 
+                />
+                <DetailRow 
+                  label="Bank Name" 
+                  value={transaction.withdrawal_request?.bank_name || 'N/A'} 
+                  C={C} 
+                />
               </>
             )}
             

@@ -18,8 +18,10 @@ export const getBalance = async (token) =>
 export const getTransactionHistory = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.Transaction_History, "GET", undefined, token);
 
-export const getNotifications = async (token) =>
-  await apiCall(API_ENDPOINTS.SETTINGS.Notifications, "GET", undefined, token);
+export const getNotifications = async (token, page = 1) => {
+  const url = `${API_ENDPOINTS.SETTINGS.Notifications}?page=${page}`;
+  return await apiCall(url, "GET", undefined, token);
+};
 
 export const getAnnouncements = async (token) =>
   await apiCall(API_ENDPOINTS.SETTINGS.List_Of_Announcements, "GET", undefined, token);
@@ -123,4 +125,7 @@ export const getKnowledgeBase = async (token, params = {}) => {
   
   return await apiCall(url, "GET", undefined, token);
 };
+
+export const getUserPlan = async (token) =>
+  await apiCall(API_ENDPOINTS.AUTH.GetPlan, "GET", undefined, token);
 

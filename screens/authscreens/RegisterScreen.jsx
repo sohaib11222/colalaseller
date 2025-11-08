@@ -1341,20 +1341,11 @@ export default function RegisterStoreScreen() {
           )}
 
           {/* Actions */}
-          <View style={styles.actionRow}>
-            {!(level === 1 && phase === 1) && (
-              <RoundButton onPress={goPrev} disabled={level === 1 && phase === 1}>
-                <Ionicons
-                  name="arrow-back"
-                  size={20}
-                  color={level === 1 && phase === 1 ? "#A8A8A8" : "#1A1A1A"}
-                />
-              </RoundButton>
-            )}
-
+          {level === 3 && phase === 2 ? (
+            // Last step: Single full-width button
             <TouchableOpacity
               style={[
-                level === 1 && phase === 1 ? styles.proceedBtnFull : styles.proceedBtn,
+                styles.proceedBtnFull,
                 { backgroundColor: theme.colors.primary },
                 getCurrentMutation()?.isPending && styles.buttonDisabled,
               ]}
@@ -1366,29 +1357,59 @@ export default function RegisterStoreScreen() {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <ThemedText style={styles.proceedText}>
-                  {level === 1 && phase === 1 && "Create Store"}
-                  {level === 1 && phase === 2 && "Submit"}
-                  {level === 1 && phase === 3 && "Submit"}
-                  {level === 2 && phase === 1 && "Submit"}
-                  {level === 2 && phase === 2 && "Submit"}
-                  {level === 3 && phase === 1 && "Submit"}
-                  {level === 3 && phase === 2 && "Submit"}
+                  Submit & Complete Setup
                 </ThemedText>
               )}
             </TouchableOpacity>
+          ) : (
+            <View style={styles.actionRow}>
+              {!(level === 1 && phase === 1) && (
+                <RoundButton onPress={goPrev} disabled={level === 1 && phase === 1}>
+                  <Ionicons
+                    name="arrow-back"
+                    size={20}
+                    color={level === 1 && phase === 1 ? "#A8A8A8" : "#1A1A1A"}
+                  />
+                </RoundButton>
+              )}
 
-            {!(level === 1 && phase === 1) && (
-              <TouchableOpacity 
-                style={styles.saveSkipBtn} 
+              <TouchableOpacity
+                style={[
+                  level === 1 && phase === 1 ? styles.proceedBtnFull : styles.proceedBtn,
+                  { backgroundColor: theme.colors.primary },
+                  getCurrentMutation()?.isPending && styles.buttonDisabled,
+                ]}
+                onPress={handleCurrentStep}
                 activeOpacity={0.9}
-                onPress={() => navigation.replace("Login")}
+                disabled={getCurrentMutation()?.isPending}
               >
-                <ThemedText style={styles.saveSkipText}>
-                Continue Later
-                </ThemedText>
+                {getCurrentMutation()?.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <ThemedText style={styles.proceedText}>
+                    {level === 1 && phase === 1 && "Create Store"}
+                    {level === 1 && phase === 2 && "Submit"}
+                    {level === 1 && phase === 3 && "Submit"}
+                    {level === 2 && phase === 1 && "Submit"}
+                    {level === 2 && phase === 2 && "Submit"}
+                    {level === 3 && phase === 1 && "Submit"}
+                  </ThemedText>
+                )}
               </TouchableOpacity>
-            )}
-          </View>
+
+              {!(level === 1 && phase === 1) && (
+                <TouchableOpacity 
+                  style={styles.saveSkipBtn} 
+                  activeOpacity={0.9}
+                  onPress={() => navigation.replace("Login")}
+                >
+                  <ThemedText style={styles.saveSkipText}>
+                  Continue Later
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* Login (disabled look) */}
           <TouchableOpacity

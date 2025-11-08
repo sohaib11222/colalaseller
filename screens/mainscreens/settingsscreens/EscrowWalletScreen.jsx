@@ -106,8 +106,8 @@ function LockRow({ C, item, onPressLink }) {
           Order: {item.order?.order_no || 'N/A'}
         </ThemedText>
         <ThemedText style={[styles.rowLink, { color: C.primary, marginTop: 4 }]}>
-          View Details
-        </ThemedText>
+            View Details
+          </ThemedText>
       </View>
 
       <View style={{ alignItems: "flex-end" }}>
@@ -290,9 +290,9 @@ function EscrowDetailModal({ visible, onClose, C, item }) {
               <ThemedText style={[styles.detailLabel, { color: C.text, fontWeight: '700' }]}>Locked Amount</ThemedText>
               <ThemedText style={[styles.detailValue, { color: C.primary, fontWeight: '800', fontSize: 18 }]}>
                 {currency(item.amount || 0)}
-              </ThemedText>
-            </View>
-          </View>
+        </ThemedText>
+      </View>
+    </View>
         </ScrollView>
       </SafeAreaView>
     </Modal>

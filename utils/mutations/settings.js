@@ -189,3 +189,17 @@ export const updatePhoneVisibility = async ({ is_phone_visible, token }) => {
     throw error;
   }
 };
+
+//Wallet Withdraw
+export const withdrawWallet = async (payload, token) => {
+  console.log("Withdraw Wallet - Payload:", payload);
+  console.log("Withdraw Wallet - Token:", token);
+  try {
+    const result = await apiCall(API_ENDPOINTS.GENERAL.Wallet_Withdraw, "POST", payload, token);
+    console.log("Withdraw Wallet - Success:", result);
+    return result;
+  } catch (error) {
+    console.log("Withdraw Wallet - Error:", error);
+    throw error;
+  }
+};

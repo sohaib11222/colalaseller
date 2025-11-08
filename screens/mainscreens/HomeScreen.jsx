@@ -9,6 +9,8 @@ import {
   Dimensions,
   RefreshControl,
   ActivityIndicator,
+  Modal,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -18,11 +20,14 @@ import StoreProfileModal from "../../components/StoreProfileModal";
 import { useNavigation } from "@react-navigation/native";
 import { API_DOMAIN } from "../../apiConfig"; // add this import
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { getToken } from "../../utils/tokenStorage";
 import { getStoreBuilder } from "../../utils/queries/stores";
 import * as OrderQueries from "../../utils/queries/orders"; // latest 3 orders
 import { useQueryClient } from "@tanstack/react-query";
+import { getUserPlan, getBalance } from "../../utils/queries/settings";
+import { addSubscription } from "../../utils/mutations/settings";
+import { useAuth } from "../../contexts/AuthContext";
 const { width } = Dimensions.get("window");
 
 /* ---------- assets ---------- */
@@ -113,8 +118,11 @@ export default function StoreHomeScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+  const { token } = useAuth();
   const [profileVisible, setProfileVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("wallet");
 
   /* -------- fetch store builder -------- */
   const {
@@ -132,6 +140,88 @@ export default function StoreHomeScreen() {
   });
 
   const apiStore = builder?.store;
+
+  /* -------- fetch user plan for renewal check -------- */
+  const {
+    data: userPlanData,
+    isLoading: planLoading,
+    refetch: refetchPlan,
+  } = useQuery({
+    queryKey: ["userPlan"],
+    queryFn: async () => {
+      const token = await getToken();
+      return await getUserPlan(token);
+    },
+    enabled: !!token,
+    staleTime: 30_000,
+  });
+
+  /* -------- fetch balance for renewal payment -------- */
+  const {
+    data: balanceData,
+    isLoading: balanceLoading,
+  } = useQuery({
+    queryKey: ["walletBalance"],
+    queryFn: async () => {
+      const token = await getToken();
+      return await getBalance(token);
+    },
+    enabled: !!token && showRenewalModal,
+    staleTime: 10_000,
+  });
+
+  const walletAmount = useMemo(() => {
+    return Number(balanceData?.data?.shopping_balance || 0);
+  }, [balanceData]);
+
+  /* -------- subscription renewal mutation -------- */
+  const renewalMutation = useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      return await addSubscription(payload, token);
+    },
+    onSuccess: (data) => {
+      console.log("✅ Renewal successful:", data);
+      Alert.alert("Success", "Subscription renewed successfully!");
+      setShowRenewalModal(false);
+      refetchPlan();
+      queryClient.invalidateQueries({ queryKey: ["walletBalance"] });
+    },
+    onError: (error) => {
+      console.error("❌ Renewal error:", error);
+      Alert.alert("Error", error.message || "Failed to renew subscription. Please try again.");
+    },
+  });
+
+  /* -------- check if renewal is needed -------- */
+  useEffect(() => {
+    if (userPlanData?.data) {
+      const planData = userPlanData.data;
+      const needsRenewal = planData.needs_renewal || false;
+      const endDate = planData.subscription?.end_date;
+      const isExpired = planData.is_expired || false;
+
+      // Check if end_date is today or past
+      let shouldShowRenewal = needsRenewal || isExpired;
+      
+      if (endDate && !shouldShowRenewal) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiryDate = new Date(endDate);
+        expiryDate.setHours(0, 0, 0, 0);
+        
+        // Show renewal if end_date is today or past
+        if (expiryDate <= today) {
+          shouldShowRenewal = true;
+        }
+      }
+
+      if (shouldShowRenewal && planData.subscription?.plan_id) {
+        console.log("🔄 Renewal needed - showing modal");
+        setShowRenewalModal(true);
+      }
+    }
+  }, [userPlanData]);
 
   // Debug: Log the API response to see what data we're getting
   useEffect(() => {
@@ -332,12 +422,45 @@ export default function StoreHomeScreen() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["store", "builder"] }),
         queryClient.invalidateQueries({ queryKey: ["orders", "latest3"] }),
+        refetchPlan(),
       ]);
     } catch (error) {
       console.error("Error refreshing data:", error);
     } finally {
       setRefreshing(false);
     }
+  };
+
+  /* -------- renewal handlers -------- */
+  const handleRenewal = (paymentMethod) => {
+    const planData = userPlanData?.data;
+    if (!planData?.subscription?.plan_id) {
+      Alert.alert("Error", "Unable to renew subscription. Please contact support.");
+      return;
+    }
+
+    if (paymentMethod === "wallet") {
+      // Renew with wallet
+      renewalMutation.mutate({
+        plan_id: planData.subscription.plan_id,
+        payment_method: "wallet",
+      });
+    } else if (paymentMethod === "flutterwave") {
+      // Navigate to Flutterwave payment
+      const planPrice = parseFloat(planData.subscription?.plan_price || 0);
+      navigation.navigate("FlutterwaveWebView", {
+        amount: planPrice,
+        order_id: `renewal-${Date.now()}`,
+        isSubscription: true,
+        plan_id: planData.subscription.plan_id,
+      });
+      setShowRenewalModal(false);
+    }
+  };
+
+  const handleTopUpNavigation = () => {
+    setShowRenewalModal(false);
+    navigation.navigate("SettingsNavigator", { screen: "ShoppingWallet" });
   };
 
   return (
@@ -658,9 +781,180 @@ export default function StoreHomeScreen() {
             onClose={() => setProfileVisible(false)}
             store={store}
           />
+
+          {/* Renewal Modal */}
+          <RenewalModal
+            visible={showRenewalModal}
+            onClose={() => setShowRenewalModal(false)}
+            planData={userPlanData?.data}
+            selectedPaymentMethod={selectedPaymentMethod}
+            onPaymentMethodSelect={setSelectedPaymentMethod}
+            onRenew={handleRenewal}
+            isLoading={renewalMutation.isPending}
+            walletAmount={walletAmount}
+            balanceLoading={balanceLoading}
+            onTopUp={handleTopUpNavigation}
+          />
         </>
       )}
     </SafeAreaView>
+  );
+}
+
+/* -------- Renewal Modal Component -------- */
+function RenewalModal({
+  visible,
+  onClose,
+  planData,
+  selectedPaymentMethod,
+  onPaymentMethodSelect,
+  onRenew,
+  isLoading,
+  walletAmount = 0,
+  balanceLoading = false,
+  onTopUp,
+}) {
+  const planPrice = planData?.subscription?.plan_price 
+    ? parseFloat(planData.subscription.plan_price) 
+    : 0;
+  const hasEnoughBalance = walletAmount >= planPrice;
+  const planName = planData?.plan || "Current Plan";
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={renewalModalStyles.overlay}>
+        <TouchableOpacity
+          style={renewalModalStyles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={renewalModalStyles.content}>
+          <View style={renewalModalStyles.header}>
+            <ThemedText style={renewalModalStyles.title}>
+              Renew Subscription
+            </ThemedText>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={renewalModalStyles.body}>
+            <ThemedText style={renewalModalStyles.description}>
+              Your {planName} subscription needs to be renewed to continue enjoying all features.
+            </ThemedText>
+
+            {/* Wallet Balance */}
+            <View style={renewalModalStyles.walletBalanceContainer}>
+              <ThemedText style={renewalModalStyles.walletBalanceLabel}>
+                Wallet Balance
+              </ThemedText>
+              {balanceLoading ? (
+                <ActivityIndicator size="small" color="#E53E3E" />
+              ) : (
+                <ThemedText style={renewalModalStyles.walletBalanceAmount}>
+                  ₦{Number(walletAmount).toLocaleString()}
+                </ThemedText>
+              )}
+            </View>
+
+            {/* Payment Methods */}
+            <TouchableOpacity
+              style={[
+                renewalModalStyles.paymentMethodOption,
+                selectedPaymentMethod === "wallet" &&
+                  renewalModalStyles.paymentMethodOptionSelected,
+              ]}
+              onPress={() => onPaymentMethodSelect("wallet")}
+            >
+              <View style={renewalModalStyles.paymentMethodLeft}>
+                <Ionicons
+                  name="wallet"
+                  size={24}
+                  color={selectedPaymentMethod === "wallet" ? "#E53E3E" : "#6B7280"}
+                />
+                <ThemedText
+                  style={[
+                    renewalModalStyles.paymentMethodText,
+                    selectedPaymentMethod === "wallet" &&
+                      renewalModalStyles.paymentMethodTextSelected,
+                  ]}
+                >
+                  Wallet
+                </ThemedText>
+              </View>
+              {selectedPaymentMethod === "wallet" && (
+                <Ionicons name="checkmark-circle" size={24} color="#E53E3E" />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                renewalModalStyles.paymentMethodOption,
+                selectedPaymentMethod === "flutterwave" &&
+                  renewalModalStyles.paymentMethodOptionSelected,
+              ]}
+              onPress={() => onPaymentMethodSelect("flutterwave")}
+            >
+              <View style={renewalModalStyles.paymentMethodLeft}>
+                <Ionicons
+                  name="card"
+                  size={24}
+                  color={selectedPaymentMethod === "flutterwave" ? "#E53E3E" : "#6B7280"}
+                />
+                <ThemedText
+                  style={[
+                    renewalModalStyles.paymentMethodText,
+                    selectedPaymentMethod === "flutterwave" &&
+                      renewalModalStyles.paymentMethodTextSelected,
+                  ]}
+                >
+                  Flutterwave
+                </ThemedText>
+              </View>
+              {selectedPaymentMethod === "flutterwave" && (
+                <Ionicons name="checkmark-circle" size={24} color="#E53E3E" />
+              )}
+            </TouchableOpacity>
+
+            {selectedPaymentMethod === "wallet" && !hasEnoughBalance && (
+              <TouchableOpacity
+                style={renewalModalStyles.topUpButton}
+                onPress={onTopUp}
+              >
+                <ThemedText style={renewalModalStyles.topUpButtonText}>
+                  Top Up Wallet
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+
+          <View style={renewalModalStyles.footer}>
+            <TouchableOpacity
+              style={[
+                renewalModalStyles.renewButton,
+                (!hasEnoughBalance && selectedPaymentMethod === "wallet") &&
+                  renewalModalStyles.renewButtonDisabled,
+              ]}
+              onPress={() => onRenew(selectedPaymentMethod)}
+              disabled={isLoading || (selectedPaymentMethod === "wallet" && !hasEnoughBalance)}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <ThemedText style={renewalModalStyles.renewButtonText}>
+                  Renew Subscription
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -916,5 +1210,128 @@ const styles = StyleSheet.create({
   iconButton: { marginLeft: 9 },
   iconPill: { backgroundColor: "#fff", padding: 6, borderRadius: 25 },
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
+});
+
+const renewalModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    flex: 1,
+  },
+  content: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "80%",
+    paddingBottom: 20,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  body: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  description: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  walletBalanceContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  walletBalanceLabel: {
+    fontSize: 14,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  walletBalanceAmount: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  paymentMethodOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    marginBottom: 12,
+  },
+  paymentMethodOptionSelected: {
+    borderColor: "#E53E3E",
+    backgroundColor: "#FEF2F2",
+  },
+  paymentMethodLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paymentMethodText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
+  paymentMethodTextSelected: {
+    color: "#E53E3E",
+    fontWeight: "600",
+  },
+  topUpButton: {
+    backgroundColor: "#E53E3E",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  topUpButtonText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  renewButton: {
+    backgroundColor: "#E53E3E",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  renewButtonDisabled: {
+    backgroundColor: "#D1D5DB",
+  },
+  renewButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
 

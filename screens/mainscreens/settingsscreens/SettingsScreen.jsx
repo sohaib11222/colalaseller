@@ -12,6 +12,8 @@ import {
   RefreshControl,
   Alert,
   Switch,
+  Modal,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -20,7 +22,7 @@ import { useTheme } from "../../../components/ThemeProvider";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 //Code Related to the integration
-import { getBalance, getEscrowWallet, getPhoneRequests, getPhoneVisibility } from "../../../utils/queries/settings";
+import { getBalance, getEscrowWallet, getPhoneRequests, getPhoneVisibility, getUserPlan } from "../../../utils/queries/settings";
 import { updatePhoneVisibility } from "../../../utils/mutations/settings";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -32,6 +34,7 @@ const SettingsScreen = () => {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [errorDismissed, setErrorDismissed] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   const C = useMemo(
     () => ({
@@ -140,6 +143,28 @@ const SettingsScreen = () => {
     },
   });
 
+  // Fetch user plan data using React Query (always enabled to show plan name)
+  const {
+    data: userPlanData,
+    isLoading: userPlanLoading,
+    error: userPlanError,
+    refetch: refetchUserPlan,
+  } = useQuery({
+    queryKey: ["userPlan", token],
+    queryFn: () => {
+      console.log("🚀 Executing getUserPlan API call with token:", token);
+      return getUserPlan(token);
+    },
+    enabled: !!token, // Always fetch when token is available
+    onSuccess: (data) => {
+      console.log("✅ User plan API call successful:", data);
+      console.log("✅ User plan data structure:", JSON.stringify(data, null, 2));
+    },
+    onError: (error) => {
+      console.error("❌ User plan API call failed:", error);
+    },
+  });
+
   // Mutation for updating phone visibility
   const updatePhoneVisibilityMutation = useMutation({
     mutationFn: ({ is_phone_visible, token }) => 
@@ -158,12 +183,12 @@ const SettingsScreen = () => {
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
-    console.log("🔄 Starting balance, escrow, phone requests, and phone visibility pull-to-refresh...");
+    console.log("🔄 Starting balance, escrow, phone requests, phone visibility, and user plan pull-to-refresh...");
     setRefreshing(true);
     try {
-      console.log("🔄 Refreshing balance, escrow, phone requests, and phone visibility data...");
-      await Promise.all([refetchBalance(), refetchEscrow(), refetchPhoneRequests(), refetchPhoneVisibility()]);
-      console.log("✅ Balance, escrow, phone requests, and phone visibility data refreshed successfully");
+      console.log("🔄 Refreshing balance, escrow, phone requests, phone visibility, and user plan data...");
+      await Promise.all([refetchBalance(), refetchEscrow(), refetchPhoneRequests(), refetchPhoneVisibility(), refetchUserPlan()]);
+      console.log("✅ Balance, escrow, phone requests, phone visibility, and user plan data refreshed successfully");
     } catch (error) {
       console.error("❌ Error refreshing data:", error);
     } finally {
@@ -248,8 +273,8 @@ const SettingsScreen = () => {
   console.log("📱 Phone Requests Error:", phoneRequestsError);
 
 
-  // Main section (match screenshot)
-  const menuMain = [
+  // Main section (match screenshot) - useMemo to react to userPlanName changes
+  const menuMain = useMemo(() => [
     {
       key: "myProducts",
       label: "My Products",
@@ -273,6 +298,7 @@ const SettingsScreen = () => {
       label: "Subscriptions",
       img: require("../../../assets/Vector (12).png"),
       leftColor: "#62E53E",
+      badgeText: userPlanName ? userPlanName : undefined, // Show plan name if available
     },
     {
       key: "promoted",
@@ -311,7 +337,7 @@ const SettingsScreen = () => {
       img: require("../../../assets/Question.png"),
       leftColor: "#3EC9E5",
     },
-  ];
+  ], [userPlanName]);
 
   // Others (match screenshot)
   const menuOthers = [
@@ -343,6 +369,12 @@ const SettingsScreen = () => {
   ];
 
   const onPressRow = (key) => {
+    // Handle support separately to show modal
+    if (key === "support") {
+      setShowSupportModal(true);
+      return;
+    }
+
     // Wire up to your settings navigator screens
     const map = {
       myProducts: ["SettingsNavigator", { screen: "MyProducts" }],
@@ -354,7 +386,6 @@ const SettingsScreen = () => {
       announcements: ["ChatNavigator", { screen: "Announcements" }],
       reviews: ["ChatNavigator", { screen: "MyReviews" }],
       referrals: ["SettingsNavigator", { screen: "Referrals" }],
-      support: ["ChatNavigator", { screen: "Support" }],
       faqs: ["ChatNavigator", { screen: "FAQs" }],
 
       sellerLeaderboard: ["ChatNavigator", { screen: "SellerLeaderBoard" }],
@@ -370,6 +401,85 @@ const SettingsScreen = () => {
 
     const route = map[key];
     if (route) navigation.navigate(route[0], route[1]);
+  };
+
+  // Map plan name from API to plan tier
+  const getPlanTier = (planName) => {
+    if (!planName) return "basic";
+    const name = planName.toLowerCase();
+    
+    // Map various plan name formats to tiers
+    if (name.includes("free") || name.includes("basic")) {
+      return "basic";
+    }
+    if (name.includes("pro")) {
+      return "pro";
+    }
+    if (name.includes("vip")) {
+      return "vip";
+    }
+    if (name.includes("gold")) {
+      return "vip"; // Gold Plan treated as VIP
+    }
+    
+    // Default to basic if unknown
+    return "basic";
+  };
+
+  // Get plan name and tier from API response
+  const userPlanName = useMemo(() => {
+    // Try different possible data structures
+    const planName = 
+      userPlanData?.data?.plan || 
+      userPlanData?.plan || 
+      userPlanData?.data?.plan_name ||
+      "";
+    console.log("📋 User Plan Name from API:", planName);
+    console.log("📋 User Plan Data:", userPlanData);
+    console.log("📋 User Plan Data?.data:", userPlanData?.data);
+    console.log("📋 User Plan Data?.data?.plan:", userPlanData?.data?.plan);
+    return planName;
+  }, [userPlanData]);
+
+  const planTier = useMemo(() => {
+    if (!userPlanData?.data) return "basic"; // Default to basic if no data
+    const planName = userPlanData?.data?.plan || "";
+    const tier = getPlanTier(planName);
+    console.log("📋 Plan name from API:", planName);
+    console.log("📋 Mapped plan tier:", tier);
+    return tier;
+  }, [userPlanData]);
+
+  // Handle support actions
+  const handleSupportEmail = async () => {
+    const email = "support@kolalamall.com";
+    const url = `mailto:${email}`;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Error", "Unable to open email app");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to open email");
+    }
+    setShowSupportModal(false);
+  };
+
+  const handleSupportChat = () => {
+    setShowSupportModal(false);
+    navigation.navigate("ChatNavigator", { screen: "Support" });
+  };
+
+  const handleSupportPhone = () => {
+    // TODO: Get phone number from admin settings
+    const phoneNumber = "+1234567890"; // Placeholder - should come from admin settings
+    const url = `tel:${phoneNumber}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Error", "Unable to make phone call");
+    });
+    setShowSupportModal(false);
   };
 
   return (
@@ -563,19 +673,27 @@ const SettingsScreen = () => {
 
         {/* Main options */}
         <View style={{ marginTop: 12 }}>
-          {menuMain.map((item) => (
-            <OptionPillCard
-              key={item.key}
-              label={item.label}
-              img={item.img}
-              leftColor={item.leftColor}
-              badgeImg={item.badgeImg}
-              onPress={() => onPressRow(item.key)}
-              badgeText={item.badgeText}
-              badgeColor={item.badgeColor || C.success}
-              C={C}
-            />
-          ))}
+          {menuMain.map((item) => {
+            // Debug logging for subscriptions item
+            if (item.key === "subscriptions") {
+              console.log("🔍 Rendering Subscriptions - badgeText:", item.badgeText);
+              console.log("🔍 Rendering Subscriptions - userPlanName:", userPlanName);
+              console.log("🔍 Rendering Subscriptions - userPlanData:", userPlanData);
+            }
+            return (
+              <OptionPillCard
+                key={item.key}
+                label={item.label}
+                img={item.img}
+                leftColor={item.leftColor}
+                badgeImg={item.badgeImg}
+                onPress={() => onPressRow(item.key)}
+                badgeText={item.badgeText}
+                badgeColor={item.badgeColor || C.success}
+                C={C}
+              />
+            );
+          })}
         </View>
 
         {/* Others */}
@@ -615,7 +733,7 @@ const SettingsScreen = () => {
                   style={[styles.pillLabel, { color: C.text, marginTop: 10 }]}
                   numberOfLines={2}
                 >
-                  Allow people to view my phone number
+                  Make Phone Number Public
                 </ThemedText>
                 {storePhone && (
                   <ThemedText
@@ -674,6 +792,18 @@ const SettingsScreen = () => {
           </ThemedText>
         </View>
       )}
+
+      {/* Support Modal */}
+      <SupportModal
+        visible={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        planTier={planTier}
+        isLoading={userPlanLoading}
+        onEmail={handleSupportEmail}
+        onChat={handleSupportChat}
+        onPhone={handleSupportPhone}
+        C={C}
+      />
     </SafeAreaView>
   );
 };
@@ -688,6 +818,193 @@ const HeaderIconCircle = ({ children, onPress }) => (
     {children}
   </TouchableOpacity>
 );
+
+/* ---------------- Support Modal ---------------- */
+const SupportModal = ({ visible, onClose, planTier, isLoading, onEmail, onChat, onPhone, C }) => {
+  if (!visible) return null;
+
+  // Ensure planTier has a default value
+  const currentPlanTier = planTier || "basic";
+  
+  console.log("🔍 SupportModal - planTier:", planTier);
+  console.log("🔍 SupportModal - currentPlanTier:", currentPlanTier);
+  console.log("🔍 SupportModal - isLoading:", isLoading);
+
+  const getResponseTime = () => {
+    switch (currentPlanTier) {
+      case "basic":
+        return "48–72 hrs response";
+      case "pro":
+        return "24–48 hrs response";
+      case "vip":
+        return "Immediate response";
+      default:
+        return "48–72 hrs response";
+    }
+  };
+
+  const renderSupportOptions = () => {
+    console.log("🎨 Rendering support options for tier:", currentPlanTier);
+    switch (currentPlanTier) {
+      case "basic":
+        return (
+          <View>
+            <TouchableOpacity
+              style={[styles.supportOption, { backgroundColor: C.white, borderColor: C.border }]}
+              onPress={onEmail}
+            >
+              <Ionicons name="mail-outline" size={24} color={C.primary} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <ThemedText style={[styles.supportOptionTitle, { color: C.text }]}>
+                  Email Support
+                </ThemedText>
+                <ThemedText style={[styles.supportOptionSubtitle, { color: C.sub }]}>
+                  {getResponseTime()}
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.sub} />
+            </TouchableOpacity>
+          </View>
+        );
+
+      case "pro":
+        return (
+          <View>
+            <TouchableOpacity
+              style={[styles.supportOption, { backgroundColor: C.white, borderColor: C.border }]}
+              onPress={onEmail}
+            >
+              <Ionicons name="mail-outline" size={24} color={C.primary} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <ThemedText style={[styles.supportOptionTitle, { color: C.text }]}>
+                  Email Support
+                </ThemedText>
+                <ThemedText style={[styles.supportOptionSubtitle, { color: C.sub }]}>
+                  {getResponseTime()}
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.sub} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.supportOption, { backgroundColor: C.white, borderColor: C.border }]}
+              onPress={onChat}
+            >
+              <Ionicons name="chatbubble-outline" size={24} color={C.primary} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <ThemedText style={[styles.supportOptionTitle, { color: C.text }]}>
+                  Chat Support
+                </ThemedText>
+                <ThemedText style={[styles.supportOptionSubtitle, { color: C.sub }]}>
+                  {getResponseTime()}
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.sub} />
+            </TouchableOpacity>
+          </View>
+        );
+
+      case "vip":
+        return (
+          <View>
+            <TouchableOpacity
+              style={[styles.supportOption, { backgroundColor: C.white, borderColor: C.border }]}
+              onPress={onChat}
+            >
+              <Ionicons name="chatbubble-outline" size={24} color={C.primary} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <ThemedText style={[styles.supportOptionTitle, { color: C.text }]}>
+                  Chat Support
+                </ThemedText>
+                <ThemedText style={[styles.supportOptionSubtitle, { color: C.sub }]}>
+                  {getResponseTime()}
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.sub} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.supportOption, { backgroundColor: C.white, borderColor: C.border }]}
+              onPress={onPhone}
+            >
+              <Ionicons name="call-outline" size={24} color={C.primary} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <ThemedText style={[styles.supportOptionTitle, { color: C.text }]}>
+                  Phone Support
+                </ThemedText>
+                <ThemedText style={[styles.supportOptionSubtitle, { color: C.sub }]}>
+                  {getResponseTime()}
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={C.sub} />
+            </TouchableOpacity>
+          </View>
+        );
+
+      default:
+        return (
+          <TouchableOpacity
+            style={[styles.supportOption, { backgroundColor: C.white, borderColor: C.border }]}
+            onPress={onEmail}
+          >
+            <Ionicons name="mail-outline" size={24} color={C.primary} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <ThemedText style={[styles.supportOptionTitle, { color: C.text }]}>
+                Email Support
+              </ThemedText>
+              <ThemedText style={[styles.supportOptionSubtitle, { color: C.sub }]}>
+                {getResponseTime()}
+              </ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={C.sub} />
+          </TouchableOpacity>
+        );
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.supportModalOverlay}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={[styles.supportModalSheet, { backgroundColor: C.bg }]}>
+          <View style={styles.supportModalHandle} />
+          <View style={styles.supportModalHeader}>
+            <ThemedText style={[styles.supportModalTitle, { color: C.text }]}>
+              Contact Support
+            </ThemedText>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={C.text} />
+            </TouchableOpacity>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.supportModalLoading}>
+              <ActivityIndicator size="small" color={C.primary} />
+              <ThemedText style={[styles.supportModalLoadingText, { color: C.sub }]}>
+                Loading support options...
+              </ThemedText>
+            </View>
+          ) : (
+            <ScrollView
+              style={styles.supportModalContent}
+              contentContainerStyle={{ paddingBottom: 20, paddingTop: 8, paddingHorizontal: 4 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {renderSupportOptions()}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 const OptionPillCard = ({
   label,
@@ -706,6 +1023,13 @@ const OptionPillCard = ({
     console.log("🔍 OptionPillCard - label:", label);
     console.log("🔍 OptionPillCard - countBadge:", countBadge);
     console.log("🔍 OptionPillCard - countBadge !== undefined:", countBadge !== undefined);
+  }
+  
+  // Debug logging for badgeText
+  if (label === "Subscriptions") {
+    console.log("🔍 OptionPillCard - Subscriptions badgeText:", badgeText);
+    console.log("🔍 OptionPillCard - Subscriptions badgeText type:", typeof badgeText);
+    console.log("🔍 OptionPillCard - Subscriptions badgeText truthy:", !!badgeText);
   }
   
   return (
@@ -760,7 +1084,7 @@ const OptionPillCard = ({
             ]}
           >
             <ThemedText style={[styles.badgePillText, { color: badgeColor }]}>
-              {badgeText}
+              {String(badgeText)}
             </ThemedText>
           </View>
         ) : null}
@@ -1045,6 +1369,66 @@ const styles = StyleSheet.create({
 
   // If your PNGs are already colored, remove tintColor.
   iconImg: { width: 22, height: 22, resizeMode: "contain" },
+
+  // Support Modal styles
+  supportModalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  supportModalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    maxHeight: "70%",
+    minHeight: 200,
+  },
+  supportModalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#DADADA",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  supportModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  supportModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  supportModalContent: {
+    flexGrow: 1,
+  },
+  supportModalLoading: {
+    padding: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  supportModalLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  supportOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  supportOptionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  supportOptionSubtitle: {
+    fontSize: 12,
+  },
 });
 
 export default SettingsScreen;

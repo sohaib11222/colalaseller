@@ -1581,6 +1581,7 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   });
 
   const wallet = Number(balanceData?.data?.shopping_balance || 0);
+  const adCredit = Number(balanceData?.data?.ad_credit || 0);
 
   // Pause/Resume
   const updateStatusMutation = useMutation({
@@ -1852,9 +1853,11 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
           days={boostDays}
           previewData={previewData}
           walletBalance={wallet}
+          adCredit={adCredit}
           onConfirm={() => {
             const required = Number(previewData?.total) || Number(dailyBudget) * Number(boostDays);
-            if ((wallet || 0) < required) {
+            const totalAvailableBalance = (adCredit || 0) + (wallet || 0);
+            if (totalAvailableBalance < required) {
               Alert.alert("Insufficient balance", "Please top up your wallet.");
               return;
             }
@@ -1987,6 +1990,7 @@ function UpdateReviewModal({
   days,
   previewData,
   walletBalance,
+  adCredit = 0,
   onConfirm,
 }) {
   const img =
@@ -2045,6 +2049,21 @@ function UpdateReviewModal({
               ₦{Number(totalAmount).toLocaleString()}
             </ThemedText>
           </View>
+
+          {/* Ad Credit Wallet */}
+          {adCredit > 0 && (
+            <View style={{ borderRadius: 16, padding: 16, marginTop: 12, backgroundColor: C.primary }}>
+              <ThemedText style={{ color: "#fff", opacity: 0.9, marginBottom: 4 }}>
+                Monthly Ad Credit Wallet
+              </ThemedText>
+              <ThemedText style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>
+                ₦{Number(adCredit).toLocaleString()}
+              </ThemedText>
+              <ThemedText style={{ color: "#fff", opacity: 0.8, fontSize: 11, marginTop: 6 }}>
+                Note: Ad credit will be used before wallet balance
+              </ThemedText>
+            </View>
+          )}
 
           {/* Wallet */}
           <View style={{ borderRadius: 16, padding: 16, marginTop: 12, backgroundColor: C.primary }}>

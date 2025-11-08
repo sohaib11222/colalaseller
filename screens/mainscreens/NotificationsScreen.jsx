@@ -30,6 +30,10 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [onboardingToken, setOnboardingToken] = useState(null);
   const [markingAsRead, setMarkingAsRead] = useState(null); // Track which notification is being marked as read
+  const [currentPage, setCurrentPage] = useState(1);
+  const [allNotifications, setAllNotifications] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Get token for API calls - use auth token first, then onboarding token
   const token = authToken || onboardingToken;
@@ -65,7 +69,7 @@ export default function NotificationsScreen() {
     });
   }, [authToken, onboardingToken, token]);
 
-  // Fetch notifications using React Query
+  // Fetch notifications using React Query (first page)
   const {
     data: notificationsData,
     isLoading,
@@ -74,8 +78,8 @@ export default function NotificationsScreen() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["notifications", token],
-    queryFn: () => getNotifications(token),
+    queryKey: ["notifications", token, 1],
+    queryFn: () => getNotifications(token, 1),
     enabled: !!token,
     staleTime: 5 * 60 * 1000, // 5 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
@@ -88,6 +92,27 @@ export default function NotificationsScreen() {
     },
   });
   console.log("Notifications data:", notificationsData);
+
+  // Update allNotifications and pagination when first page data changes
+  React.useEffect(() => {
+    if (notificationsData?.data && currentPage === 1) {
+      let notifications = [];
+      
+      // Extract notifications from response
+      if (Array.isArray(notificationsData.data)) {
+        notifications = notificationsData.data;
+      } else if (notificationsData.data.notifications && Array.isArray(notificationsData.data.notifications)) {
+        notifications = notificationsData.data.notifications;
+        // Store pagination info
+        if (notificationsData.data.pagination) {
+          setPagination(notificationsData.data.pagination);
+        }
+      }
+      
+      // Only update if this is the first page (reset on refresh)
+      setAllNotifications(notifications);
+    }
+  }, [notificationsData]);
 
   // Mark as read mutation
   const markAsReadMutation = useMutation({
@@ -108,10 +133,48 @@ export default function NotificationsScreen() {
   // Handle pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
+    setCurrentPage(1);
+    setAllNotifications([]);
     try {
       await refetch();
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Handle load more
+  const handleLoadMore = async () => {
+    if (loadingMore || !pagination) return;
+    
+    const nextPage = currentPage + 1;
+    if (nextPage > pagination.last_page) return; // Already on last page
+    
+    setLoadingMore(true);
+    try {
+      const response = await getNotifications(token, nextPage);
+      
+      if (response?.data) {
+        let newNotifications = [];
+        
+        // Extract notifications from response
+        if (Array.isArray(response.data)) {
+          newNotifications = response.data;
+        } else if (response.data.notifications && Array.isArray(response.data.notifications)) {
+          newNotifications = response.data.notifications;
+          // Update pagination info
+          if (response.data.pagination) {
+            setPagination(response.data.pagination);
+          }
+        }
+        
+        // Append new notifications to existing ones
+        setAllNotifications(prev => [...prev, ...newNotifications]);
+        setCurrentPage(nextPage);
+      }
+    } catch (error) {
+      console.error("Error loading more notifications:", error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -121,8 +184,11 @@ export default function NotificationsScreen() {
     markAsReadMutation.mutate({ notificationId });
   };
 
-  // Extract notifications from API response
-  const notifications = notificationsData?.data || [];
+  // Use accumulated notifications (allNotifications) instead of just first page
+  const notifications = allNotifications;
+  
+  // Check if there are more pages to load
+  const hasMorePages = pagination && currentPage < pagination.last_page;
 
   // const C = useMemo(
   //   () => ({
@@ -304,6 +370,31 @@ export default function NotificationsScreen() {
               tintColor={C.primary}
             />
           }
+          ListFooterComponent={() => {
+            if (!hasMorePages) return null;
+            
+            return (
+              <View style={styles.loadMoreContainer}>
+                <TouchableOpacity
+                  style={[styles.loadMoreButton, { backgroundColor: C.primary }]}
+                  onPress={handleLoadMore}
+                  disabled={loadingMore}
+                  activeOpacity={0.8}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <>
+                      <ThemedText style={styles.loadMoreButtonText}>
+                        Load More
+                      </ThemedText>
+                      
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            );
+          }}
         />
       )}
     </SafeAreaView>
@@ -396,5 +487,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
+  },
+  loadMoreContainer: {
+    paddingVertical: 20,
+    // paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  loadMoreButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 200,
+  },
+  loadMoreButtonText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  loadMoreButtonSubtext: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "400",
+    textAlign: "center",
+    marginTop: 4,
+    opacity: 0.9,
   },
 });

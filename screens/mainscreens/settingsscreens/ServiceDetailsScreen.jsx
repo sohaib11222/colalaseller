@@ -292,11 +292,11 @@ export default function ServiceDetailsScreen({ route, navigation }) {
                 {serviceData?.name || item.title || "Service Name"}
               </ThemedText>
               <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: 4 }}>
-                <ThemedText
+              <ThemedText
                   style={{ color: C.primary, fontWeight: "600", fontSize: 12 }}
-                >
+              >
                   Starting from{" "}
-                </ThemedText>
+              </ThemedText>
                 <ThemedText
                   style={{ color: C.primary, fontWeight: "800", fontSize: 16 }}
                 >
@@ -874,15 +874,15 @@ function ViewServiceModal({
               >
                 Starting from{" "}
               </ThemedText>
-              <ThemedText
-                style={{
-                  color: "#E53E3E",
-                  fontSize: 16,
-                  fontWeight: "bold",
-                }}
-              >
+            <ThemedText
+              style={{
+                color: "#E53E3E",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}
+            >
                 ₦{Number(serviceData?.price_from || 0).toLocaleString()}
-              </ThemedText>
+            </ThemedText>
             </View>
 
             <View style={styles.divider} />
@@ -912,10 +912,10 @@ function ViewServiceModal({
                   <View style={{ flexDirection: "row", alignItems: "baseline" }}>
                     <ThemedText style={[styles.breakdownPrice, { fontSize: 12, fontWeight: "500" }]}>
                       Starting from{" "}
-                    </ThemedText>
-                    <ThemedText style={styles.breakdownPrice}>
+                  </ThemedText>
+                  <ThemedText style={styles.breakdownPrice}>
                       ₦{Number(subService.price_from || 0).toLocaleString()}
-                    </ThemedText>
+                  </ThemedText>
                   </View>
                 </View>
               ))

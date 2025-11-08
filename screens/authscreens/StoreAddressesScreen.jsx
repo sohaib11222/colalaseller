@@ -152,17 +152,17 @@ function AddressCard({ index, item, onEdit, onDelete, onMap }) {
 
           {/* Only show "View on Map" button if coordinates are valid */}
           {hasValidCoordinates && (
-            <TouchableOpacity
-              style={styles.mapBtn}
-              onPress={onMap}
-              activeOpacity={0.9}
-            >
-              <Image
-                source={require("../../assets/home.png")}
-                style={{ width: 14, height: 14, marginRight: 6, tintColor: "#E53E3E" }}
-              />
-              <ThemedText style={styles.mapBtnText}>View on Map</ThemedText>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.mapBtn}
+            onPress={onMap}
+            activeOpacity={0.9}
+          >
+            <Image
+              source={require("../../assets/home.png")}
+              style={{ width: 14, height: 14, marginRight: 6, tintColor: "#E53E3E" }}
+            />
+            <ThemedText style={styles.mapBtnText}>View on Map</ThemedText>
+          </TouchableOpacity>
           )}
         </View>
       </View>

@@ -215,6 +215,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
 
   // Extract balance data from API response
   const shoppingBalance = balanceData?.data?.shopping_balance || 0;
+  const adCredit = balanceData?.data?.ad_credit || 0;
 
   // Debug logging
   console.log("product qty", product.qty);
@@ -670,6 +671,7 @@ export default function ProductDetailsScreen({ route, navigation }) {
         productId={productId}
         C={C}
         shoppingBalance={shoppingBalance}
+        adCredit={adCredit}
         quantityMutation={quantityMutation}
         stats={finalStats}
         chart={finalSeries}
@@ -717,6 +719,7 @@ function ViewProductModal(props) {
     onEditProduct,
     productId,
     shoppingBalance,
+    adCredit = 0,
     quantityMutation,
     stats,
     chart,
@@ -1499,6 +1502,7 @@ function ViewProductModal(props) {
           previewData={previewData}
           productId={productId}
           shoppingBalance={shoppingBalance}
+          adCredit={adCredit}
           onTopUp={onTopUp}
           onEditLocation={handleEditLocation}
           onEditBudget={handleEditBudget}
@@ -1922,6 +1926,7 @@ function ReviewAdModal({
   previewData,
   productId,
   shoppingBalance,
+  adCredit = 0,
   onTopUp,
   onEditLocation,
   onEditBudget,
@@ -2142,7 +2147,33 @@ function ReviewAdModal({
             </ThemedText>
           </View>
 
-          {/* Balance card */}
+          {/* Ad Credit Wallet */}
+          {adCredit > 0 && (
+            <LinearGradient
+              colors={["#9A0834", "#E53E3E"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ borderRadius: 16, padding: 16, marginTop: 12 }}
+            >
+              <ThemedText
+                style={{ color: "#fff", opacity: 0.9, marginBottom: 4 }}
+              >
+                Monthly Ad Credit Wallet
+              </ThemedText>
+              <ThemedText
+                style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}
+              >
+                ₦{Number(adCredit).toLocaleString()}
+              </ThemedText>
+              <ThemedText
+                style={{ color: "#fff", opacity: 0.8, fontSize: 11, marginTop: 6 }}
+              >
+                Note: Ad credit will be used before wallet balance
+              </ThemedText>
+            </LinearGradient>
+          )}
+
+          {/* Spending Wallet Balance */}
           <LinearGradient
             colors={["#9A0834", "#E53E3E"]}
             start={{ x: 0, y: 0 }}
@@ -2208,14 +2239,16 @@ function ReviewAdModal({
             onPress={() => {
               // Guard: ensure wallet has enough balance for total amount.
               // Use preview total if available; otherwise fallback to daily * days.
+              const adCreditBalance = Number(adCredit) || 0;
               const walletBalance = Number(shoppingBalance) || 0;
+              const totalAvailableBalance = adCreditBalance + walletBalance;
               const previewTotal = Number(totalAmount) || 0;
               const fallbackTotal = Math.round(
                 (Number(daily) || 0) * (Number(days) || 0)
               );
               const requiredAmount =
                 previewTotal > 0 ? previewTotal : fallbackTotal;
-              if (walletBalance < requiredAmount) {
+              if (totalAvailableBalance < requiredAmount) {
                 alert("Insufficient balance. Please top up your wallet.");
                 return;
               }

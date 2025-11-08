@@ -23,9 +23,11 @@ import { StatusBar } from "expo-status-bar";
 
 //Code Related to the integration
 import { getTransactionHistory } from "../../../utils/queries/settings";
-import { useQuery } from "@tanstack/react-query";
+import { withdrawWallet } from "../../../utils/mutations/settings";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import { useAuth } from "../../../contexts/AuthContext";
+import { Alert } from "react-native";
 
 /* ---------- Local icons (swap paths if different) ---------- */
 const ICONS = {
@@ -185,6 +187,94 @@ export default function ShoppingWalletScreen() {
     }
   };
 
+  // Withdrawal mutation
+  const withdrawMutation = useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      return await withdrawWallet(payload, token);
+    },
+    onSuccess: (data) => {
+      console.log("✅ Withdrawal successful:", data);
+      Alert.alert(
+        "Success",
+        data?.message || "Withdrawal request submitted successfully!",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Reset form
+              setWAmount("");
+              setWAccNumber("");
+              setWBankName("");
+              setWAccName("");
+              setSaveDetails(false);
+              // Close modal
+              setWithdrawVisible(false);
+              // Refresh transaction history
+              refetch();
+            },
+          },
+        ]
+      );
+    },
+    onError: (error) => {
+      console.error("❌ Withdrawal failed:", error);
+      Alert.alert(
+        "Error",
+        error?.message || "Failed to process withdrawal. Please try again."
+      );
+    },
+  });
+
+  // Handle withdrawal submission
+  const handleWithdraw = () => {
+    // Validate form fields
+    if (!wAmount || parseFloat(wAmount) <= 0) {
+      Alert.alert("Error", "Please enter a valid withdrawal amount.");
+      return;
+    }
+
+    if (!wAccNumber || wAccNumber.trim().length === 0) {
+      Alert.alert("Error", "Please enter your account number.");
+      return;
+    }
+
+    if (!wBankName || wBankName.trim().length === 0) {
+      Alert.alert("Error", "Please enter your bank name.");
+      return;
+    }
+
+    if (!wAccName || wAccName.trim().length === 0) {
+      Alert.alert("Error", "Please enter your account name.");
+      return;
+    }
+
+    // Check if balance is sufficient
+    const withdrawAmount = parseFloat(wAmount);
+    const currentBalance = parseFloat(balance || 0);
+    
+    if (withdrawAmount > currentBalance) {
+      Alert.alert(
+        "Insufficient Balance",
+        `You cannot withdraw ₦${withdrawAmount.toLocaleString()}. Your current balance is ₦${currentBalance.toLocaleString()}.`
+      );
+      return;
+    }
+
+    // Prepare payload
+    const payload = {
+      amount: wAmount,
+      bank_name: wBankName.trim(),
+      account_number: wAccNumber.trim(),
+      account_name: wAccName.trim(),
+    };
+
+    console.log("🚀 Submitting withdrawal request:", payload);
+    
+    // Call withdrawal API
+    withdrawMutation.mutate(payload);
+  };
+
   // Extract data from API response - using actual API structure
   const balance = transactionData?.data?.balance || 0;
   const transactions = transactionData?.data?.transactions || [];
@@ -220,6 +310,11 @@ export default function ShoppingWalletScreen() {
       tx_id: tx.tx_id,
       type: tx.type,
       order_id: tx.order_id,
+      created_at: tx.created_at, // Preserve original date for detail screen
+      // Preserve withdrawal_request for withdrawal transactions
+      withdrawal_request: tx.withdrawal_request || null,
+      // Preserve order for order_payment transactions
+      order: tx.order || null,
     }));
   };
 
@@ -575,12 +670,21 @@ export default function ShoppingWalletScreen() {
 
               <View style={{ flex: 1 }} />
               <TouchableOpacity
-                style={[styles.withdrawBtn, { backgroundColor: C.primary }]}
-                onPress={() => setWithdrawVisible(false)}
+                style={[
+                  styles.withdrawBtn,
+                  { backgroundColor: C.primary },
+                  withdrawMutation.isPending && styles.withdrawBtnDisabled,
+                ]}
+                onPress={handleWithdraw}
+                disabled={withdrawMutation.isPending}
               >
-                <ThemedText style={styles.withdrawBtnTxt}>
-                  Process Withdrawal
-                </ThemedText>
+                {withdrawMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.withdrawBtnTxt}>
+                    Process Withdrawal
+                  </ThemedText>
+                )}
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -889,6 +993,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  withdrawBtnDisabled: {
+    opacity: 0.6,
   },
   withdrawBtnTxt: { color: "#fff", fontWeight: "600" },
 });
