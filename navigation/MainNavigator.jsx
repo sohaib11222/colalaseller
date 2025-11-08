@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRoleAccess } from "../hooks/useRoleAccess";
 
 import HomeScreen from "../screens/mainscreens/HomeScreen";
 import FeedScreen from "../screens/mainscreens/FeedScreen";
@@ -38,8 +39,25 @@ const COLOR = {
 /* ----------------- Custom tab bar ----------------- */
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const { screenAccess } = useRoleAccess();
 
   const onPress = (route, isFocused, index) => {
+    // Check access based on route name
+    const accessMap = {
+      'Feed': screenAccess.canAccessFeed,
+      'Chat': screenAccess.canAccessChat,
+      'Home': screenAccess.canAccessHome,
+      'Orders': screenAccess.canAccessOrders,
+      'Settings': screenAccess.canAccessSettings,
+    };
+
+    const hasAccess = accessMap[route.name] ?? true;
+
+    if (!hasAccess) {
+      // Show access denied - will be handled by screen
+      return;
+    }
+
     const event = navigation.emit({
       type: "tabPress",
       target: route.key,
@@ -74,7 +92,17 @@ function CustomTabBar({ state, descriptors, navigation }) {
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
-          const color = isFocused ? COLOR.active : COLOR.inactive;
+          
+          // Check access for this route
+          const accessMap = {
+            'Feed': screenAccess.canAccessFeed,
+            'Chat': screenAccess.canAccessChat,
+            'Home': screenAccess.canAccessHome,
+            'Orders': screenAccess.canAccessOrders,
+            'Settings': screenAccess.canAccessSettings,
+          };
+          const hasAccess = accessMap[route.name] ?? true;
+          const color = isFocused ? COLOR.active : (hasAccess ? COLOR.inactive : '#666666');
 
           // Home (center) gets the raised badge
           if (index === middleIndex) {
@@ -99,6 +127,11 @@ function CustomTabBar({ state, descriptors, navigation }) {
           }
 
           // Regular tabs (left/right of Home)
+          // Hide tabs user doesn't have access to (except Home which is always shown)
+          if (!hasAccess) {
+            return null;
+          }
+          
           return (
             <View key={route.key} style={styles.slot}>
               <TouchableOpacity

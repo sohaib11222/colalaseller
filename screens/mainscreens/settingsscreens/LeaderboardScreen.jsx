@@ -169,7 +169,8 @@ export default function LeaderboardScreen() {
   // ----- Tabs -----
   const navigation = useNavigation();
 
-  const [order, setOrder] = useState(ALL_TABS); // left → right
+  // Default to "All Time" tab
+  const [order, setOrder] = useState(["All Time", "Today", "weekly", "Monthly"]); // left → right
   
   // API call for leaderboard data
   const { data: leaderboardData, isLoading, error } = useQuery({
@@ -188,7 +189,7 @@ export default function LeaderboardScreen() {
   });
   const scaleMap = useRef(
     ALL_TABS.reduce(
-      (acc, k) => ({ ...acc, [k]: new Animated.Value(k === "Today" ? 1.25 : 1) }),
+      (acc, k) => ({ ...acc, [k]: new Animated.Value(k === "All Time" ? 1.25 : 1) }),
       {}
     )
   ).current;
@@ -300,9 +301,16 @@ export default function LeaderboardScreen() {
     const data = currentData.slice(0, 3);
     console.log('Top3 raw data:', data);
     const processedData = data.map((store, index) => {
-      // Try server image first, fallback will be handled by AvatarImage component
-      const avatarUrl = store.profile_image ? fileUrl(store.profile_image) : require("../../../assets/Ellipse 18.png");
-      console.log(`Store ${store.store_name} - Original image: ${store.profile_image}, Generated URL: ${avatarUrl}`);
+      // Use real store profile image from API
+      let avatarUrl = null;
+      if (store.profile_image) {
+        avatarUrl = fileUrl(store.profile_image);
+        console.log(`Store ${store.store_name} - Using real image: ${avatarUrl}`);
+      } else {
+        // Only use fallback if no image is provided
+        avatarUrl = require("../../../assets/Ellipse 18.png");
+        console.log(`Store ${store.store_name} - No image, using fallback`);
+      }
       
       return {
         id: store.store_id.toString(),
@@ -334,9 +342,16 @@ export default function LeaderboardScreen() {
   const others = useMemo(() => {
     // Show ALL stores in the list, not just those after the top 3
     const processedOthers = currentData.map((store, index) => {
-      // Try server image first, fallback will be handled by AvatarImage component
-      const avatarUrl = store.profile_image ? fileUrl(store.profile_image) : require("../../../assets/Ellipse 18.png");
-      console.log(`Others Store ${store.store_name} - Original image: ${store.profile_image}, Generated URL: ${avatarUrl}`);
+      // Use real store profile image from API
+      let avatarUrl = null;
+      if (store.profile_image) {
+        avatarUrl = fileUrl(store.profile_image);
+        console.log(`Others Store ${store.store_name} - Using real image: ${avatarUrl}`);
+      } else {
+        // Only use fallback if no image is provided
+        avatarUrl = require("../../../assets/Ellipse 18.png");
+        console.log(`Others Store ${store.store_name} - No image, using fallback`);
+      }
       return {
         id: store.store_id.toString(),
         name: store.store_name,
@@ -418,12 +433,12 @@ export default function LeaderboardScreen() {
           })}
         </View>
         {/* Debug info - remove this later */}
-        <ThemedText style={{ color: '#fff', fontSize: 12, textAlign: 'center', marginTop: 5 }}>
+        {/* <ThemedText style={{ color: '#fff', fontSize: 12, textAlign: 'center', marginTop: 5 }}>
           Active: {order[0]} | Data: {currentData.length} stores | Loading: {isLoading ? 'Yes' : 'No'} | Error: {error ? 'Yes' : 'No'}
         </ThemedText>
         <ThemedText style={{ color: '#fff', fontSize: 10, textAlign: 'center', marginTop: 2 }}>
           Raw Data: {leaderboardData ? 'Exists' : 'None'} | Top3: {top3.length} | Others: {others.length}
-        </ThemedText>
+        </ThemedText> */}
       </View>
 
       {/* Podium area */}

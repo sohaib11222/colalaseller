@@ -30,3 +30,8 @@ export const deleteComment = async (postId, commentId, token) =>
 // payload = { channel: "facebook" }
 export const sharePost = async (id, payload, token) =>
   await apiCall(API_ENDPOINTS.POSTS.Share(id), "POST", payload, token);
+
+// Report Post
+// payload = { reason: "spam" | "inappropriate_content" | "harassment" | "false_information" | "copyright_violation" | "other", description?: string }
+export const reportPost = async (id, payload, token) =>
+  await apiCall(API_ENDPOINTS.POSTS.Report(id), "POST", payload, token);

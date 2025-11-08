@@ -71,6 +71,36 @@ export const useRoleAccess = () => {
     return requiredRoles.some(role => hasRole(role));
   };
 
+  // Screen access checks based on role
+  const screenAccess = useMemo(() => {
+    const role = effectiveRole;
+    
+    return {
+      // Main tabs
+      canAccessFeed: role === 'owner' || role === 'admin' || role === 'store_manager',
+      canAccessChat: role === 'owner' || role === 'admin' || role === 'store_manager',
+      canAccessHome: role === 'owner' || role === 'admin' || role === 'store_manager' || role === 'inventory' || role === 'accountant',
+      canAccessOrders: role === 'owner' || role === 'admin' || role === 'store_manager' || role === 'accountant',
+      canAccessSettings: role === 'owner' || role === 'admin', // Only owner/admin can access settings
+      
+      // Settings sub-screens
+      canAccessMyProducts: role === 'owner' || role === 'admin' || role === 'inventory',
+      canAccessAnalytics: role === 'owner' || role === 'admin' || role === 'accountant',
+      canAccessSubscription: role === 'owner' || role === 'admin' || role === 'accountant',
+      canAccessInventory: role === 'owner' || role === 'admin' || role === 'inventory',
+      canAccessReviews: role === 'owner' || role === 'admin' || role === 'store_manager',
+      canAccessAccessControl: role === 'owner' || role === 'admin',
+      canAccessWallet: role === 'owner' || role === 'admin',
+      canAccessEscrow: role === 'owner' || role === 'admin',
+      canAccessPromotedProducts: role === 'owner' || role === 'admin',
+      canAccessStoreBuilder: role === 'owner' || role === 'admin',
+      canAccessCoupons: role === 'owner' || role === 'admin',
+      canAccessAnnouncements: role === 'owner' || role === 'admin',
+      canAccessSupport: role === 'owner' || role === 'admin' || role === 'store_manager' || role === 'inventory' || role === 'accountant',
+      canAccessFAQs: role === 'owner' || role === 'admin' || role === 'store_manager' || role === 'inventory' || role === 'accountant',
+    };
+  }, [effectiveRole]);
+
   // Permission checks based on role
   const permissions = useMemo(() => {
     const role = effectiveRole;
@@ -106,6 +136,7 @@ export const useRoleAccess = () => {
     hasRole,
     hasAnyRole,
     permissions,
+    screenAccess,
     isLoading: !user || !token,
   };
 };

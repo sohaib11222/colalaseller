@@ -203,3 +203,29 @@ export const withdrawWallet = async (payload, token) => {
     throw error;
   }
 };
+
+// Review Replies - Store Reviews
+export const replyToStoreReview = async (reviewId, payload, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Reply_To_Store_Review(reviewId), "POST", payload, token);
+};
+
+export const updateStoreReviewReply = async (reviewId, payload, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Update_Store_Review_Reply(reviewId), "PUT", payload, token);
+};
+
+export const deleteStoreReviewReply = async (reviewId, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Delete_Store_Review_Reply(reviewId), "DELETE", undefined, token);
+};
+
+// Review Replies - Product Reviews
+export const replyToProductReview = async (reviewId, payload, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Reply_To_Product_Review(reviewId), "POST", payload, token);
+};
+
+export const updateProductReviewReply = async (reviewId, payload, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Update_Product_Review_Reply(reviewId), "PUT", payload, token);
+};
+
+export const deleteProductReviewReply = async (reviewId, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Delete_Product_Review_Reply(reviewId), "DELETE", undefined, token);
+};

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useMemo as useMemo2, useRef } from "react";
+import React, { useMemo, useState, useMemo as useMemo2, useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -20,6 +20,9 @@ import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import * as ChatQueries from "../../../utils/queries/chats"; // getChatList
+import { useRoleAccess } from "../../../hooks/useRoleAccess";
+import { useNavigation } from "@react-navigation/native";
+import AccessDeniedModal from "../../../components/AccessDeniedModal";
 
 // DEBUG helper
 const D = (...a) => console.log("[ChatList]", ...a);
@@ -163,6 +166,27 @@ const mapChatItem = (it) => ({
 });
 
 export default function ChatListScreen({ navigation }) {
+  const { screenAccess, isLoading: roleLoading } = useRoleAccess();
+  const [showAccessDenied, setShowAccessDenied] = useState(false);
+
+  useEffect(() => {
+    if (!roleLoading && !screenAccess.canAccessChat) {
+      setShowAccessDenied(true);
+    }
+  }, [roleLoading, screenAccess.canAccessChat]);
+
+  if (!roleLoading && !screenAccess.canAccessChat) {
+    return (
+      <AccessDeniedModal
+        visible={showAccessDenied}
+        onClose={() => {
+          setShowAccessDenied(false);
+          navigation.goBack();
+        }}
+        requiredPermission="Chat access"
+      />
+    );
+  }
   const qc = useQueryClient();
   const C = {
     primary: STATIC_COLORS.primary,

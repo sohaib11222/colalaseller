@@ -21,6 +21,7 @@ import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import * as VisitorQueries from "../../../utils/queries/visitors";
+import * as ChatQueries from "../../../utils/queries/chats";
 
 export default function VisitorsScreen() {
   const navigation = useNavigation();
@@ -65,19 +66,54 @@ export default function VisitorsScreen() {
       );
     },
     onSuccess: (data, variables) => {
-      const chatId = data?.data?.chat?.id;
+      const chatId = data?.data?.chat?.id || data?.data?.id;
       if (chatId) {
+        // Navigate to chat (either newly created or existing)
         navigation.navigate("ChatNavigator", {
           screen: "ChatDetails",
-          params: { chat_id: chatId },
+          params: { 
+            chat_id: chatId,
+            userId: variables.userId,
+          },
         });
+        // Refresh visitors list to update has_chat status
+        refetch();
       } else {
         Alert.alert("Success", "Chat created successfully");
         refetch();
       }
     },
     onError: (error) => {
-      Alert.alert("Error", error?.message || "Failed to start chat");
+      // If error says chat already exists, try to find it in chat list
+      const errorMessage = error?.message || error?.response?.data?.message || "";
+      if (errorMessage.toLowerCase().includes("already") || errorMessage.toLowerCase().includes("exist")) {
+        // Try to find existing chat
+        getToken().then(async (token) => {
+          try {
+            const chatListRes = await ChatQueries.getChatList(token);
+            const chats = chatListRes?.data?.chats || chatListRes?.data?.data || chatListRes?.data || [];
+            const existingChat = chats.find((chat) => {
+              const chatUserId = chat?.user?.id || chat?.user_id;
+              return chatUserId === variables.userId;
+            });
+            if (existingChat?.chat_id || existingChat?.id) {
+              navigation.navigate("ChatNavigator", {
+                screen: "ChatDetails",
+                params: { 
+                  chat_id: existingChat.chat_id || existingChat.id,
+                  userId: variables.userId,
+                },
+              });
+            } else {
+              Alert.alert("Error", "Chat exists but could not be found. Please try again.");
+            }
+          } catch (err) {
+            Alert.alert("Error", errorMessage || "Failed to start chat");
+          }
+        });
+      } else {
+        Alert.alert("Error", errorMessage || "Failed to start chat");
+      }
     },
   });
 
@@ -104,19 +140,56 @@ export default function VisitorsScreen() {
     }
   };
 
-  const handleStartChat = (visitor) => {
+  const handleStartChat = async (visitor) => {
     const userId = visitor?.visitor?.id;
     if (!userId) {
       Alert.alert("Error", "Visitor ID not found");
       return;
     }
 
+    // If chat already exists, navigate to it
     if (visitor?.visitor?.has_chat) {
-      // Navigate to existing chat
-      Alert.alert("Info", "Chat already exists with this visitor");
+      try {
+        // Fetch chat list to find the chat with this user
+        const token = await getToken();
+        const chatListRes = await ChatQueries.getChatList(token);
+        const chats = chatListRes?.data?.chats || chatListRes?.data?.data || chatListRes?.data || [];
+        
+        // Find chat with this user
+        const existingChat = chats.find((chat) => {
+          const chatUserId = chat?.user?.id || chat?.user_id;
+          return chatUserId === userId;
+        });
+
+        if (existingChat?.chat_id || existingChat?.id) {
+          // Navigate to existing chat
+          navigation.navigate("ChatNavigator", {
+            screen: "ChatDetails",
+            params: { 
+              chat_id: existingChat.chat_id || existingChat.id,
+              userId: userId,
+            },
+          });
+        } else {
+          // If chat exists but we can't find it in the list, try to start a new one
+          // The API should return the existing chat
+          startChatMutation.mutate({
+            userId,
+            message: null, // Don't send a message, just get the chat
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching chat list:", error);
+        // Fallback: try to start chat (API should return existing chat if it exists)
+        startChatMutation.mutate({
+          userId,
+          message: null,
+        });
+      }
       return;
     }
 
+    // If no chat exists, show confirmation and start new chat
     Alert.alert(
       "Start Chat",
       `Do you want to start a chat with ${visitor?.visitor?.name || "this visitor"}?`,

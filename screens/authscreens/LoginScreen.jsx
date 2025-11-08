@@ -198,7 +198,7 @@ const LoginScreen = () => {
             style={styles.bottomGradient}
           >
             <ThemedText style={styles.sellerText}>
-              Do you want to sell on Colala Mall as a store
+            Do you want to shop for several products and services on Colala Mall
             </ThemedText>
             <View style={styles.storeButtons}>
               <TouchableOpacity style={{ marginLeft: -100 }}>

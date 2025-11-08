@@ -112,6 +112,7 @@ const API_ENDPOINTS = {
       `${API_DOMAIN}/posts/${postId}/comments/${commentId}`, // DELETE
 
     Share: (id) => `${API_DOMAIN}/posts/${id}/share`, // POST
+    Report: (id) => `${API_DOMAIN}/posts/${id}/report`, // POST
   },
   SETTINGS: {
     Balance: `${API_DOMAIN}/buyer/getBalance`, // GET
@@ -156,6 +157,14 @@ const API_ENDPOINTS = {
 
     //Reviews
     List_Of_Reviews: `${API_DOMAIN}/user-reveiws`, // GET
+    
+    // Review Replies
+    Reply_To_Store_Review: (reviewId) => `${API_DOMAIN}/seller/reviews/store/${reviewId}/reply`, // POST
+    Update_Store_Review_Reply: (reviewId) => `${API_DOMAIN}/seller/reviews/store/${reviewId}/reply`, // PUT
+    Delete_Store_Review_Reply: (reviewId) => `${API_DOMAIN}/seller/reviews/store/${reviewId}/reply`, // DELETE
+    Reply_To_Product_Review: (reviewId) => `${API_DOMAIN}/seller/reviews/product/${reviewId}/reply`, // POST
+    Update_Product_Review_Reply: (reviewId) => `${API_DOMAIN}/seller/reviews/product/${reviewId}/reply`, // PUT
+    Delete_Product_Review_Reply: (reviewId) => `${API_DOMAIN}/seller/reviews/product/${reviewId}/reply`, // DELETE
 
 
     //Boosts Data
@@ -188,6 +197,7 @@ const API_ENDPOINTS = {
   },
   GENERAL: {
     Categories: `${API_DOMAIN}/categories`, // GET
+    Service_Categories: `${API_DOMAIN}/service-categories`, // GET
     Brands: `${API_DOMAIN}/brands`, // GET
     Wallet_TopUp: `${API_DOMAIN}/wallet/top-up`, // POST
     Wallet_Withdraw: `${API_DOMAIN}/wallet/withdraw`, // POST
@@ -207,6 +217,9 @@ const API_ENDPOINTS = {
     List: `${API_DOMAIN}/seller/chat`,
     Details: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/messages`,
     Send: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/send`,
+  },
+  USERS: {
+    GetStatus: (userId) => `${API_DOMAIN}/users/${userId}/status`, // GET
   },
   STORES: {
     // GET -> fetch current store + all_categories

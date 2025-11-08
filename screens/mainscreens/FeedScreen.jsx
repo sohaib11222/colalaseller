@@ -31,6 +31,8 @@ import { getToken } from "../../utils/tokenStorage";
 import * as PostQueries from "../../utils/queries/posts"; // getPosts, getPostComments
 import * as PostMutations from "../../utils/mutations/posts"; // createPost, updatePost, deletePost, likePost, addComment
 import { StatusBar } from "expo-status-bar";
+import { useRoleAccess } from "../../hooks/useRoleAccess";
+import AccessDeniedModal from "../../components/AccessDeniedModal";
 
 /* -------------------- HELPERS -------------------- */
 const absUrl = (maybePath) => {
@@ -268,6 +270,19 @@ function CreatePostModal({
   ];
 
   const submit = () => {
+    // For create mode, require at least one image
+    if (mode === "create") {
+      const totalImages = newFiles.length + existingUrls.length;
+      if (totalImages === 0) {
+        Alert.alert(
+          "Image Required",
+          "Please select at least one image to create a post.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+    }
+    
     onSubmit?.({
       body: text || "Shared a new post",
       newFiles, // files to upload
@@ -785,8 +800,139 @@ function CommentsSheet({ visible, onClose, postId }) {
   );
 }
 
+/* -------------------- REPORT POST MODAL -------------------- */
+function ReportPostModal({ visible, onClose, onReport, isLoading }) {
+  const [selectedReason, setSelectedReason] = useState("");
+  const [description, setDescription] = useState("");
+  
+  const reasons = [
+    { value: "spam", label: "Spam" },
+    { value: "inappropriate_content", label: "Inappropriate Content" },
+    { value: "harassment", label: "Harassment" },
+    { value: "false_information", label: "False Information" },
+    { value: "copyright_violation", label: "Copyright Violation" },
+    { value: "other", label: "Other" },
+  ];
+
+  const handleSubmit = () => {
+    if (!selectedReason) {
+      Alert.alert("Error", "Please select a reason for reporting this post.");
+      return;
+    }
+    onReport(selectedReason, description.trim() || null);
+  };
+
+  const handleClose = () => {
+    setSelectedReason("");
+    setDescription("");
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={handleClose}
+    >
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
+        <View style={[styles.sheet, { backgroundColor: "#F9F9F9" }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <ThemedText font="oleo" style={styles.sheetTitle}>
+              Report Post
+            </ThemedText>
+            <TouchableOpacity
+              style={{
+                borderColor: "#000",
+                borderWidth: 1.4,
+                borderRadius: 20,
+                padding: 2,
+              }}
+              onPress={handleClose}
+            >
+              <Ionicons name="close" size={18} color="#101318" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ maxHeight: 400 }}>
+            <ThemedText style={{ fontSize: 14, marginBottom: 12, color: "#6C727A" }}>
+              Why are you reporting this post?
+            </ThemedText>
+
+            {reasons.map((reason) => (
+              <TouchableOpacity
+                key={reason.value}
+                style={[
+                  styles.reportOption,
+                  selectedReason === reason.value && {
+                    backgroundColor: "#FFF1F1",
+                    borderColor: "#E53E3E",
+                  },
+                ]}
+                onPress={() => setSelectedReason(reason.value)}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Ionicons
+                    name={selectedReason === reason.value ? "radio-button-on" : "radio-button-off"}
+                    size={20}
+                    color={selectedReason === reason.value ? "#E53E3E" : "#6C727A"}
+                  />
+                  <ThemedText style={{ marginLeft: 12, fontSize: 14 }}>
+                    {reason.label}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            <ThemedText style={{ fontSize: 14, marginTop: 20, marginBottom: 8, color: "#6C727A" }}>
+              Additional details (optional)
+            </ThemedText>
+            <TextInput
+              style={[
+                styles.reportTextInput,
+                { borderColor: "#E5E5E5", color: "#101318" },
+              ]}
+              placeholder="Provide more information about this report..."
+              placeholderTextColor="#999"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              maxLength={1000}
+            />
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[
+              styles.reportButton,
+              { backgroundColor: "#E53E3E" },
+              isLoading && { opacity: 0.6 },
+            ]}
+            onPress={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                Submit Report
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 /* -------------------- OPTIONS SHEETS -------------------- */
-function OptionsSheetAll({ visible, onClose, onHidePost }) {
+function OptionsSheetAll({ visible, onClose, onHidePost, onReportPost }) {
   return (
     <Modal
       visible={visible}
@@ -861,7 +1007,13 @@ function OptionsSheetAll({ visible, onClose, onHidePost }) {
             <Ionicons name="chevron-forward" size={18} color="#6C727A" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionRow, styles.optionRowDanger]}>
+          <TouchableOpacity 
+            style={[styles.optionRow, styles.optionRowDanger]}
+            onPress={() => {
+              onReportPost?.();
+              onClose?.();
+            }}
+          >
             <View style={styles.optionLeft}>
               <Ionicons name="warning-outline" size={20} color="#EF534E" />
               <ThemedText style={[styles.optionLabel, { color: "#EF534E" }]}>
@@ -962,9 +1114,47 @@ function useAllAndMyPosts(currentUserId) {
     queryFn: async () => {
       const token = await getToken();
       const res = await PostQueries.getPosts(token);
-      const posts = (res?.data?.posts?.data || []).map(p => mapPost(p, currentUserId));
-      const myPosts = (res?.data?.myPosts?.data || []).map(p => mapPost(p, currentUserId));
-      return { posts, myPosts };
+      
+      // Get all posts from API response
+      const allPostsRaw = res?.data?.posts?.data || res?.data?.data || res?.data || [];
+      
+      // Map all posts
+      const allPosts = allPostsRaw.map(p => mapPost(p, currentUserId));
+      
+      // Filter my posts: where user_id matches currentUserId
+      // Check both user.id and user_id fields
+      const myPosts = allPostsRaw
+        .filter(p => {
+          const postUserId = p?.user?.id || p?.user_id || null;
+          return postUserId && currentUserId && String(postUserId) === String(currentUserId);
+        })
+        .map(p => mapPost(p, currentUserId));
+      
+      // If API provides myPosts separately, use that (but also include filtered ones to be safe)
+      const apiMyPosts = (res?.data?.myPosts?.data || []).map(p => mapPost(p, currentUserId));
+      
+      // Combine API myPosts with filtered my posts, removing duplicates
+      const combinedMyPosts = [...apiMyPosts];
+      myPosts.forEach(post => {
+        if (!combinedMyPosts.find(p => String(p.id) === String(post.id))) {
+          combinedMyPosts.push(post);
+        }
+      });
+      
+      console.log("Posts filtering debug:", {
+        currentUserId,
+        allPostsCount: allPosts.length,
+        filteredMyPostsCount: myPosts.length,
+        apiMyPostsCount: apiMyPosts.length,
+        combinedMyPostsCount: combinedMyPosts.length,
+        samplePost: allPostsRaw[0] ? {
+          postId: allPostsRaw[0].id,
+          postUserId: allPostsRaw[0]?.user?.id || allPostsRaw[0]?.user_id,
+          matches: String(allPostsRaw[0]?.user?.id || allPostsRaw[0]?.user_id) === String(currentUserId)
+        } : null
+      });
+      
+      return { posts: allPosts, myPosts: combinedMyPosts };
     },
     staleTime: 30_000,
   });
@@ -1085,6 +1275,27 @@ function useToggleLikeMutation() {
 export default function FeedScreen() {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { screenAccess, isLoading: roleLoading } = useRoleAccess();
+  const [showAccessDenied, setShowAccessDenied] = useState(false);
+
+  useEffect(() => {
+    if (!roleLoading && !screenAccess.canAccessFeed) {
+      setShowAccessDenied(true);
+    }
+  }, [roleLoading, screenAccess.canAccessFeed]);
+
+  if (!roleLoading && !screenAccess.canAccessFeed) {
+    return (
+      <AccessDeniedModal
+        visible={showAccessDenied}
+        onClose={() => {
+          setShowAccessDenied(false);
+          navigation.goBack();
+        }}
+        requiredPermission="Feed access"
+      />
+    );
+  }
   // const { theme } = useTheme();
 
   // Handle navigation safely
@@ -1196,6 +1407,7 @@ export default function FeedScreen() {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [createVisible, setCreateVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
   const [activePost, setActivePost] = useState(null);
   const [tab, setTab] = useState("my"); // 'my' | 'all'
   const [refreshing, setRefreshing] = useState(false);
@@ -1206,6 +1418,21 @@ export default function FeedScreen() {
   const update = useUpdatePost(user?.id);
   const remove = useDeletePost();
   const likeMut = useToggleLikeMutation();
+  
+  // Report post mutation
+  const reportMut = useMutation({
+    mutationFn: async ({ postId, reason, description }) => {
+      const token = await getToken();
+      return await PostMutations.reportPost(postId, { reason, description }, token);
+    },
+    onSuccess: (data) => {
+      Alert.alert("Success", data?.message || "Post reported successfully. Our team will review it shortly.");
+      setReportVisible(false);
+    },
+    onError: (error) => {
+      Alert.alert("Error", error?.response?.data?.message || error?.message || "Failed to report post. Please try again.");
+    },
+  });
 
   const posts = data?.posts || [];
   const myPosts = data?.myPosts || [];
@@ -1245,6 +1472,12 @@ export default function FeedScreen() {
   const openOptions = (post) => {
     setActivePost(post);
     setOptionsVisible(true);
+  };
+
+  const handleReportPost = () => {
+    if (activePost) {
+      setReportVisible(true);
+    }
   };
 
   const handleHidePost = () => {
@@ -1421,14 +1654,28 @@ export default function FeedScreen() {
           visible={optionsVisible}
           onClose={() => setOptionsVisible(false)}
           onHidePost={handleHidePost}
+          onReportPost={handleReportPost}
         />
       )}
+
+      {/* Report Post Modal */}
+      <ReportPostModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        onReport={(reason, description) => {
+          if (activePost?.id) {
+            reportMut.mutate({ postId: activePost.id, reason, description });
+          }
+        }}
+        isLoading={reportMut.isPending}
+      />
 
       {/* Create (new) */}
       <CreatePostModal
         visible={createVisible}
         onClose={() => setCreateVisible(false)}
         mode="create"
+        headerAvatar={user?.store?.profile_image ? absUrl(user.store.profile_image) : (user?.profile_picture ? absUrl(user.profile_picture) : null)}
         onSubmit={async ({ body, newFiles }) => {
           await create.mutateAsync({ body, files: newFiles });
           setCreateVisible(false);
@@ -1720,6 +1967,31 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     marginTop: 8,
+  },
+  reportOption: {
+    padding: 14,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+    backgroundColor: "#fff",
+  },
+  reportTextInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    minHeight: 100,
+    textAlignVertical: "top",
+    backgroundColor: "#fff",
+    fontSize: 14,
+  },
+  reportButton: {
+    marginTop: 16,
+    marginHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 

@@ -1,5 +1,5 @@
 // screens/FAQsScreen.jsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -84,6 +84,8 @@ export default function FAQsScreen() {
   const [openId, setOpenId] = useState(null);
   const [expandedVideoId, setExpandedVideoId] = useState(null);
   const [videoThumbnails, setVideoThumbnails] = useState({});
+  const [playingVideoId, setPlayingVideoId] = useState(null);
+  const videoRefs = useRef({});
 
   // Handle pull-to-refresh
   const onRefresh = async () => {
@@ -189,21 +191,31 @@ export default function FAQsScreen() {
     return extractYouTubeId(url) !== null;
   };
 
-  // Handle video play - opens in-app video player
-  const handleVideoPlay = (videoUrl, videoTitle = "Video Tutorial") => {
-    try {
-      console.log("Opening video in app:", videoUrl);
-      navigation.navigate("VideoPlayerWebView", {
-        videoUrl: videoUrl,
-        title: videoTitle,
-      });
-    } catch (error) {
-      console.error("Error opening video:", error);
-      Alert.alert(
-        "Error",
-        "Failed to open video. Please try again later.",
-        [{ text: "OK" }]
-      );
+  // Handle video play/pause - inline playback
+  const handleVideoToggle = (videoId, videoUrl) => {
+    if (playingVideoId === videoId) {
+      // Pause current video
+      if (videoRefs.current[videoId]) {
+        videoRefs.current[videoId].pauseAsync();
+      }
+      setPlayingVideoId(null);
+    } else {
+      // Pause any other playing video
+      if (playingVideoId && videoRefs.current[playingVideoId]) {
+        videoRefs.current[playingVideoId].pauseAsync();
+      }
+      // Play new video
+      if (videoRefs.current[videoId]) {
+        videoRefs.current[videoId].playAsync();
+      }
+      setPlayingVideoId(videoId);
+    }
+  };
+
+  // Handle video status updates
+  const handleVideoStatusUpdate = (videoId, status) => {
+    if (status.didJustFinish) {
+      setPlayingVideoId(null);
     }
   };
 
@@ -388,47 +400,84 @@ export default function FAQsScreen() {
                       key={video.id}
                       style={[styles.videoAccordionCard, shadow(4), { marginBottom: 16 }]}
                     >
-                      {/* Video Thumbnail */}
-              <TouchableOpacity 
-                        style={styles.videoThumbnailContainer}
-                        onPress={() => handleVideoPlay(video.media_url, video.title)}
-                activeOpacity={0.9}
-              >
-                        {getVideoThumbnail(video.media_url, video.id) ? (
-                <Image
-                  source={{
-                              uri: getVideoThumbnail(video.media_url, video.id),
-                  }}
-                  style={styles.videoImage}
-                  resizeMode="cover"
-                            onError={() => {
-                              console.log("Error loading video thumbnail");
+                      {/* Video Player Container */}
+                      <View style={styles.videoThumbnailContainer}>
+                        {isYouTubeVideo(video.media_url) ? (
+                          // YouTube videos - show thumbnail with play button (navigate to webview)
+                          <TouchableOpacity 
+                            style={{ width: '100%', height: '100%' }}
+                            onPress={() => {
+                              navigation.navigate("VideoPlayerWebView", {
+                                videoUrl: video.media_url,
+                                title: video.title,
+                              });
                             }}
-                          />
+                            activeOpacity={0.9}
+                          >
+                            {getVideoThumbnail(video.media_url, video.id) ? (
+                              <Image
+                                source={{ uri: getVideoThumbnail(video.media_url, video.id) }}
+                                style={styles.videoImage}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View style={styles.videoPlaceholder}>
+                                <View style={styles.placeholderIconContainer}>
+                                  <Ionicons name="videocam-outline" size={56} color={C.sub} />
+                                </View>
+                              </View>
+                            )}
+                            <View style={styles.playOverlay}>
+                              <Ionicons name="play" size={32} color="#fff" />
+                            </View>
+                            <View style={styles.youtubeIndicator}>
+                              <Ionicons name="logo-youtube" size={20} color="#fff" />
+                            </View>
+                          </TouchableOpacity>
+                        ) : getFullVideoUrl(video.media_url) ? (
+                          // Direct video files - inline player with play/pause
+                          <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                            <Video
+                              ref={(ref) => {
+                                if (ref) videoRefs.current[video.id] = ref;
+                              }}
+                              source={{ uri: getFullVideoUrl(video.media_url) }}
+                              style={styles.videoPlayer}
+                              resizeMode={ResizeMode.CONTAIN}
+                              useNativeControls={false}
+                              shouldPlay={playingVideoId === video.id}
+                              isLooping={false}
+                              onPlaybackStatusUpdate={(status) => handleVideoStatusUpdate(video.id, status)}
+                            />
+                            {/* Custom Play/Pause Overlay */}
+                            <TouchableOpacity
+                              style={[
+                                styles.playPauseOverlay,
+                                playingVideoId === video.id && { backgroundColor: 'transparent' }
+                              ]}
+                              onPress={() => handleVideoToggle(video.id, getFullVideoUrl(video.media_url))}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.playPauseButton}>
+                                <Ionicons 
+                                  name={playingVideoId === video.id ? "pause" : "play"} 
+                                  size={40} 
+                                  color="#fff" 
+                                />
+                              </View>
+                            </TouchableOpacity>
+                          </View>
                         ) : (
                           <View style={styles.videoPlaceholder}>
                             <View style={styles.placeholderIconContainer}>
-                              <Ionicons name="videocam-outline" size={56} color={C.sub} />
+                              <ActivityIndicator size="large" color={C.primary} />
                               <ThemedText style={[styles.placeholderText, { color: C.sub, marginTop: 12 }]}>
-                                {isDirectVideoFile(video.media_url) ? "Loading Preview..." : "Video Preview"}
+                                Loading Video...
                               </ThemedText>
                             </View>
                           </View>
                         )}
-                <View style={styles.playOverlay}>
-                        <Ionicons name="play" size={32} color="#fff" />
-                </View>
-                      {isYouTubeVideo(video.media_url) && (
-                  <View style={styles.youtubeIndicator}>
-                    <Ionicons name="logo-youtube" size={20} color="#fff" />
-                  </View>
-                )}
-                      {isDirectVideoFile(video.media_url) && (
-                        <View style={[styles.youtubeIndicator, { backgroundColor: "rgba(0, 122, 255, 0.8)" }]}>
-                          <Ionicons name="film" size={20} color="#fff" />
-                        </View>
-                      )}
-                    </TouchableOpacity>
+                      </View>
 
                     {/* Title - Clickable to expand/collapse */}
                     <TouchableOpacity
@@ -839,5 +888,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginTop: 12,
+  },
+  videoPlayer: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+  playPauseOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  playPauseButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
 });

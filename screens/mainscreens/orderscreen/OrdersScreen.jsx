@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -19,8 +19,31 @@ import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { useQuery } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import * as OrderQueries from "../../../utils/queries/orders"; // getOrders
+import { useRoleAccess } from "../../../hooks/useRoleAccess";
+import AccessDeniedModal from "../../../components/AccessDeniedModal";
 
 const OrdersScreen = ({ navigation }) => {
+  const { screenAccess, isLoading: roleLoading } = useRoleAccess();
+  const [showAccessDenied, setShowAccessDenied] = useState(false);
+
+  useEffect(() => {
+    if (!roleLoading && !screenAccess.canAccessOrders) {
+      setShowAccessDenied(true);
+    }
+  }, [roleLoading, screenAccess.canAccessOrders]);
+
+  if (!roleLoading && !screenAccess.canAccessOrders) {
+    return (
+      <AccessDeniedModal
+        visible={showAccessDenied}
+        onClose={() => {
+          setShowAccessDenied(false);
+          navigation.goBack();
+        }}
+        requiredPermission="Orders access"
+      />
+    );
+  }
   const C = {
     primary: STATIC_COLORS.primary,
     bg: "#F5F6F8",

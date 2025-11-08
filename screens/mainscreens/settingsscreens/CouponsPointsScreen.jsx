@@ -574,7 +574,7 @@ function CouponCard({ C, data, onEdit, onDelete }) {
   const createdDate = new Date(data.created_at);
   const discountText =
     data.discount_type === "percentage"
-      ? `${data.discount_value}%`
+      ? `${data.discount_value}`
       : `$${data.discount_value}`;
 
   return (
@@ -876,13 +876,7 @@ function CreateCouponModal({
             value={percent}
             onChangeText={setPercent}
             editable={!isLoading}
-            right={
-              <ThemedText
-                style={{ color: C.sub, fontWeight: "800", fontSize: 18 }}
-              >
-                %
-              </ThemedText>
-            }
+            
           />
           <Field
             C={C}

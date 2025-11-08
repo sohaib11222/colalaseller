@@ -193,10 +193,59 @@ const getPlanGradient = (planName) => {
 };
 
 // Get plan price display
-const getPlanPrice = (plan) => {
-  if (!plan) return "N5,000";
+const getPlanPrice = (plan, isAnnual = false) => {
+  if (!plan) return "₦5,000";
+  const planName = plan?.name?.toLowerCase() || "";
+  const isBasic = planName.includes("basic");
+  const isPro = planName.includes("pro");
+  const isVIP = planName.includes("vip");
+  const isGold = planName.includes("gold") || planName.includes("good partner");
+  
+  if (isGold) return "Custom pricing & contract";
+  
+  if (isAnnual) {
+    // Annual pricing with discounts
+    if (isBasic) {
+      // Basic: No discount, 12 months
+      return "₦60,000";
+    } else if (isPro) {
+      // Pro: 1 month free (11 months)
+      return "₦165,000";
+    } else if (isVIP) {
+      // VIP: 2 months free (10 months)
+      return "₦350,000";
+    }
+  } else {
+    // Monthly pricing
+    if (isBasic) return "₦5,000";
+    if (isPro) return "₦15,000";
+    if (isVIP) return "₦35,000";
+  }
+  
+  // Fallback to plan price from API
   const price = parseFloat(plan.price || 0);
-  return price === 0 ? "Free" : `N${price.toLocaleString()}`;
+  if (price === 0) return "Free";
+  return `₦${price.toLocaleString()}`;
+};
+
+// Get monthly price for a plan
+const getMonthlyPrice = (plan) => {
+  if (!plan) return 5000;
+  const planName = plan?.name?.toLowerCase() || "";
+  if (planName.includes("basic")) return 5000;
+  if (planName.includes("pro")) return 15000;
+  if (planName.includes("vip")) return 35000;
+  return parseFloat(plan.price || 0);
+};
+
+// Get annual price for a plan
+const getAnnualPrice = (plan) => {
+  if (!plan) return 60000;
+  const planName = plan?.name?.toLowerCase() || "";
+  if (planName.includes("basic")) return 60000; // 5000 * 12
+  if (planName.includes("pro")) return 165000; // 15000 * 11 (1 month free)
+  if (planName.includes("vip")) return 350000; // 35000 * 10 (2 months free)
+  return parseFloat(plan.price || 0) * 12;
 };
 
 // Fallback Gold Partner plan (in case API doesn't return it)
@@ -220,10 +269,13 @@ function PaymentMethodSheet({
   walletAmount = 0,
   balanceLoading = false,
   onTopUp,
+  isAnnual = false,
 }) {
   const [selected, setSelected] = useState("wallet");
 
-  const planPrice = selectedPlan ? parseFloat(selectedPlan.price || 0) : 0;
+  const planPrice = isAnnual 
+    ? getAnnualPrice(selectedPlan)
+    : getMonthlyPrice(selectedPlan);
   const hasEnoughBalance = walletAmount >= planPrice;
 
   return (
@@ -255,9 +307,33 @@ function PaymentMethodSheet({
                 <ActivityIndicator size="small" color="#E53E3E" />
             ) : (
                 <ThemedText style={styles.walletBalanceAmount}>
-                  N{Number(walletAmount).toLocaleString()}
+                  ₦{Number(walletAmount).toLocaleString()}
               </ThemedText>
             )}
+            </View>
+
+            {/* Plan Price Display */}
+            <View style={styles.planPriceDisplayContainer}>
+              <ThemedText style={styles.planPriceDisplayLabel}>
+                {selectedPlan?.name || "Plan"} - {isAnnual ? "Annual" : "Monthly"}
+              </ThemedText>
+              <ThemedText style={styles.planPriceDisplayAmount}>
+                {getPlanPrice(selectedPlan, isAnnual)}
+                {isAnnual ? "/year" : "/month"}
+              </ThemedText>
+              {isAnnual && (
+                <ThemedText style={styles.planPriceDisplaySavings}>
+                  {(() => {
+                    const planName = selectedPlan?.name?.toLowerCase() || "";
+                    if (planName.includes("pro")) {
+                      return "Save ₦15,000 (1 month free)";
+                    } else if (planName.includes("vip")) {
+                      return "Save ₦70,000 (2 months free)";
+                    }
+                    return "";
+                  })()}
+                </ThemedText>
+              )}
             </View>
 
             {/* Payment Methods */}
@@ -320,7 +396,7 @@ function PaymentMethodSheet({
               <View style={styles.insufficientBalanceWarning}>
                 <Ionicons name="warning" size={20} color="#F59E0B" />
                 <ThemedText style={styles.insufficientBalanceText}>
-                  Insufficient balance. You need N{planPrice.toLocaleString()} but have N{Number(walletAmount).toLocaleString()}
+                  Insufficient balance. You need ₦{planPrice.toLocaleString()} but have ₦{Number(walletAmount).toLocaleString()}
                 </ThemedText>
               </View>
             )}
@@ -383,6 +459,7 @@ export default function SubscriptionScreen() {
   const [showPay, setShowPay] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   // Fetch plans
   const {
@@ -559,6 +636,24 @@ export default function SubscriptionScreen() {
     const method = paymentMethod || selectedPaymentMethod;
     
     if (selectedPlan && method) {
+      // Check if it's a free plan
+      const planPrice = isAnnual 
+        ? getAnnualPrice(selectedPlan)
+        : getMonthlyPrice(selectedPlan);
+      const isFreePlan = planPrice === 0 || selectedPlan.name?.toLowerCase().includes("free");
+      
+      if (isFreePlan) {
+        Alert.alert(
+          "Free Plan",
+          "The free plan is automatically subscribed. You don't need to subscribe to it.",
+          [
+            { text: "OK", style: "default" }
+          ]
+        );
+        setShowPay(false);
+        return;
+      }
+      
       // Check if it's Gold Partner (custom pricing)
       const isGoldPartner = selectedPlan.name?.toLowerCase().includes("gold");
       
@@ -584,6 +679,8 @@ export default function SubscriptionScreen() {
         payload: {
           plan_id: selectedPlan.id,
           payment_method: method,
+          billing_period: isAnnual ? "annual" : "monthly",
+          amount: planPrice,
         },
       });
     }
@@ -592,6 +689,25 @@ export default function SubscriptionScreen() {
   const handleFlutterwavePayment = () => {
     if (!selectedPlan) {
       Alert.alert("Error", "Please select a plan first.");
+      return;
+    }
+    
+    const planPrice = isAnnual 
+      ? getAnnualPrice(selectedPlan)
+      : getMonthlyPrice(selectedPlan);
+    
+    // Check if it's a free plan
+    const isFreePlan = planPrice === 0 || selectedPlan.name?.toLowerCase().includes("free");
+    
+    if (isFreePlan) {
+      Alert.alert(
+        "Free Plan",
+        "The free plan is automatically subscribed. You don't need to subscribe to it.",
+        [
+          { text: "OK", style: "default" }
+        ]
+      );
+      setShowPay(false);
       return;
     }
     
@@ -610,7 +726,6 @@ export default function SubscriptionScreen() {
       return;
     }
     
-    const planPrice = parseFloat(selectedPlan.price || 0);
     if (planPrice <= 0) {
       Alert.alert("Error", "Invalid plan price.");
       return;
@@ -629,6 +744,7 @@ export default function SubscriptionScreen() {
       isTopUp: false,
       isSubscription: true,
       plan_id: selectedPlan.id,
+      billing_period: isAnnual ? "annual" : "monthly",
     });
     
     setShowPay(false);
@@ -730,6 +846,35 @@ export default function SubscriptionScreen() {
           </ThemedText>
         </View>
 
+        {/* Annual/Monthly Toggle */}
+        <View style={styles.billingToggleContainer}>
+          <ThemedText style={[styles.billingToggleLabel, !isAnnual && styles.billingToggleLabelActive]}>
+            Monthly
+          </ThemedText>
+          <TouchableOpacity
+            style={[styles.billingToggleSwitch, isAnnual && styles.billingToggleSwitchActive]}
+            onPress={() => setIsAnnual(!isAnnual)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.billingToggleThumb, isAnnual && styles.billingToggleThumbActive]} />
+          </TouchableOpacity>
+          <ThemedText style={[styles.billingToggleLabel, isAnnual && styles.billingToggleLabelActive]}>
+            Annual
+          </ThemedText>
+          {isAnnual && (
+            <View style={styles.annualDiscountBadge}>
+              <ThemedText style={styles.annualDiscountText}>
+                {(() => {
+                  const planName = selectedPlan?.name?.toLowerCase() || "";
+                  if (planName.includes("pro")) return "1 month free";
+                  if (planName.includes("vip")) return "2 months free";
+                  return "Save";
+                })()}
+              </ThemedText>
+            </View>
+          )}
+        </View>
+
         {/* Plan Selector and Headers Row */}
         <View style={styles.planHeadersRowContainer}>
           {/* Dropdown */}
@@ -779,10 +924,12 @@ export default function SubscriptionScreen() {
                       )}
                       <View style={styles.planHeaderCardPriceContainer}>
                         <ThemedText style={styles.planHeaderCardPrice}>
-                          {getPlanPrice(plan)}
+                          {getPlanPrice(plan, isAnnual)}
                         </ThemedText>
                         {plan.price && parseFloat(plan.price) > 0 && (
-                          <ThemedText style={styles.planHeaderCardPriceUnit}>/month</ThemedText>
+                          <ThemedText style={styles.planHeaderCardPriceUnit}>
+                            {isAnnual ? "/year" : "/month"}
+                          </ThemedText>
                         )}
                       </View>
                     </LinearGradient>
@@ -919,6 +1066,23 @@ export default function SubscriptionScreen() {
                 return;
               }
               
+              // Check if it's a free plan
+              const planPrice = isAnnual 
+                ? getAnnualPrice(selectedPlan)
+                : getMonthlyPrice(selectedPlan);
+              const isFreePlan = planPrice === 0 || selectedPlan.name?.toLowerCase().includes("free");
+              
+              if (isFreePlan) {
+                Alert.alert(
+                  "Free Plan",
+                  "The free plan is automatically subscribed. You don't need to subscribe to it.",
+                  [
+                    { text: "OK", style: "default" }
+                  ]
+                );
+                return;
+              }
+              
               // Check if it's Gold Partner (custom pricing)
               const isGoldPartner = selectedPlan.name?.toLowerCase().includes("gold");
               if (isGoldPartner) {
@@ -935,19 +1099,36 @@ export default function SubscriptionScreen() {
               setShowPay(true);
             }}
           >
-            {isSubscriptionActive && activePlanId === selectedPlan.id ? (
-              <View style={styles.subscriptionActiveButtonContent}>
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <ThemedText style={styles.ctaButtonText}>
-                  Subscription Active
-              </ThemedText>
-            </View>
-          ) : (
-              <ThemedText style={styles.ctaButtonText}>
-                {selectedPlan.name} Plan - Subscribe for {getPlanPrice(selectedPlan)}
-                {selectedPlan.price && parseFloat(selectedPlan.price) > 0 && "/month"}
-              </ThemedText>
-            )}
+            {(() => {
+              const planPrice = isAnnual 
+                ? getAnnualPrice(selectedPlan)
+                : getMonthlyPrice(selectedPlan);
+              const isFreePlan = planPrice === 0 || selectedPlan.name?.toLowerCase().includes("free");
+              
+              if (isSubscriptionActive && activePlanId === selectedPlan.id) {
+                return (
+                  <View style={styles.subscriptionActiveButtonContent}>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <ThemedText style={styles.ctaButtonText}>
+                      Subscription Active
+                    </ThemedText>
+                  </View>
+                );
+              } else if (isFreePlan) {
+                return (
+                  <ThemedText style={styles.ctaButtonText}>
+                    Free Plan - Automatically Subscribed
+                  </ThemedText>
+                );
+              } else {
+                return (
+                  <ThemedText style={styles.ctaButtonText}>
+                    {selectedPlan.name} Plan - Subscribe for {getPlanPrice(selectedPlan, isAnnual)}
+                    {selectedPlan.price && parseFloat(selectedPlan.price) > 0 && (isAnnual ? "/year" : "/month")}
+                  </ThemedText>
+                );
+              }
+            })()}
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -981,7 +1162,7 @@ export default function SubscriptionScreen() {
                 >
                   <ThemedText style={styles.modalOptionText}>{plan.name}</ThemedText>
                   <ThemedText style={styles.modalOptionPrice}>
-                    {getPlanPrice(plan)}
+                    {getPlanPrice(plan, false)}
                     {plan.price && parseFloat(plan.price) > 0 && "/month"}
                   </ThemedText>
                 </TouchableOpacity>
@@ -1006,6 +1187,7 @@ export default function SubscriptionScreen() {
         walletAmount={walletAmount}
         balanceLoading={balanceLoading}
         onTopUp={handleTopUpNavigation}
+        isAnnual={isAnnual}
       />
     </SafeAreaView>
   );
@@ -1297,6 +1479,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 50,
   },
+  ctaButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+    opacity: 0.6,
+  },
   subscriptionActiveButtonContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -1523,6 +1709,80 @@ const styles = StyleSheet.create({
   subscribeButtonText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  billingToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
+    gap: 12,
+  },
+  billingToggleLabel: {
+    fontSize: 14,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  billingToggleLabelActive: {
+    color: "#E53E3E",
+    fontWeight: "600",
+  },
+  billingToggleSwitch: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#E5E7EB",
+    padding: 2,
+    justifyContent: "center",
+  },
+  billingToggleSwitchActive: {
+    backgroundColor: "#E53E3E",
+  },
+  billingToggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    alignSelf: "flex-start",
+  },
+  billingToggleThumbActive: {
+    alignSelf: "flex-end",
+  },
+  annualDiscountBadge: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  annualDiscountText: {
+    fontSize: 10,
+    color: "#92400E",
+    fontWeight: "600",
+  },
+  planPriceDisplayContainer: {
+    backgroundColor: "#F9FAFB",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    alignItems: "center",
+  },
+  planPriceDisplayLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  planPriceDisplayAmount: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#000",
+    marginBottom: 4,
+  },
+  planPriceDisplaySavings: {
+    fontSize: 12,
+    color: "#22C55E",
     fontWeight: "600",
   },
 });

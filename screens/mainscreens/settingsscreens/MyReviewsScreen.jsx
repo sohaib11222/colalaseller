@@ -12,6 +12,8 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,10 +22,12 @@ import ThemedText from "../../../components/ThemedText";
 import { STATIC_COLORS } from "../../../components/ThemeProvider";
 
 //Code Relate to this screen
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getReviews } from "../../../utils/queries/settings";
 import { useAuth } from "../../../contexts/AuthContext";
 import { StatusBar } from "expo-status-bar";
+import * as ReviewMutations from "../../../utils/mutations/settings";
+import { getToken } from "../../../utils/tokenStorage";
 
 
 
@@ -85,36 +89,141 @@ const Gallery = ({ images = [] }) =>
   );
 
 /* ---------- Card ---------- */
-const ReviewCard = ({ C, item, type = "store", onPress, onPressRight }) => {
+const ReviewCard = ({ 
+  C, 
+  item, 
+  type = "store", 
+  onPress, 
+  onPressRight,
+  isReplying,
+  replyText,
+  onReplyTextChange,
+  onReplySubmit,
+  onReplyCancel,
+  onReplyEdit,
+  onReplyDelete,
+  isSubmitting,
+  isProduct = false
+}) => {
   const isStore = type === "store";
+  const hasReply = !!item.seller_reply;
+  
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[styles.card, { backgroundColor: C.card, borderColor: C.line }]}>
-      {/* Header */}
-      <View style={styles.cardTop}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {item.avatar ? (
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
-              <Ionicons name="person-outline" size={20} color={C.sub} />
+    <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line }]}>
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+        {/* Header */}
+        <View style={styles.cardTop}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {item.avatar ? (
+              <Image source={{ uri: item.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
+                <Ionicons name="person-outline" size={20} color={C.sub} />
+              </View>
+            )}
+            <View>
+              <ThemedText style={[styles.name, { color: C.text }]}>{item.user}</ThemedText>
+              <Stars value={item.rating} color={C.primary} />
             </View>
-          )}
-          <View>
-            <ThemedText style={[styles.name, { color: C.text }]}>{item.user}</ThemedText>
-            <Stars value={item.rating} color={C.primary} />
+          </View>
+          <ThemedText style={[styles.time, { color: C.sub }]}>{item.time}</ThemedText>
+        </View>
+
+        {/* Body */}
+        <ThemedText style={[styles.body, { color: C.text }]}>{item.body}</ThemedText>
+
+        {/* Optional gallery */}
+        <Gallery images={item.gallery} />
+      </TouchableOpacity>
+
+      {/* Seller Reply Display */}
+      {hasReply && !isReplying && (
+        <View style={[styles.replyContainer, { backgroundColor: C.bg, borderColor: C.line }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Ionicons name="storefront" size={14} color={C.primary} />
+              <ThemedText style={[styles.replyLabel, { color: C.primary }]}>Your Reply</ThemedText>
+              {item.seller_replied_at && (
+                <ThemedText style={[styles.replyTime, { color: C.sub }]}>
+                  {" • "}
+                  {new Date(item.seller_replied_at).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit', 
+                    year: '2-digit'
+                  })}
+                </ThemedText>
+              )}
+            </View>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity onPress={onReplyEdit} activeOpacity={0.7}>
+                <Ionicons name="create-outline" size={18} color={C.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onReplyDelete} activeOpacity={0.7}>
+                <Ionicons name="trash-outline" size={18} color="#E53E3E" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <ThemedText style={[styles.replyText, { color: C.text }]}>{item.seller_reply}</ThemedText>
+        </View>
+      )}
+
+      {/* Reply Input Section */}
+      {isReplying && (
+        <View style={[styles.replyInputContainer, { backgroundColor: C.bg, borderColor: C.line }]}>
+          <TextInput
+            placeholder="Write your reply..."
+            placeholderTextColor={C.sub}
+            value={replyText}
+            onChangeText={onReplyTextChange}
+            multiline
+            numberOfLines={4}
+            maxLength={1000}
+            style={[styles.inlineReplyInput, { color: C.text, borderColor: C.line, backgroundColor: C.card }]}
+            textAlignVertical="top"
+            autoFocus={true}
+          />
+          <ThemedText style={[styles.charCount, { color: C.sub }]}>
+            {replyText.length}/1000 characters
+          </ThemedText>
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+            <TouchableOpacity
+              style={[styles.inlineCancelBtn, { borderColor: C.line, backgroundColor: C.card }]}
+              onPress={onReplyCancel}
+            >
+              <ThemedText style={{ color: C.text, fontWeight: "600" }}>Cancel</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.inlineSubmitBtn, { backgroundColor: C.primary }]}
+              onPress={onReplySubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                  {hasReply ? "Update" : "Submit"}
+                </ThemedText>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-        <ThemedText style={[styles.time, { color: C.sub }]}>{item.time}</ThemedText>
-      </View>
+      )}
 
-      {/* Body */}
-      <ThemedText style={[styles.body, { color: C.text }]}>{item.body}</ThemedText>
-
-      {/* Optional gallery */}
-      <Gallery images={item.gallery} />
-
-     
-    </TouchableOpacity>
+      {/* Reply Button (when not replying and no reply exists) */}
+      {!hasReply && !isReplying && (
+        <TouchableOpacity 
+          style={[styles.replyBtn, { borderColor: C.primary, backgroundColor: C.card }]} 
+          onPress={() => {
+            // This will be handled by parent component
+            if (onPressRight) onPressRight(item);
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chatbubble-outline" size={18} color={C.primary} style={{ marginRight: 8 }} />
+          <ThemedText style={{ color: C.primary, fontWeight: "600" }}>Reply to Review</ThemedText>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 
@@ -191,6 +300,8 @@ export default function MyReviewsScreen() {
         hour12: true
       }).replace(/AM|PM/, (match) => match === 'AM' ? 'AM' : 'PM'),
       body: review.comment,
+      seller_reply: review.seller_reply || null,
+      seller_replied_at: review.seller_replied_at || null,
       store: {
         name: review.user?.full_name || "Store Name", // Use the actual store name from API
         rating: review.rating, // Use the actual rating from the review API
@@ -217,10 +328,135 @@ export default function MyReviewsScreen() {
   // view modal state
   const [activeReview, setActiveReview] = useState(null);
   const [viewVisible, setViewVisible] = useState(false);
+  
+  // Inline reply state
+  const [replyingToId, setReplyingToId] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [editingReplyId, setEditingReplyId] = useState(null);
+
+  const queryClient = useQueryClient();
+
+  // Reply mutations
+  const replyMutation = useMutation({
+    mutationFn: async ({ reviewId, reply, isProduct }) => {
+      const token = await getToken();
+      if (isProduct) {
+        return await ReviewMutations.replyToProductReview(reviewId, { reply }, token);
+      } else {
+        return await ReviewMutations.replyToStoreReview(reviewId, { reply }, token);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviews', token] });
+      setReplyingToId(null);
+      setReplyText("");
+      setEditingReplyId(null);
+      Alert.alert("Success", "Reply added successfully");
+    },
+    onError: (error) => {
+      Alert.alert("Error", error?.response?.data?.message || error?.message || "Failed to add reply");
+    },
+  });
+
+  const updateReplyMutation = useMutation({
+    mutationFn: async ({ reviewId, reply, isProduct }) => {
+      const token = await getToken();
+      if (isProduct) {
+        return await ReviewMutations.updateProductReviewReply(reviewId, { reply }, token);
+      } else {
+        return await ReviewMutations.updateStoreReviewReply(reviewId, { reply }, token);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviews', token] });
+      setReplyingToId(null);
+      setReplyText("");
+      setEditingReplyId(null);
+      Alert.alert("Success", "Reply updated successfully");
+    },
+    onError: (error) => {
+      Alert.alert("Error", error?.response?.data?.message || error?.message || "Failed to update reply");
+    },
+  });
+
+  const deleteReplyMutation = useMutation({
+    mutationFn: async ({ reviewId, isProduct }) => {
+      const token = await getToken();
+      if (isProduct) {
+        return await ReviewMutations.deleteProductReviewReply(reviewId, token);
+      } else {
+        return await ReviewMutations.deleteStoreReviewReply(reviewId, token);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reviews', token] });
+      Alert.alert("Success", "Reply deleted successfully");
+    },
+    onError: (error) => {
+      Alert.alert("Error", error?.response?.data?.message || error?.message || "Failed to delete reply");
+    },
+  });
 
   const openView = (review) => {
     setActiveReview(review);
     setViewVisible(true);
+  };
+
+  const startReply = (review) => {
+    setReplyingToId(review.id);
+    setReplyText(review.seller_reply || "");
+    setEditingReplyId(review.seller_reply ? review.id : null);
+  };
+
+  const cancelReply = () => {
+    setReplyingToId(null);
+    setReplyText("");
+    setEditingReplyId(null);
+  };
+
+  const handleSubmitReply = (reviewId) => {
+    if (!replyText.trim()) {
+      Alert.alert("Error", "Please enter a reply");
+      return;
+    }
+
+    const isProduct = tab === "product";
+    const isEditing = editingReplyId === reviewId;
+    
+    if (isEditing) {
+      updateReplyMutation.mutate({
+        reviewId: reviewId,
+        reply: replyText.trim(),
+        isProduct,
+      });
+    } else {
+      replyMutation.mutate({
+        reviewId: reviewId,
+        reply: replyText.trim(),
+        isProduct,
+      });
+    }
+  };
+
+  const handleDeleteReply = (reviewId) => {
+    Alert.alert(
+      "Delete Reply",
+      "Are you sure you want to delete this reply?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            const isProduct = tab === "product";
+            deleteReplyMutation.mutate({
+              reviewId: reviewId,
+              isProduct,
+            });
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -327,7 +563,16 @@ export default function MyReviewsScreen() {
               item={item}
               type={tab}
               onPress={() => openView(item)}
-              onPressRight={() => {}}
+              onPressRight={() => startReply(item)}
+              isReplying={replyingToId === item.id}
+              replyText={replyingToId === item.id ? replyText : ""}
+              onReplyTextChange={setReplyText}
+              onReplySubmit={() => handleSubmitReply(item.id)}
+              onReplyCancel={cancelReply}
+              onReplyEdit={() => startReply(item)}
+              onReplyDelete={() => handleDeleteReply(item.id)}
+              isSubmitting={replyMutation.isPending || updateReplyMutation.isPending}
+              isProduct={tab === "product"}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -392,13 +637,69 @@ export default function MyReviewsScreen() {
               </View>
             )}
 
-            {/* Report button */}
-            <TouchableOpacity style={[styles.reportBtn, { borderColor: C.line, backgroundColor: C.card }]} onPress={() => {}}>
-              <ThemedText style={{ color: C.text, fontWeight: "600" }}>Report Review</ThemedText>
-            </TouchableOpacity>
+            {/* Reply section */}
+            {activeReview?.seller_reply ? (
+              <View style={[styles.replyContainer, { backgroundColor: C.bg, borderColor: C.line }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="storefront" size={14} color={C.primary} />
+                    <ThemedText style={[styles.replyLabel, { color: C.primary }]}>Your Reply</ThemedText>
+                    {activeReview.seller_replied_at && (
+                      <ThemedText style={[styles.replyTime, { color: C.sub }]}>
+                        {" • "}
+                        {new Date(activeReview.seller_replied_at).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit', 
+                          year: '2-digit'
+                        })}
+                      </ThemedText>
+                    )}
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 12 }}>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        if (activeReview) {
+                          setViewVisible(false);
+                          startReply(activeReview);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="create-outline" size={18} color={C.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        if (activeReview) {
+                          handleDeleteReply(activeReview.id);
+                        }
+                      }} 
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#E53E3E" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <ThemedText style={[styles.replyText, { color: C.text }]}>{activeReview.seller_reply}</ThemedText>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.replyBtn, { borderColor: C.primary, backgroundColor: C.card }]} 
+                onPress={() => {
+                  if (activeReview) {
+                    setViewVisible(false);
+                    startReply(activeReview);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chatbubble-outline" size={18} color={C.primary} style={{ marginRight: 8 }} />
+                <ThemedText style={{ color: C.primary, fontWeight: "600" }}>Reply to Review</ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
     </SafeAreaView>
   );
 }
@@ -578,5 +879,94 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+
+  // Reply styles
+  replyContainer: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  replyLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginLeft: 6,
+  },
+  replyTime: {
+    fontSize: 11,
+    marginLeft: 4,
+  },
+  replyText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  replyBtn: {
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 6,
+    flexDirection: "row",
+  },
+  replyInput: {
+    minHeight: 120,
+    maxHeight: 200,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    textAlignVertical: "top",
+    fontSize: 14,
+    marginTop: 12,
+  },
+  replyInputContainer: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  inlineReplyInput: {
+    minHeight: 100,
+    maxHeight: 150,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 14,
+  },
+  inlineCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineSubmitBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  charCount: {
+    fontSize: 12,
+    textAlign: "right",
+    marginTop: 4,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

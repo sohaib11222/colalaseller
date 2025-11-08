@@ -17,3 +17,12 @@ export const getChatDetails = async (chatId, token) => {
     if (!chatId) throw new Error("chatId is required");
     return apiCall(API_ENDPOINTS.CHATS.Details(chatId), "GET", undefined, token);
 };
+
+/**
+ * Get user status (online/offline)
+ * response: { status: true, data: { is_online: true, last_seen_at: "..." } }
+ */
+export const getUserStatus = async (userId, token) => {
+    if (!userId) throw new Error("userId is required");
+    return apiCall(API_ENDPOINTS.USERS.GetStatus(userId), "GET", undefined, token);
+};

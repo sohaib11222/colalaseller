@@ -37,6 +37,7 @@ import {
   submitOnboarding,
   submitHelpRequest,
 } from "../../utils/mutations/seller";
+import { verifyOtp } from "../../utils/mutations/auth";
 import {
   storeOnboardingData,
   getOnboardingToken,
@@ -281,6 +282,12 @@ export default function RegisterStoreScreen() {
   const [selectedService, setSelectedService] = useState("");
   const [helpFee, setHelpFee] = useState("");
   const [helpNotes, setHelpNotes] = useState("");
+  
+  // ------------ OTP Verification ------------
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(0);
 
   const filteredLocations = allLocations.filter((c) =>
     c.toLowerCase().includes(locationSearch.toLowerCase())
@@ -327,11 +334,13 @@ export default function RegisterStoreScreen() {
           await storeOnboardingData(data.token, data.store_id);
           setOnboardingToken(data.token);
           setStoreId(data.store_id);
+          // Show OTP verification modal instead of going to next step
+          setShowOtpModal(true);
+          setOtpTimer(60); // Start 60 second timer
           Alert.alert(
-            "Success",
-            data.message || "Store registration started successfully!"
+            "OTP Sent",
+            "Please check your email for the verification code."
           );
-          goNext();
         } catch (storageError) {
           console.error("Error storing onboarding data:", storageError);
           Alert.alert(
@@ -352,6 +361,35 @@ export default function RegisterStoreScreen() {
         "Error",
         error.message ||
         "An error occurred during registration. Please try again."
+      );
+    },
+  });
+
+  // Verify OTP Mutation
+  const verifyOtpMutation = useMutation({
+    mutationFn: verifyOtp,
+    onSuccess: (data) => {
+      if (data.status === "success") {
+        setOtpVerified(true);
+        setShowOtpModal(false);
+        Alert.alert(
+          "Success",
+          data.message || "Email verified successfully!"
+        );
+        // Now proceed to next step
+        goNext();
+      } else {
+        Alert.alert(
+          "Error",
+          data.message || "Invalid verification code. Please try again."
+        );
+      }
+    },
+    onError: (error) => {
+      console.error("Verify OTP error:", error);
+      Alert.alert(
+        "Error",
+        error.message || "An error occurred. Please try again."
       );
     },
   });
@@ -872,7 +910,11 @@ export default function RegisterStoreScreen() {
 
   // Helper function to handle current step
   const handleCurrentStep = () => {
-    if (level === 1 && phase === 1) return handleStartOnboarding();
+    if (level === 1 && phase === 1) {
+      // For first step, check if OTP is verified before allowing to proceed
+      // Note: OTP verification happens after startOnboarding, so this check is for re-submission
+      return handleStartOnboarding();
+    }
     if (level === 1 && phase === 2) return handleUploadProfileMedia();
     if (level === 1 && phase === 3) return handleSetCategoriesSocial();
     if (level === 2 && phase === 1) return handleSetBusinessDetails();
@@ -880,6 +922,29 @@ export default function RegisterStoreScreen() {
     if (level === 3 && phase === 1) return handleUploadPhysicalStore();
     if (level === 3 && phase === 2) return handleSubmitOnboarding();
   };
+
+  // Handle OTP verification
+  const handleVerifyOtp = () => {
+    if (!otpCode.trim() || otpCode.trim().length < 4) {
+      Alert.alert("Error", "Please enter a valid OTP code");
+      return;
+    }
+
+    verifyOtpMutation.mutate({
+      email: storeEmail.trim(),
+      otp: otpCode.trim(),
+    });
+  };
+
+  // OTP Timer effect
+  useEffect(() => {
+    if (otpTimer > 0 && showOtpModal) {
+      const interval = setInterval(() => {
+        setOtpTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [otpTimer, showOtpModal]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: "#B91919" }]}>
@@ -1645,6 +1710,99 @@ export default function RegisterStoreScreen() {
           theme={theme}
         />
       </ScrollView>
+
+      {/* OTP Verification Modal */}
+      <Modal
+        visible={showOtpModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          if (otpVerified) {
+            setShowOtpModal(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.otpModalContent}>
+            <TouchableOpacity
+              style={styles.otpModalClose}
+              onPress={() => {
+                if (otpVerified) {
+                  setShowOtpModal(false);
+                } else {
+                  Alert.alert(
+                    "Verification Required",
+                    "Please verify your email to continue with registration.",
+                    [{ text: "OK" }]
+                  );
+                }
+              }}
+            >
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+
+            <ThemedText style={styles.otpModalTitle}>
+              Verify Your Email
+            </ThemedText>
+            <ThemedText style={styles.otpModalSubtitle}>
+              We've sent a verification code to{'\n'}
+              <ThemedText style={{ fontWeight: '600' }}>{storeEmail}</ThemedText>
+            </ThemedText>
+
+            <View style={styles.otpInputContainer}>
+              <TextInput
+                style={styles.otpInput}
+                value={otpCode}
+                onChangeText={setOtpCode}
+                placeholder="Enter OTP Code"
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus={true}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {otpTimer > 0 && (
+              <ThemedText style={styles.otpTimerText}>
+                Resend code in {otpTimer}s
+              </ThemedText>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.otpVerifyButton,
+                { backgroundColor: theme.colors.primary },
+                (verifyOtpMutation.isPending || !otpCode.trim()) && styles.otpVerifyButtonDisabled
+              ]}
+              onPress={handleVerifyOtp}
+              disabled={verifyOtpMutation.isPending || !otpCode.trim()}
+            >
+              {verifyOtpMutation.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <ThemedText style={styles.otpVerifyButtonText}>
+                  Verify OTP
+                </ThemedText>
+              )}
+            </TouchableOpacity>
+
+            {otpTimer === 0 && (
+              <TouchableOpacity
+                style={styles.otpResendButton}
+                onPress={() => {
+                  // Resend OTP by calling startOnboarding again
+                  handleStartOnboarding();
+                  setOtpTimer(60);
+                }}
+              >
+                <ThemedText style={[styles.otpResendText, { color: theme.colors.primary }]}>
+                  Resend Code
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2670,5 +2828,82 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#101318",
     lineHeight: 22,
+  },
+  // OTP Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  otpModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    position: "relative",
+  },
+  otpModalClose: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  otpModalTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  otpModalSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  otpInputContainer: {
+    marginBottom: 16,
+  },
+  otpInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    textAlign: "center",
+    letterSpacing: 4,
+    backgroundColor: "#f9f9f9",
+  },
+  otpTimerText: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  otpVerifyButton: {
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  otpVerifyButtonDisabled: {
+    opacity: 0.5,
+  },
+  otpVerifyButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  otpResendButton: {
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  otpResendText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

@@ -24,6 +24,7 @@ import { getToken } from '../../../utils/tokenStorage';
 import * as ChatQueries from '../../../utils/queries/chats';      // getChatDetails(chatId, token)
 import * as ChatMutations from '../../../utils/mutations/chats';  // sendMessage(chatId, payload|FormData, token)
 import { API_DOMAIN } from '../../../apiConfig';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // ---------- debug helper ----------
 const D = (...args) => console.log('[ChatDetails]', ...args);
@@ -108,6 +109,7 @@ export default function ChatDetailsScreen() {
   const insets = useSafeAreaInsets();
   // const { theme } = useTheme();
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   // const C = useMemo(
   //   () => ({
@@ -224,6 +226,44 @@ export default function ChatDetailsScreen() {
     },
     staleTime: 10_000,
   });
+
+  // Fetch user status for online/offline indicator
+  const otherUserId = detail?.user?.id || params?.userId;
+  const { data: userStatusData } = useQuery({
+    queryKey: ['userStatus', otherUserId],
+    queryFn: async () => {
+      if (!otherUserId || !user?.id || otherUserId === user.id) return null;
+      const token = await getToken();
+      return await ChatQueries.getUserStatus(otherUserId, token);
+    },
+    enabled: !!otherUserId && !!user?.id && otherUserId !== user.id && !detailLoading,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 10000,
+  });
+
+  const isOnline = userStatusData?.data?.is_online || false;
+  const lastSeenAt = userStatusData?.data?.last_seen_at;
+
+  // Format last seen time
+  const formatLastSeen = (isoString) => {
+    if (!isoString) return "Last seen recently";
+    try {
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return "Active now";
+      if (diffMins < 60) return `Last seen ${diffMins} ${diffMins === 1 ? 'min' : 'mins'} ago`;
+      if (diffHours < 24) return `Last seen ${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+      if (diffDays < 7) return `Last seen ${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+      return `Last seen ${date.toLocaleDateString()}`;
+    } catch {
+      return "Last seen recently";
+    }
+  };
 
   // hydrate messages when fetched
   useEffect(() => {
@@ -396,7 +436,7 @@ export default function ChatDetailsScreen() {
           styles.bubble,
           mine
             ? [styles.bubbleRight, { backgroundColor: C.primary }]
-            : [styles.bubbleLeft, { backgroundColor: C.lightPink }],
+            : [styles.bubbleLeft, { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5E5' }],
         ]}
       >
         <ThemedText style={[styles.msg, { color: mine ? '#fff' : '#000' }]}>
@@ -423,7 +463,7 @@ export default function ChatDetailsScreen() {
             />
           </TouchableOpacity>
         )}
-        <ThemedText style={[styles.time, { color: mine ? '#fff' : '#000' }]}>
+        <ThemedText style={[styles.time, { color: mine ? '#fff' : '#666' }]}>
           {item.time || '07:22AM'}
         </ThemedText>
       </View>
@@ -457,8 +497,14 @@ export default function ChatDetailsScreen() {
               <ThemedText style={[styles.storeName, { color: C.text }]}>
                 {store?.name || 'Store'}
               </ThemedText>
-              {/* Not provided by API → keep hardcoded */}
-              <ThemedText style={[styles.lastSeen, { color: C.sub }]}>Last seen 2 mins ago</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {isOnline && (
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E', marginRight: 4 }} />
+                )}
+                <ThemedText style={[styles.lastSeen, { color: C.sub }]}>
+                  {isOnline ? 'Active now' : formatLastSeen(lastSeenAt)}
+                </ThemedText>
+              </View>
             </View>
           </View>
 

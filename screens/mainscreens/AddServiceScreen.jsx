@@ -21,6 +21,7 @@ import { STATIC_COLORS } from "../../components/ThemeProvider";
 
 //Code Related to the integration
 import { getStoreCategories } from "../../utils/queries/seller";
+import { getServiceCategories } from "../../utils/queries/general";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import { createService } from "../../utils/mutations/services";
@@ -134,18 +135,18 @@ export default function AddServiceScreen({ navigation, route }) {
     }
   }, [isEdit, serviceData]);
 
-  // Fetch store categories using React Query
+  // Fetch service categories using React Query
   const {
-    data: categoriesData,
+    data: serviceCategoriesData,
     isLoading: categoriesLoading,
     error: categoriesError,
   } = useQuery({
-    queryKey: ["storeCategories", token],
-    queryFn: () => getStoreCategories(token),
+    queryKey: ["serviceCategories", token],
+    queryFn: () => getServiceCategories(token),
     enabled: !!token, // Only run query when token is available
   });
 
-  const categories = categoriesData?.selected || [];
+  const serviceCategories = serviceCategoriesData?.data || [];
 
   // Create service mutation with direct axios call
   const createServiceMutation = useMutation({
@@ -342,10 +343,11 @@ export default function AddServiceScreen({ navigation, route }) {
         imageUris: images.map(img => img?.uri)
       });
 
-      if (validImages.length === 0 && !hasValidVideo) {
+      // Video is optional, but at least one image is required
+      if (validImages.length === 0) {
         Alert.alert(
           "Error",
-          "Please add at least one image or video before submitting."
+          "Please add at least one image before submitting."
         );
         return;
       }
@@ -471,7 +473,7 @@ export default function AddServiceScreen({ navigation, route }) {
 
       console.log("Submitting service with FormData:", {
         category_id: category,
-        category_title: categories.find((cat) => cat.id === category)?.title,
+        category_title: serviceCategories.find((cat) => cat.id === parseInt(category))?.title,
         name: name.trim(),
         hasVideo: !!video,
         videoUri: video?.uri,
@@ -842,15 +844,15 @@ export default function AddServiceScreen({ navigation, route }) {
         onClose={() => setCatOpen(false)}
         onSelect={(categoryId) => {
           console.log("Selected category ID:", categoryId);
-          console.log("Available categories:", categories);
-          const selectedCategory = categories.find(
+          console.log("Available categories:", serviceCategories);
+          const selectedCategory = serviceCategories.find(
             (cat) => cat.id === categoryId
           );
           console.log("Selected category object:", selectedCategory);
-          setCategory(categoryId);
+          setCategory(categoryId.toString());
           setCatOpen(false);
         }}
-        categories={categories}
+        categories={serviceCategories}
         isLoading={categoriesLoading}
         error={categoriesError}
         C={C}
@@ -947,7 +949,13 @@ function CategorySheet({
       ]}
       activeOpacity={0.9}
     >
-      <ThemedText style={{ color: C.text }}>{category.title}</ThemedText>
+      {category.image && (
+        <Image 
+          source={{ uri: `https://colala.hmstech.xyz/storage/${category.image}` }}
+          style={{ width: 40, height: 40, borderRadius: 8, marginRight: 12 }}
+        />
+      )}
+      <ThemedText style={{ color: C.text, flex: 1 }}>{category.title}</ThemedText>
     </TouchableOpacity>
   );
 

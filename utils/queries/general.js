@@ -5,6 +5,9 @@ import { API_ENDPOINTS } from "../../apiConfig";
 export const getCategories = async (token) =>
     await apiCall(API_ENDPOINTS.GENERAL.Categories, "GET", undefined, token);
 
+export const getServiceCategories = async (token) =>
+    await apiCall(API_ENDPOINTS.GENERAL.Service_Categories, "GET", undefined, token);
+
 export const getBrands = async (token) =>
     await apiCall(API_ENDPOINTS.GENERAL.Brands, "GET", undefined, token);
 

@@ -26,15 +26,42 @@ import { getBalance, getEscrowWallet, getPhoneRequests, getPhoneVisibility, getU
 import { updatePhoneVisibility } from "../../../utils/mutations/settings";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useRoleAccess } from "../../../hooks/useRoleAccess";
+import AccessDeniedModal from "../../../components/AccessDeniedModal";
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user, token, logout } = useAuth();
+  const { screenAccess, isLoading: roleLoading } = useRoleAccess();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showAccessDenied, setShowAccessDenied] = useState(false);
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState("");
+
+  // Check access on screen load
+  useEffect(() => {
+    if (!roleLoading && !screenAccess.canAccessSettings) {
+      setShowAccessDenied(true);
+      setAccessDeniedMessage("You don't have permission to access Settings");
+    }
+  }, [roleLoading, screenAccess.canAccessSettings]);
+
+  // Show access denied if user doesn't have access
+  if (!roleLoading && !screenAccess.canAccessSettings) {
+    return (
+      <AccessDeniedModal
+        visible={showAccessDenied}
+        onClose={() => {
+          setShowAccessDenied(false);
+          navigation.goBack();
+        }}
+        requiredPermission={accessDeniedMessage}
+      />
+    );
+  }
 
   const C = useMemo(
     () => ({
@@ -368,7 +395,33 @@ const SettingsScreen = () => {
     },
   ];
 
+  // Access control map for menu items
+  const accessMap = {
+    myProducts: screenAccess.canAccessMyProducts,
+    analytics: screenAccess.canAccessAnalytics,
+    subscriptions: screenAccess.canAccessSubscription,
+    promoted: screenAccess.canAccessPromotedProducts,
+    coupons: screenAccess.canAccessCoupons,
+    announcements: screenAccess.canAccessAnnouncements,
+    reviews: screenAccess.canAccessReviews,
+    accessControl: screenAccess.canAccessAccessControl,
+    wallet: screenAccess.canAccessWallet,
+    holdingWallet: screenAccess.canAccessEscrow,
+    shopUpgrade: screenAccess.canAccessStoreBuilder,
+    support: screenAccess.canAccessSupport,
+    faqs: screenAccess.canAccessFAQs,
+  };
+
   const onPressRow = (key) => {
+    // Check access for this menu item
+    const hasAccess = accessMap[key] ?? true; // Default to true for items not in map
+    
+    if (!hasAccess) {
+      setAccessDeniedMessage(`You don't have permission to access ${key.replace(/([A-Z])/g, ' $1').trim()}`);
+      setShowAccessDenied(true);
+      return;
+    }
+
     // Handle support separately to show modal
     if (key === "support") {
       setShowSupportModal(true);
@@ -377,7 +430,7 @@ const SettingsScreen = () => {
 
     // Wire up to your settings navigator screens
     const map = {
-      myProducts: ["SettingsNavigator", { screen: "MyProducts" }],
+      myProducts: ["SettingsNavigator", { screen: "myproducts" }],
       analytics: ["ChatNavigator", { screen: "Analytics" }],
       visitors: ["ChatNavigator", { screen: "Visitors" }],
       subscriptions: ["ChatNavigator", { screen: "Subscription" }],
@@ -701,17 +754,25 @@ const SettingsScreen = () => {
           Others
         </ThemedText>
         <View>
-          {menuOthers.map((item) => (
-            <OptionPillCard
-              key={item.key}
-              label={item.label}
-              img={item.img}
-              leftColor={item.leftColor}
-              onPress={() => onPressRow(item.key)}
-              countBadge={item.countBadge}
-              C={C}
-            />
-          ))}
+          {menuOthers.map((item) => {
+            // Check if user has access to this menu item
+            const hasAccess = accessMap[item.key] ?? true;
+            
+            // Hide menu items user doesn't have access to
+            if (!hasAccess) return null;
+            
+            return (
+              <OptionPillCard
+                key={item.key}
+                label={item.label}
+                img={item.img}
+                leftColor={item.leftColor}
+                onPress={() => onPressRow(item.key)}
+                countBadge={item.countBadge}
+                C={C}
+              />
+            );
+          })}
 
           {/* Phone Visibility Toggle */}
           <View style={styles.pillWrap}>
@@ -803,6 +864,16 @@ const SettingsScreen = () => {
         onChat={handleSupportChat}
         onPhone={handleSupportPhone}
         C={C}
+      />
+
+      {/* Access Denied Modal */}
+      <AccessDeniedModal
+        visible={showAccessDenied}
+        onClose={() => {
+          setShowAccessDenied(false);
+          navigation.goBack();
+        }}
+        requiredPermission={accessDeniedMessage}
       />
     </SafeAreaView>
   );
