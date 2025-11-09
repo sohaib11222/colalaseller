@@ -174,6 +174,7 @@ const API_ENDPOINTS = {
     Boost_Update: (id) => `${API_DOMAIN}/seller/boosts/update/${id}`,
     Single_Boost: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // GET
     Boost_Status: (id) => `${API_DOMAIN}/seller/boosts/${id}/status`, // PATCH
+    Boost_Delete: (id) => `${API_DOMAIN}/seller/boosts/${id}`, // DELETE
 
 
     //Support 

@@ -1092,7 +1092,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
 import { getBoostsList, getSingleBoost, getBalance } from "../../../utils/queries/settings";
-import { updateBoostStatus } from "../../../utils/mutations/settings";
+import { updateBoostStatus, deleteBoost } from "../../../utils/mutations/settings";
 import { previewBoost, updateBoost } from "../../../utils/mutations/settings";
 
 /* ---------- helpers ---------- */
@@ -1565,13 +1565,11 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   const navigation = useNavigation(); // Safe to use in child components. :contentReference[oaicite:0]{index=0}
   const queryClient = useQueryClient();
 
-  if (!visible || !item) return null;
-
   // Single boost + balance
   const { data: boostDetails } = useQuery({
-    queryKey: ["singleBoost", item.id, token],
-    queryFn: () => getSingleBoost(token, item.id),
-    enabled: !!token && !!item.id && visible,
+    queryKey: ["singleBoost", item?.id, token],
+    queryFn: () => getSingleBoost(token, item?.id),
+    enabled: !!token && !!item?.id && visible,
   });
 
   const { data: balanceData } = useQuery({
@@ -1594,7 +1592,7 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   });
 
   const handleStatusUpdate = (action) => {
-    updateStatusMutation.mutate({ id: item.id, action });
+    updateStatusMutation.mutate({ id: item?.id, action });
   };
 
   // Update Flow state
@@ -1602,12 +1600,12 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   const [reviewOpen, setReviewOpen] = useState(false);
 
   const initialBudget = Number(
-    boostDetails?.data?.budget ?? item.oldPrice ?? 2000
+    boostDetails?.data?.budget ?? item?.oldPrice ?? 2000
   );
   const initialDays = Number(
-    boostDetails?.data?.duration ?? item.duration ?? 7
+    boostDetails?.data?.duration ?? item?.duration ?? 7
   );
-  const initialLoc = boostDetails?.data?.location ?? item.location ?? "";
+  const initialLoc = boostDetails?.data?.location ?? item?.location ?? "";
 
   const [boostLocation, setBoostLocation] = useState(initialLoc);
   const [dailyBudget, setDailyBudget] = useState(initialBudget);
@@ -1623,16 +1621,44 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (payload) => updateBoost({ id: item.id, payload, token }),
+    mutationFn: (payload) => updateBoost({ id: item?.id, payload, token }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["boosts"] }); // invalidate list after update. :contentReference[oaicite:2]{index=2}
-      queryClient.invalidateQueries({ queryKey: ["singleBoost", item.id, token] });
+      queryClient.invalidateQueries({ queryKey: ["singleBoost", item?.id, token] });
       Alert.alert("Success", "Boost updated successfully!");
       setReviewOpen(false);
       setSetupOpen(false);
     },
     onError: () => Alert.alert("Error", "Failed to update boost."),
   });
+
+  const deleteBoostMutation = useMutation({
+    mutationFn: (id) => deleteBoost(id, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["boosts"] });
+      Alert.alert("Success", "Boost deleted successfully!");
+      onClose();
+    },
+    onError: () => Alert.alert("Error", "Failed to delete boost. Please try again."),
+  });
+
+  const handleDeleteBoost = () => {
+    Alert.alert(
+      "Delete Boost",
+      "Are you sure you want to delete this boost? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteBoostMutation.mutate(item?.id),
+        },
+      ]
+    );
+  };
+
+  // Early return after all hooks
+  if (!visible || !item) return null;
 
   // Tiny row component
   const Row = ({ label, value, green }) => (
@@ -1664,7 +1690,7 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
 
   // Image helpers
   const productImage =
-    boostDetails?.data?.product?.images?.[0]?.url || item.image;
+    boostDetails?.data?.product?.images?.[0]?.url || item?.image;
 
   return (
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
@@ -1742,7 +1768,7 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
           <Row label="Reach" value={boostDetails?.data?.reach?.toLocaleString?.() || item.reach?.toLocaleString?.() || "N/A"} />
           <Row label="Impressions" value={boostDetails?.data?.impressions?.toLocaleString?.() || item.impressions?.toLocaleString?.() || "N/A"} />
           <Row label="Cost/Click" value={boostDetails?.data?.cpc ? `₦${boostDetails.data.cpc}` : (item.cpc ? `₦${item.cpc}` : "N/A")} />
-          <Row label="Amount Spent" value={boostDetails?.data?.total_amount ? `₦${Number(boostDetails.data.total_amount).toLocaleString()}` : (item.price ? `₦${Number(item.price).toLocaleString()}` : "N/A")} />
+          <Row label="Amount Spent" value={boostDetails?.data?.amount_spent ? `₦${Number(boostDetails.data.amount_spent).toLocaleString()}` : (item.amount_spent ? `₦${Number(item.amount_spent).toLocaleString()}` : "N/A")} />
           <Row label="Date Created" value={boostDetails?.data?.created_at ? new Date(boostDetails.data.created_at).toLocaleDateString() : "N/A"} />
           <Row label="Duration" value={boostDetails?.data?.duration ? `${boostDetails.data.duration} days` : (item.duration ? `${item.duration} days` : "N/A")} />
           <Row label="Budget" value={boostDetails?.data?.budget ? `₦${Number(boostDetails.data.budget).toLocaleString()}` : (item.oldPrice ? `₦${Number(item.oldPrice).toLocaleString()}` : "N/A")} />
@@ -1794,7 +1820,12 @@ const PromotionDetailsModal = ({ visible, onClose, item, C, token }) => {
                 )}
               </TouchableOpacity>
 
-              <MiniIconBtn icon="trash-outline" C={C} onPress={() => Alert.alert("Coming soon", "Delete boost endpoint not wired here.")} />
+              <MiniIconBtn 
+                icon="trash-outline" 
+                C={C} 
+                onPress={handleDeleteBoost}
+                disabled={deleteBoostMutation.isPending}
+              />
             </View>
 
             {/* Extend +7 days -> open Setup prefilled */}

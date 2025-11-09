@@ -746,24 +746,24 @@ function TrackOrderModal({
                   )}`}</ThemedText>
                 </View>
                 {detail?.shipping_fee && Number(detail.shipping_fee) > 0 && (
-                  <View
-                    style={[
-                      styles.infoRow,
-                      {
-                        borderTopWidth: 1,
-                        borderTopColor: C.line,
-                        marginTop: 8,
-                        paddingTop: 8,
-                      },
-                    ]}
-                  >
-                    <ThemedText style={{ color: C.text }}>
-                      Delivery fee
-                    </ThemedText>
-                    <ThemedText style={{ color: C.primary }}>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text }}>
+                    Delivery fee
+                  </ThemedText>
+                  <ThemedText style={{ color: C.primary }}>
                       {currency(detail.shipping_fee)}
-                    </ThemedText>
-                  </View>
+                  </ThemedText>
+                </View>
                 )}
                 <View
                   style={[
@@ -1442,7 +1442,7 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
     <View style={styles.section}>
       <View style={[styles.storeHeader, { backgroundColor: C.primary }]}>
         <ThemedText style={styles.storeName}>
-          {detail?.store?.store_name || "Store"}
+          {detail?.order?.user?.full_name || "Customer"}
         </ThemedText>
 
         <TouchableOpacity
@@ -1508,12 +1508,12 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
             </View>
 
             {!isPending && (
-              <TouchableOpacity
-                style={[styles.trackBtn, { backgroundColor: C.primary }]}
-                onPress={onOpenTracker}
-              >
-                <ThemedText style={styles.trackTxt}>Track Order</ThemedText>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.trackBtn, { backgroundColor: C.primary }]}
+              onPress={onOpenTracker}
+            >
+              <ThemedText style={styles.trackTxt}>Track Order</ThemedText>
+            </TouchableOpacity>
             )}
           </View>
         ))}
@@ -1612,7 +1612,7 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
                 topBorder
               />
               {!isPending && fee !== null && (
-                <InfoRow left="Delivery fee" right={currency(fee)} topBorder />
+              <InfoRow left="Delivery fee" right={currency(fee)} topBorder />
               )}
               <InfoRow
                 left="Total to pay"
@@ -1656,8 +1656,8 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
               <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
               <ThemedText style={{ color: "#fff", fontWeight: "600", marginLeft: 8 }}>
                 Accept Order
-              </ThemedText>
-            </TouchableOpacity>
+          </ThemedText>
+        </TouchableOpacity>
           </View>
         )}
       </View>

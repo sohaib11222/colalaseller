@@ -111,29 +111,29 @@ const ReviewCard = ({
   return (
     <View style={[styles.card, { backgroundColor: C.card, borderColor: C.line }]}>
       <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
-        {/* Header */}
-        <View style={styles.cardTop}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {item.avatar ? (
-              <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
-                <Ionicons name="person-outline" size={20} color={C.sub} />
-              </View>
-            )}
-            <View>
-              <ThemedText style={[styles.name, { color: C.text }]}>{item.user}</ThemedText>
-              <Stars value={item.rating} color={C.primary} />
+      {/* Header */}
+      <View style={styles.cardTop}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {item.avatar ? (
+            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: C.bg, justifyContent: "center", alignItems: "center" }]}>
+              <Ionicons name="person-outline" size={20} color={C.sub} />
             </View>
+          )}
+          <View>
+            <ThemedText style={[styles.name, { color: C.text }]}>{item.user}</ThemedText>
+            <Stars value={item.rating} color={C.primary} />
           </View>
-          <ThemedText style={[styles.time, { color: C.sub }]}>{item.time}</ThemedText>
         </View>
+        <ThemedText style={[styles.time, { color: C.sub }]}>{item.time}</ThemedText>
+      </View>
 
-        {/* Body */}
-        <ThemedText style={[styles.body, { color: C.text }]}>{item.body}</ThemedText>
+      {/* Body */}
+      <ThemedText style={[styles.body, { color: C.text }]}>{item.body}</ThemedText>
 
-        {/* Optional gallery */}
-        <Gallery images={item.gallery} />
+      {/* Optional gallery */}
+      <Gallery images={item.gallery} />
       </TouchableOpacity>
 
       {/* Seller Reply Display */}
@@ -221,7 +221,7 @@ const ReviewCard = ({
         >
           <Ionicons name="chatbubble-outline" size={18} color={C.primary} style={{ marginRight: 8 }} />
           <ThemedText style={{ color: C.primary, fontWeight: "600" }}>Reply to Review</ThemedText>
-        </TouchableOpacity>
+    </TouchableOpacity>
       )}
     </View>
   );
@@ -694,7 +694,7 @@ export default function MyReviewsScreen() {
               >
                 <Ionicons name="chatbubble-outline" size={18} color={C.primary} style={{ marginRight: 8 }} />
                 <ThemedText style={{ color: C.primary, fontWeight: "600" }}>Reply to Review</ThemedText>
-              </TouchableOpacity>
+            </TouchableOpacity>
             )}
           </View>
         </KeyboardAvoidingView>

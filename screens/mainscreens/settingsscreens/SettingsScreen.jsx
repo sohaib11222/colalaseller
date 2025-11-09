@@ -291,7 +291,7 @@ const SettingsScreen = () => {
   console.log("⏳ Is loading:", isLoading);
   console.log("❌ Has error:", error);
   console.log("🔄 Is refreshing:", refreshing);
-  
+
   // Debug logging for phone requests
   console.log("📱 Phone Requests Data:", phoneRequestsData);
   console.log("📱 Phone Requests Array:", phoneRequests);
@@ -300,8 +300,20 @@ const SettingsScreen = () => {
   console.log("📱 Phone Requests Error:", phoneRequestsError);
 
 
-  // Main section (match screenshot) - useMemo to react to userPlanName changes
-  const menuMain = useMemo(() => [
+  // Main section (match screenshot) - useMemo to react to userPlanName and isSubscriptionActive changes
+  const menuMain = useMemo(() => {
+    // Check if subscription is active (show "Active" if subscribed)
+    // Directly check plan from userPlanData to avoid timing issues
+    const plan = userPlanData?.data?.plan ? (userPlanData.data.plan).toLowerCase() : "";
+    const showActive = plan !== "basic" && plan !== "";
+    
+    // Debug logging
+    console.log("🔍 MenuMain - isSubscriptionActive:", isSubscriptionActive);
+    console.log("🔍 MenuMain - plan from userPlanData:", plan);
+    console.log("🔍 MenuMain - showActive:", showActive);
+    console.log("🔍 MenuMain - userPlanData:", userPlanData);
+    
+    const menuItems = [
     {
       key: "myProducts",
       label: "My Products",
@@ -325,7 +337,7 @@ const SettingsScreen = () => {
       label: "Subscriptions",
       img: require("../../../assets/Vector (12).png"),
       leftColor: "#62E53E",
-      badgeText: userPlanName ? userPlanName : undefined, // Show plan name if available
+      showActiveText: showActive, // Flag to show "Active" as text
     },
     {
       key: "promoted",
@@ -364,7 +376,15 @@ const SettingsScreen = () => {
       img: require("../../../assets/Question.png"),
       leftColor: "#3EC9E5",
     },
-  ], [userPlanName]);
+  ];
+    
+    // Debug logging for subscriptions item
+    const subscriptionsItem = menuItems.find(item => item.key === "subscriptions");
+    console.log("🔍 MenuMain - subscriptionsItem:", subscriptionsItem);
+    console.log("🔍 MenuMain - subscriptionsItem.showActiveText:", subscriptionsItem?.showActiveText);
+    
+    return menuItems;
+  }, [userPlanName, isSubscriptionActive, userPlanData]);
 
   // Others (match screenshot)
   const menuOthers = [
@@ -492,6 +512,22 @@ const SettingsScreen = () => {
     console.log("📋 User Plan Data?.data:", userPlanData?.data);
     console.log("📋 User Plan Data?.data?.plan:", userPlanData?.data?.plan);
     return planName;
+  }, [userPlanData]);
+
+  // Check if subscription is active - show "Active" if plan is not "basic"
+  const isSubscriptionActive = useMemo(() => {
+    if (!userPlanData?.data) {
+      return false;
+    }
+    
+    const plan = (userPlanData?.data?.plan || "").toLowerCase();
+    const isNotBasic = plan !== "basic";
+    
+    console.log("📋 Plan from API:", userPlanData?.data?.plan);
+    console.log("📋 Plan (lowercase):", plan);
+    console.log("📋 Is Not Basic:", isNotBasic);
+    
+    return isNotBasic;
   }, [userPlanData]);
 
   const planTier = useMemo(() => {
@@ -727,24 +763,17 @@ const SettingsScreen = () => {
         {/* Main options */}
         <View style={{ marginTop: 12 }}>
           {menuMain.map((item) => {
-            // Debug logging for subscriptions item
-            if (item.key === "subscriptions") {
-              console.log("🔍 Rendering Subscriptions - badgeText:", item.badgeText);
-              console.log("🔍 Rendering Subscriptions - userPlanName:", userPlanName);
-              console.log("🔍 Rendering Subscriptions - userPlanData:", userPlanData);
-            }
             return (
-              <OptionPillCard
-                key={item.key}
-                label={item.label}
-                img={item.img}
-                leftColor={item.leftColor}
-                badgeImg={item.badgeImg}
-                onPress={() => onPressRow(item.key)}
-                badgeText={item.badgeText}
-                badgeColor={item.badgeColor || C.success}
-                C={C}
-              />
+            <OptionPillCard
+              key={item.key}
+              label={item.label}
+              img={item.img}
+              leftColor={item.leftColor}
+              badgeImg={item.badgeImg}
+              onPress={() => onPressRow(item.key)}
+              showActiveText={item.showActiveText}
+              C={C}
+            />
             );
           })}
         </View>
@@ -762,15 +791,15 @@ const SettingsScreen = () => {
             if (!hasAccess) return null;
             
             return (
-              <OptionPillCard
-                key={item.key}
-                label={item.label}
-                img={item.img}
-                leftColor={item.leftColor}
-                onPress={() => onPressRow(item.key)}
+            <OptionPillCard
+              key={item.key}
+              label={item.label}
+              img={item.img}
+              leftColor={item.leftColor}
+              onPress={() => onPressRow(item.key)}
                 countBadge={item.countBadge}
-                C={C}
-              />
+              C={C}
+            />
             );
           })}
 
@@ -872,7 +901,7 @@ const SettingsScreen = () => {
         onClose={() => {
           setShowAccessDenied(false);
           navigation.goBack();
-        }}
+            }}
         requiredPermission={accessDeniedMessage}
       />
     </SafeAreaView>
@@ -1087,20 +1116,14 @@ const OptionPillCard = ({
   badgeColor = "#22C55E",
   badgeImg, // 👈 NEW
   countBadge, // 👈 For displaying count in left icon area
+  showActiveText, // 👈 Show "Active" as plain text next to label
   C,
 }) => {
-  // Debug logging for countBadge
-  if (label === "Pending Phone Reveal Request") {
-    console.log("🔍 OptionPillCard - label:", label);
-    console.log("🔍 OptionPillCard - countBadge:", countBadge);
-    console.log("🔍 OptionPillCard - countBadge !== undefined:", countBadge !== undefined);
-  }
-  
-  // Debug logging for badgeText
+  // Debug logging
   if (label === "Subscriptions") {
-    console.log("🔍 OptionPillCard - Subscriptions badgeText:", badgeText);
-    console.log("🔍 OptionPillCard - Subscriptions badgeText type:", typeof badgeText);
-    console.log("🔍 OptionPillCard - Subscriptions badgeText truthy:", !!badgeText);
+    console.log("🔍 OptionPillCard - Subscriptions showActiveText:", showActiveText);
+    console.log("🔍 OptionPillCard - Subscriptions showActiveText type:", typeof showActiveText);
+    console.log("🔍 OptionPillCard - Subscriptions showActiveText truthy:", !!showActiveText);
   }
   
   return (
@@ -1119,7 +1142,7 @@ const OptionPillCard = ({
           </View>
         ) : (
           // Display normal icon
-          <Image source={img} style={styles.pillIcon} resizeMode="contain" />
+        <Image source={img} style={styles.pillIcon} resizeMode="contain" />
         )}
       </View>
 
@@ -1129,12 +1152,21 @@ const OptionPillCard = ({
           { backgroundColor: C.white, borderColor: C.border },
         ]}
       >
-        <ThemedText
-          style={[styles.pillLabel, { color: textColor }]}
-          numberOfLines={1}
-        >
-          {label}
-        </ThemedText>
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+          <ThemedText
+            style={[styles.pillLabel, { color: textColor, marginRight: 8 }]}
+            numberOfLines={1}
+          >
+            {label}
+          </ThemedText>
+          {showActiveText && (
+            <ThemedText
+              style={[styles.activeText, { color: C.success }]}
+            >
+              Active
+            </ThemedText>
+          )}
+        </View>
 
         {/* 👇 image tag takes precedence */}
         {badgeImg ? (
@@ -1404,7 +1436,8 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     zIndex: 1,
   },
-  pillLabel: { flex: 1, fontSize: 14, fontWeight: "500" },
+  pillLabel: { fontSize: 14, fontWeight: "500" },
+  activeText: { fontSize: 12, fontWeight: "600" },
 
   badgePill: {
     borderRadius: 999,

@@ -123,6 +123,10 @@ export const updateBoostStatus = async ({ id, payload, token }) => {
   await apiCall(API_ENDPOINTS.SETTINGS.Boost_Status(id), "PATCH", payload, token);
 };
 
+export const deleteBoost = async (id, token) => {
+  return await apiCall(API_ENDPOINTS.SETTINGS.Boost_Delete(id), "DELETE", undefined, token);
+};
+
 export const updateBoost = async ({ id, payload, token }) => {
   return await apiCall(API_ENDPOINTS.SETTINGS.Boost_Update(id), "POST", payload, token);
 };

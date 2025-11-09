@@ -294,9 +294,8 @@ export default function AddServiceScreen({ navigation, route }) {
     category && // category is now an ID (number), so just check if it exists
     priceFrom.trim().length > 0
   ) : (
-    // For create mode, require video and images
-    !!video &&
-    images.length >= 3 &&
+    // For create mode, require at least one image (video is optional)
+    images.length >= 1 &&
     name.trim().length > 0 &&
     category && // category is now an ID (number), so just check if it exists
     priceFrom.trim().length > 0
@@ -311,7 +310,7 @@ export default function AddServiceScreen({ navigation, route }) {
     priceFrom: priceFrom.trim().length > 0,
     video: !!video,
     images: images.length,
-    requiredImages: isEdit ? "N/A" : ">= 3"
+    requiredImages: isEdit ? "N/A" : ">= 1"
   });
 
   // Handle form submission
@@ -637,7 +636,7 @@ export default function AddServiceScreen({ navigation, route }) {
       >
         {/* Video */}
         <ThemedText style={[styles.label, { color: C.text }]}>
-          Upload at least 1 Video of your product
+          Upload1 Video of your Service (optional)
         </ThemedText>
         <View style={{ flexDirection: "row", gap: 12 }}>
           <TouchableOpacity
@@ -710,13 +709,13 @@ export default function AddServiceScreen({ navigation, route }) {
         <PickerField
           label={
             category
-              ? categories.find((cat) => cat.id === category)?.title ||
+              ? serviceCategories.find((cat) => cat.id === parseInt(category))?.title ||
                 "Category"
               : "Category"
           }
           empty={!category}
           onPress={() => {
-            if (categories.length === 0 && !categoriesLoading) {
+            if (serviceCategories.length === 0 && !categoriesLoading) {
               Alert.alert(
                 "Error",
                 "No categories available. Please try again."
@@ -937,8 +936,16 @@ function CategorySheet({
 }) {
   const [q, setQ] = useState("");
 
-  const filter = (list) =>
-    list.filter((s) => s.title.toLowerCase().includes(q.trim().toLowerCase()));
+  // Ensure categories is always an array
+  const safeCategories = useMemo(() => {
+    if (!categories || !Array.isArray(categories)) return [];
+    return categories;
+  }, [categories]);
+
+  const filter = (list) => {
+    if (!list || !Array.isArray(list)) return [];
+    return list.filter((s) => s.title?.toLowerCase().includes(q.trim().toLowerCase()));
+  };
 
   const Row = ({ category }) => (
     <TouchableOpacity
@@ -1025,10 +1032,10 @@ function CategorySheet({
                 Available Categories
               </ThemedText>
               <ScrollView showsVerticalScrollIndicator={false}>
-                {filter(categories).map((category) => (
+                {filter(safeCategories).map((category) => (
                   <Row key={category.id} category={category} />
                 ))}
-                {filter(categories).length === 0 && (
+                {filter(safeCategories).length === 0 && (
                   <ThemedText
                     style={{ color: C.sub, textAlign: "center", marginTop: 20 }}
                   >

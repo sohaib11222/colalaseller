@@ -572,10 +572,17 @@ export default function CouponsPointsScreen({ navigation }) {
 /* ───────────── Coupons UI ───────────── */
 function CouponCard({ C, data, onEdit, onDelete }) {
   const createdDate = new Date(data.created_at);
+  // Format discount: remove decimals and add thousand separators
+  const formatDiscount = (value) => {
+    const numValue = parseFloat(value) || 0;
+    const intValue = Math.floor(numValue); // Remove decimals
+    return intValue.toLocaleString(); // Add thousand separators
+  };
+
   const discountText =
     data.discount_type === "percentage"
-      ? `${data.discount_value}`
-      : `$${data.discount_value}`;
+      ? `${formatDiscount(data.discount_value)}`
+      : `$${formatDiscount(data.discount_value)}`;
 
   return (
     <View
@@ -871,7 +878,7 @@ function CreateCouponModal({
           />
           <Field
             C={C}
-            placeholder="Percentage off"
+            placeholder="Amount off"
             keyboardType="numeric"
             value={percent}
             onChangeText={setPercent}

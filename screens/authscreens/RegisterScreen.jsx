@@ -136,16 +136,23 @@ export default function RegisterStoreScreen() {
     return result;
   };
 
-  // Fetch categories
-  const { data: categoriesData } = useQuery({
+  // Fetch categories (allow without token in case categories are public)
+  const { data: categoriesData, isLoading: categoriesLoading, error: categoriesError } = useQuery({
     queryKey: ["categories", token],
     queryFn: () => getCategories(token),
-    enabled: !!token,
+    enabled: true, // Try to fetch even without token (categories might be public)
+    retry: 2,
   });
 
   // Extract and flatten categories from API response
   const categoriesTree = categoriesData?.data || [];
-  const categories = React.useMemo(() => flattenCategories(categoriesTree), [categoriesTree]);
+  const categories = React.useMemo(() => {
+    console.log("Categories data:", categoriesData);
+    console.log("Categories tree:", categoriesTree);
+    const flattened = flattenCategories(categoriesTree);
+    console.log("Flattened categories:", flattened);
+    return flattened;
+  }, [categoriesTree, categoriesData]);
 
   // Fetch onboarding progress to determine starting point
   const { data: progressData, isLoading: progressLoading } = useQuery({
@@ -1555,11 +1562,26 @@ export default function RegisterStoreScreen() {
           title="Select Category"
           onClose={() => setShowCategory(false)}
         >
-          {categories.length === 0 ? (
+          {categoriesLoading ? (
             <View style={{ padding: 20, alignItems: "center" }}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
               <ThemedText style={{ color: "#6C727A", marginTop: 12 }}>
                 Loading categories...
+              </ThemedText>
+            </View>
+          ) : categoriesError ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <ThemedText style={{ color: "#EF4444", marginBottom: 12 }}>
+                Error loading categories
+              </ThemedText>
+              <ThemedText style={{ color: "#6C727A", fontSize: 12 }}>
+                {categoriesError?.message || "Please try again"}
+              </ThemedText>
+            </View>
+          ) : categories.length === 0 ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <ThemedText style={{ color: "#6C727A" }}>
+                No categories available
               </ThemedText>
             </View>
           ) : (
@@ -1581,7 +1603,7 @@ export default function RegisterStoreScreen() {
                     ]}
                     onPress={() => toggleCategory(categoryId)}
                   >
-                    <ThemedText>{category.title || `Category ${categoryId}`}</ThemedText>
+                    <ThemedText>{category.title || category.name || `Category ${categoryId}`}</ThemedText>
                   </TouchableOpacity>
                 );
               })}

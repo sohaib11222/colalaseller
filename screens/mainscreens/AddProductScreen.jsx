@@ -36,7 +36,7 @@ import { Alert, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { getCategories, getBrands } from "../../utils/queries/general";
 import { updateProduct } from "../../utils/mutations/products";
-import { getCoupons } from "../../utils/queries/settings";
+import { getCoupons, getUserPlan } from "../../utils/queries/settings";
 import { getAddresses, getDeliveries } from "../../utils/queries/seller";
 import { getBulkTemplate } from "../../utils/queries/products";
 
@@ -401,9 +401,9 @@ export default function AddProductScreen({ navigation, route }) {
     const brandSelected = !!brand;
 
     return (
+      !!video &&
       images.length >= 3 &&
       availability.length > 0 &&
-      delivery.length > 0 &&
       allStringsFilled &&
       categorySelected &&
       brandSelected
@@ -413,7 +413,6 @@ export default function AddProductScreen({ navigation, route }) {
     video,
     images,
     availability,
-    delivery,
     name,
     category,
     brand,
@@ -647,6 +646,23 @@ export default function AddProductScreen({ navigation, route }) {
     queryFn: () => getBulkTemplate(token),
     enabled: !!token,
   });
+
+  // Fetch user plan to check if bulk upload should be shown
+  const {
+    data: userPlanData,
+    isLoading: userPlanLoading,
+  } = useQuery({
+    queryKey: ["userPlan", token],
+    queryFn: () => getUserPlan(token),
+    enabled: !!token,
+  });
+
+  // Check if user has access to bulk upload (pro, vip, or gold plans)
+  const hasBulkUploadAccess = useMemo(() => {
+    if (!userPlanData?.data) return false;
+    const planName = (userPlanData.data.plan || "").toLowerCase();
+    return planName.includes("pro") || planName.includes("vip") || planName.includes("gold");
+  }, [userPlanData]);
 
   /* ───────────────────────── submit functions ───────────────────────── */
 
@@ -984,9 +1000,10 @@ export default function AddProductScreen({ navigation, route }) {
         !category ||
         !brand ||
         !fullDesc ||
-        !price
+        !price ||
+        !video
       ) {
-        Alert.alert("Error", "Please fill in all required fields");
+        Alert.alert("Error", "Please fill in all required fields including video");
         return;
       }
     }
@@ -1328,7 +1345,7 @@ export default function AddProductScreen({ navigation, route }) {
       >
         {/* Upload video */}
         <ThemedText style={[styles.label, { color: C.text }]}>
-          Upload Video of your product (Optional)
+          Upload Video of your product <ThemedText style={{ color: "#EF4444" }}>(Required)</ThemedText>
         </ThemedText>
         <View style={{ flexDirection: "row", gap: 12 }}>
           {/* video tile */}
@@ -1662,7 +1679,7 @@ export default function AddProductScreen({ navigation, route }) {
             size={20}
             color={usePoints ? C.primary : C.sub}
           />
-          <ThemedText style={{ color: C.text, marginLeft: 10,fontSize:1 }}>
+          <ThemedText style={{ color: C.text, marginLeft: 10,fontSize:13 }}>
             Buyers can use loyalty points during purchase
           </ThemedText>
         </TouchableOpacity>
@@ -1753,7 +1770,8 @@ export default function AddProductScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
 
-        {/* Bulk upload */}
+        {/* Bulk upload - Only show for pro, vip, or gold plans */}
+        {hasBulkUploadAccess && (
         <View style={[styles.bulkCard, { borderTopColor: C.line }]}>
           <ThemedText style={[styles.blockTitle, { color: C.text }]}>
             Upload several products at once with our bulk template, follow the
@@ -1857,6 +1875,7 @@ export default function AddProductScreen({ navigation, route }) {
             )}
           </TouchableOpacity>
         </View>
+        )}
       </ScrollView>
 
       {/* Sheets */}
@@ -2030,6 +2049,13 @@ function CategoriesSheet({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Reset search when modal closes - MUST be before any conditional returns
+  useEffect(() => {
+    if (!visible) {
+      setSearchQuery("");
+    }
+  }, [visible]);
+
   console.log(
     "CategoriesSheet visible:",
     visible,
@@ -2122,13 +2148,6 @@ function CategoriesSheet({
   const filteredCategories = categories.filter((category) =>
     category.title?.toLowerCase().includes(searchQuery.toLowerCase().trim())
   );
-
-  // Reset search when modal closes
-  useEffect(() => {
-    if (!visible) {
-      setSearchQuery("");
-    }
-  }, [visible]);
 
   return (
     <Modal
@@ -2458,17 +2477,11 @@ function AvailableLocationsSheet({
 
   const [q, setQ] = useState("");
 
-  // Extract addresses from API data
-  const addresses = addressesData?.items || [];
-  
-  // Get unique states for popular (main addresses)
-  const popularStates = addresses
-    .filter(addr => addr.is_main)
-    .map(addr => addr.state);
-  const popular = [...new Set(popularStates)].sort(); // Remove duplicates and sort
-  
   // Use complete list of all Nigerian states
   const allStates = ALL_NIGERIAN_STATES;
+  
+  // "All locations" option (first in the list)
+  const ALL_LOCATIONS_OPTION = "All locations";
 
   const toggle = (opt) => {
     console.log("Location toggle clicked:", opt, "Current selected:", selected);
@@ -2608,32 +2621,27 @@ function AvailableLocationsSheet({
             />
           </View>
 
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
-            Popular
-          </ThemedText>
-          {filter(popular).map((opt, index) => {
-            const checked = selected.includes(opt);
-            return (
-              <TouchableOpacity
-                key={`popular-${opt}-${index}`}
-                onPress={() => toggle(opt)}
-                activeOpacity={0.9}
-                style={[
-                  styles.locationRow,
-                  {
-                    borderColor: checked ? C.primary : C.line,
-                    backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
-                    borderWidth: checked ? 2 : 1,
-                  },
-                ]}
-              >
-                <ThemedText style={{ color: C.text, flex: 1 }}>
-                  {opt}
-                </ThemedText>
-                <Check checked={checked} C={C} />
-              </TouchableOpacity>
-            );
-          })}
+          {/* All locations option */}
+          {(!q.trim() || ALL_LOCATIONS_OPTION.toLowerCase().includes(q.trim().toLowerCase())) && (
+            <TouchableOpacity
+              onPress={() => toggle(ALL_LOCATIONS_OPTION)}
+              activeOpacity={0.9}
+              style={[
+                styles.locationRow,
+                {
+                  borderColor: selected.includes(ALL_LOCATIONS_OPTION) ? C.primary : C.line,
+                  backgroundColor: selected.includes(ALL_LOCATIONS_OPTION) ? "#E3F2FD" : "#F3F4F6",
+                  borderWidth: selected.includes(ALL_LOCATIONS_OPTION) ? 2 : 1,
+                  marginTop: 12,
+                },
+              ]}
+            >
+              <ThemedText style={{ color: C.text, flex: 1 }}>
+                {ALL_LOCATIONS_OPTION}
+              </ThemedText>
+              <Check checked={selected.includes(ALL_LOCATIONS_OPTION)} C={C} />
+            </TouchableOpacity>
+          )}
 
           <ThemedText style={[styles.sheetSection, { color: C.text }]}>
             All States

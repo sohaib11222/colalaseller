@@ -215,12 +215,12 @@ const getPlanPrice = (plan, isAnnual = false) => {
       // VIP: 2 months free (10 months)
       return "₦350,000";
     }
-  } else {
+    } else {
     // Monthly pricing
     if (isBasic) return "₦5,000";
     if (isPro) return "₦15,000";
     if (isVIP) return "₦35,000";
-  }
+    }
   
   // Fallback to plan price from API
   const price = parseFloat(plan.price || 0);
@@ -428,7 +428,7 @@ function PaymentMethodSheet({
                 onFlutterwavePayment();
               } else {
                 // Set payment method and subscribe with the selected method
-                onPaymentMethodSelect(selected);
+              onPaymentMethodSelect(selected);
                 if (onSubscribe) {
                   onSubscribe(selected);
                 }
@@ -575,7 +575,15 @@ export default function SubscriptionScreen() {
       endDate: data.subscription?.end_date,
       daysUntilExpiry: data.days_until_expiry || 0,
       planId: data.subscription?.plan_id,
+      isFreeTrialClaimed: data.is_free_trial_claimed || false,
     };
+  }, [userPlanData]);
+  
+  // Check if user is eligible for free trial (any plan + free trial not claimed)
+  const isEligibleForFreeTrial = useMemo(() => {
+    if (!userPlanData?.data) return false;
+    const isFreeTrialClaimed = userPlanData.data.is_free_trial_claimed || false;
+    return !isFreeTrialClaimed; // Free trial available for any plan if not claimed
   }, [userPlanData]);
 
   // Wallet amount - use shopping_balance like SettingsScreen
@@ -610,8 +618,15 @@ export default function SubscriptionScreen() {
   // Add subscription mutation
   const addSubscriptionMutation = useMutation({
     mutationFn: ({ payload }) => addSubscription(payload, token),
-    onSuccess: (data) => {
-      Alert.alert("Success", "Subscription activated successfully!");
+    onSuccess: (data, variables) => {
+      const isFreeTrial = variables?.payload?.payment_method === "wallet" && isEligibleForFreeTrial;
+      Alert.alert(
+        "Success", 
+        isFreeTrial 
+          ? "Free trial activated successfully! Enjoy 30 days of premium features." 
+          : "Subscription activated successfully!"
+      );
+      refetchUserPlan(); // Refetch to update is_free_trial_claimed
       refetchSubscription();
       refetchBalance();
       setShowPay(false);
@@ -651,6 +666,20 @@ export default function SubscriptionScreen() {
           ]
         );
         setShowPay(false);
+        return;
+      }
+      
+      // Handle free trial for any plan (if not claimed)
+      if (isEligibleForFreeTrial) {
+        // Use wallet payment method for free trial
+        const payload = {
+          plan_id: selectedPlan.id,
+          payment_method: "wallet",
+          billing_period: "monthly", // Free trial is monthly
+          amount: 0, // Free trial has no cost
+        };
+        
+        addSubscriptionMutation.mutate({ payload });
         return;
       }
       
@@ -1012,7 +1041,7 @@ export default function SubscriptionScreen() {
                         <View style={styles.planPriceHeaderRow}>
                           <ThemedText style={styles.planPriceHeaderText}>
                             {plan.name || "Basic"}
-                          </ThemedText>
+              </ThemedText>
                         </View>
 
                         {/* Plan Features */}
@@ -1033,8 +1062,8 @@ export default function SubscriptionScreen() {
                               ) : value === "Yes" ? (
                                 <View style={styles.checkIcon}>
                                   <Ionicons name="checkmark" size={12} color="#fff" />
-                                </View>
-                              ) : (
+            </View>
+          ) : (
                                 <ThemedText style={styles.planFeatureValue}>
                                   {value}
                                 </ThemedText>
@@ -1071,6 +1100,12 @@ export default function SubscriptionScreen() {
                 ? getAnnualPrice(selectedPlan)
                 : getMonthlyPrice(selectedPlan);
               const isFreePlan = planPrice === 0 || selectedPlan.name?.toLowerCase().includes("free");
+              
+              // Handle free trial - no payment method selection needed
+              if (isEligibleForFreeTrial) {
+                handleSubscribe("wallet");
+                return;
+              }
               
               if (isFreePlan) {
                 Alert.alert(
@@ -1113,6 +1148,12 @@ export default function SubscriptionScreen() {
                       Subscription Active
                     </ThemedText>
                   </View>
+                );
+              } else if (isEligibleForFreeTrial) {
+                return (
+                  <ThemedText style={styles.ctaButtonText}>
+                    Start Free Trial - 30 Days
+                  </ThemedText>
                 );
               } else if (isFreePlan) {
                 return (

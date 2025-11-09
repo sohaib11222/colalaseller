@@ -28,7 +28,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const LoginScreen = () => {
   const navigation = useNavigation();
-  const { login: authLogin } = useAuth();
+  const { login: authLogin, token } = useAuth();
 
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [email, setEmail] = useState("");
@@ -320,8 +320,8 @@ const styles = StyleSheet.create({
   },
   sellerText: {
     color: "#fff",
-    fontSize: 13,
-    marginLeft: -30,
+    fontSize: 11,
+    marginLeft: 0,
     marginBottom: 15,
     textAlign: "center",
   },

@@ -193,10 +193,23 @@ export default function StoreHomeScreen() {
     },
   });
 
-  /* -------- check if renewal is needed -------- */
+  /* -------- check if renewal is needed or free trial is available -------- */
   useEffect(() => {
     if (userPlanData?.data) {
       const planData = userPlanData.data;
+      const isFreeTrialClaimed = planData.is_free_trial_claimed || false;
+      
+      // Check if user is eligible for free trial (any plan + free trial not claimed)
+      if (!isFreeTrialClaimed) {
+        console.log("🆓 Free trial available - navigating to subscription");
+        // Navigate to subscription page for free trial
+        navigation.navigate("ChatNavigator", {
+          screen: "Subscription",
+        });
+        return;
+      }
+      
+      // If free trial is already claimed, check for renewal
       const needsRenewal = planData.needs_renewal || false;
       const endDate = planData.subscription?.end_date;
       const isExpired = planData.is_expired || false;
@@ -221,7 +234,7 @@ export default function StoreHomeScreen() {
         setShowRenewalModal(true);
       }
     }
-  }, [userPlanData]);
+  }, [userPlanData, navigation]);
 
   // Debug: Log the API response to see what data we're getting
   useEffect(() => {

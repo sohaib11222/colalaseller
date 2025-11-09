@@ -471,7 +471,7 @@ export default function StoreBuilderScreen() {
             label="Upload profile Banner"
           />
 
-          <ThemedText
+          {/* <ThemedText
             style={[styles.smallLabel, { color: C.sub, marginTop: 10 }]}
           >
             Upload promotional banner for your store
@@ -486,7 +486,7 @@ export default function StoreBuilderScreen() {
             uri={promoBannerUri}
             onPress={() => pickImage(setPromoBannerUri, [16, 6])}
             label="Upload promotional Banner"
-          />
+          /> */}
 
           {/* brand color */}
           <ThemedText
