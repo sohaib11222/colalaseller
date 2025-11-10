@@ -290,6 +290,22 @@ export default function StoreProfileModal({
          store.profile_image, store.banner_image
      Anything missing stays hardcoded (e.g., "Open Now" schedule text)
   */
+  // Check if banner_image exists and is not empty/null
+  // Also check if it's not a default/placeholder image path
+  const bannerValue = storeApi.banner_image;
+  const hasBanner = !!(bannerValue && 
+    typeof bannerValue === 'string' && 
+    bannerValue.trim() !== '' &&
+    !bannerValue.includes('Rectangle 30') && // Exclude default placeholder
+    !bannerValue.includes('registermain') && // Exclude registration placeholder
+    !bannerValue.includes('Frame 253')); // Exclude promo placeholder
+  
+  // Debug logging
+  console.log('[StoreProfileModal] Banner check:', {
+    banner_image: bannerValue,
+    hasBanner,
+    type: typeof bannerValue
+  });
   const store = {
     name: storeApi.name || "Not set", // API
     email: storeApi.email || "Not set", // API
@@ -298,9 +314,9 @@ export default function StoreProfileModal({
     avatar:
       toFileUrl(storeApi.profile_image) ||
       require("../assets/Ellipse 18.png"),
-    cover:
-      toFileUrl(storeApi.banner_image) ||
-      require("../assets/Rectangle 30.png"),
+    cover: hasBanner
+      ? toFileUrl(storeApi.banner_image)
+      : null,
   };
 
   // stats (present in API)
@@ -322,10 +338,7 @@ export default function StoreProfileModal({
     return first || "";
   }, [storeApi?.permotaional_banners]);
 
-  const promoSource = promoUrl
-    ? { uri: promoUrl }
-    : PROMO_BY_COLOR[(theme?.colors?.primary || "").toUpperCase()] ||
-      PROMO_FALLBACK;
+  const hasPromoBanner = !!promoUrl;
 
   /* tabs */
   const [tab, setTab] = useState("Products");
@@ -1920,10 +1933,30 @@ export default function StoreProfileModal({
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Cover */}
           <View style={styles.coverWrap}>
-            <Image
-              source={src(store.cover) || require("../assets/Rectangle 30.png")}
-              style={styles.cover}
-            />
+            {hasBanner ? (
+              <Image
+                source={src(store.cover)}
+                style={styles.cover}
+              />
+            ) : (
+              <TouchableOpacity
+                style={styles.bannerPlaceholder}
+                onPress={() => {
+                  onClose();
+                  navigation.navigate("ChatNavigator", {
+                    screen: "Announcements",
+                  });
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={styles.bannerPlaceholderTitle}>
+                  Store banner goes here
+                </ThemedText>
+                <ThemedText style={styles.bannerPlaceholderSubtitle}>
+                  Go announcements to create one
+                </ThemedText>
+              </TouchableOpacity>
+            )}
             <View style={styles.topBar}>
               <TouchableOpacity onPress={onClose} style={styles.circleBtn}>
                 <Ionicons name="chevron-back" size={20} color="#fff" />
@@ -2126,12 +2159,32 @@ export default function StoreProfileModal({
 
           {/* Promo image (theme aware) */}
           <View style={{ marginHorizontal: 16, marginTop: 12 }}>
-            <View style={{ borderRadius: 20, overflow: "hidden" }}>
-              <Image
-                source={promoSource}
-                style={{ width: "100%", height: 170 }}
-              />
-            </View>
+            {hasPromoBanner ? (
+              <View style={{ borderRadius: 20, overflow: "hidden" }}>
+                <Image
+                  source={{ uri: promoUrl }}
+                  style={{ width: "100%", height: 170 }}
+                />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.promoPlaceholder}
+                onPress={() => {
+                  onClose();
+                  navigation.navigate("ChatNavigator", {
+                    screen: "Announcements",
+                  });
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={styles.promoPlaceholderTitle}>
+                  Store banner goes here
+                </ThemedText>
+                <ThemedText style={styles.promoPlaceholderSubtitle}>
+                  Go announcements to create one
+                </ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Action buttons */}
@@ -2381,6 +2434,53 @@ export default function StoreProfileModal({
 const styles = StyleSheet.create({
   coverWrap: { position: "relative" },
   cover: { width, height: COVER_H },
+  bannerPlaceholder: {
+    width,
+    height: COVER_H,
+    backgroundColor: "#F5F6F8",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  bannerPlaceholderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#6C727A",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  bannerPlaceholderSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  promoPlaceholder: {
+    width: "100%",
+    height: 170,
+    borderRadius: 20,
+    backgroundColor: "#F5F6F8",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  promoPlaceholderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#6C727A",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  promoPlaceholderSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
   topBar: {
     position: "absolute",
     top: 10,

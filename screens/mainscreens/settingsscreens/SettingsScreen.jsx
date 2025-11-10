@@ -28,6 +28,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useRoleAccess } from "../../../hooks/useRoleAccess";
 import AccessDeniedModal from "../../../components/AccessDeniedModal";
+import { getProgress } from "../../../utils/queries/seller";
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -149,6 +150,28 @@ const SettingsScreen = () => {
     },
   });
 
+  // Fetch onboarding progress to check if complete
+  const {
+    data: progressData,
+    isLoading: progressLoading,
+  } = useQuery({
+    queryKey: ["onboardingProgress", token],
+    queryFn: () => {
+      console.log("🚀 Executing getProgress API call with token:", token);
+      return getProgress(token);
+    },
+    enabled: !!token,
+    staleTime: 30_000,
+    onSuccess: (data) => {
+      console.log("✅ Progress API call successful:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Progress API call failed:", error);
+    },
+  });
+
+  const isOnboardingComplete = progressData?.is_complete === true;
+
   // Fetch phone visibility data using React Query
   const {
     data: phoneVisibilityData,
@@ -261,6 +284,7 @@ const SettingsScreen = () => {
     escrowData?.data?.locked_balance || balanceData?.data?.escrow_balance || 0; // Use locked_balance from escrow wallet, fallback to escrow_balance
   const rewardBalance = balanceData?.data?.reward_balance || 0;
   const loyaltyPoints = balanceData?.data?.loyality_points || 0;
+  const adCredit = balanceData?.data?.ad_credit || 0;
 
   // Calculate pending phone requests count
   const phoneRequests = phoneRequestsData?.data?.requests || [];
@@ -288,6 +312,7 @@ const SettingsScreen = () => {
   console.log("🔒 Escrow balance (from escrow wallet):", escrowBalance);
   console.log("🎁 Reward balance:", rewardBalance);
   console.log("⭐ Loyalty points:", loyaltyPoints);
+  console.log("📢 Ad Credit:", adCredit);
   console.log("⏳ Is loading:", isLoading);
   console.log("❌ Has error:", error);
   console.log("🔄 Is refreshing:", refreshing);
@@ -610,7 +635,7 @@ const SettingsScreen = () => {
                 ? {
                     uri: `https://colala.hmstech.xyz/storage/${user.store.profile_image}`,
                   }
-                : { uri: "https://i.pravatar.cc/100?img=8" }
+                : require("../../../assets/profile_placeholder.png")
             }
             style={[styles.profileImg, { borderColor: "#ffffff66" }]}
           />
@@ -619,9 +644,11 @@ const SettingsScreen = () => {
               <ThemedText style={[styles.name, { color: C.white }]}>
                 {user?.store?.store_name || user?.full_name || "Store Name"}
               </ThemedText>
-              <View style={styles.verifyPill}>
-                <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
-              </View>
+              {isOnboardingComplete && (
+                <View style={styles.verifyPill}>
+                  <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
+                </View>
+              )}
             </View>
             <View style={styles.locationRow}>
               <ThemedText style={[styles.locationText, { color: C.white }]}>
@@ -672,6 +699,40 @@ const SettingsScreen = () => {
           >
             <ThemedText style={styles.viewWalletText}>View Wallet</ThemedText>
           </TouchableOpacity>
+        </View>
+        
+        {/* Ad Credit and Plan Name */}
+        <View style={[styles.adCreditCard, { backgroundColor: C.white }]}>
+          <View style={{ flex: 1 }}>
+            <View style={styles.adCreditRow}>
+              <ThemedText style={[styles.adCreditLabel, { color: C.sub }]}>
+                Ad Credit
+              </ThemedText>
+              {isLoading ? (
+                <ActivityIndicator size="small" color={C.primary} />
+              ) : error ? (
+                <ThemedText style={[styles.adCreditValue, { color: C.danger }]}>
+                  Error
+                </ThemedText>
+              ) : (
+                <ThemedText style={[styles.adCreditValue, { color: C.text }]}>
+                  ₦{parseFloat(adCredit).toLocaleString()}
+                </ThemedText>
+              )}
+            </View>
+            <View style={[styles.planNameRow, { marginTop: 8 }]}>
+              <ThemedText style={[styles.planNameLabel, { color: C.sub }]}>
+                Plan
+              </ThemedText>
+              {userPlanLoading ? (
+                <ActivityIndicator size="small" color={C.primary} />
+              ) : (
+                <ThemedText style={[styles.planNameValue, { color: C.text }]}>
+                  {userPlanName || "Basic"}
+                </ThemedText>
+              )}
+            </View>
+          </View>
         </View>
         <TouchableOpacity
           style={[styles.holdingBar, { backgroundColor: "#FF6B6B" }]}
@@ -1301,6 +1362,45 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingBottom: 25,
+  },
+  
+  /* Ad Credit Card */
+  adCreditCard: {
+    padding: 16,
+    marginTop: -10,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  adCreditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  adCreditLabel: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  adCreditValue: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  planNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  planNameLabel: {
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  planNameValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    textTransform: "capitalize",
   },
 
   // Loading overlay styles

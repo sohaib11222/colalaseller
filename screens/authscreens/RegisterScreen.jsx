@@ -730,8 +730,8 @@ export default function RegisterStoreScreen() {
   };
 
   const handleUploadDocuments = () => {
-    if (!ninSlipUri || !cacCertUri) {
-      Alert.alert("Error", "Please upload both NIN slip and CAC certificate");
+    if (!ninSlipUri) {
+      Alert.alert("Error", "Please upload your NIN slip");
       return;
     }
 
@@ -741,11 +741,15 @@ export default function RegisterStoreScreen() {
       type: "image/jpeg",
       name: "nin_document.jpg",
     });
-    formData.append("cac_document", {
-      uri: cacCertUri,
-      type: "image/jpeg",
-      name: "cac_document.jpg",
-    });
+    
+    // CAC document is optional - only append if provided
+    if (cacCertUri) {
+      formData.append("cac_document", {
+        uri: cacCertUri,
+        type: "image/jpeg",
+        name: "cac_document.jpg",
+      });
+    }
 
     uploadDocumentsMutation.mutate(formData);
   };
@@ -1276,7 +1280,7 @@ export default function RegisterStoreScreen() {
                   </TouchableOpacity>
 
                   <ThemedText style={[styles.sectionTitle, { marginTop: 18 }]}>
-                    Upload a copy of your CAC Certificate
+                    Upload a copy of your CAC Certificate <ThemedText style={{ color: "#6C727A", fontSize: 12 }}>(Optional)</ThemedText>
                   </ThemedText>
                   <TouchableOpacity
                     style={styles.docPicker}

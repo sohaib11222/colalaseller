@@ -28,13 +28,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getUserPlan, getBalance } from "../../utils/queries/settings";
 import { addSubscription } from "../../utils/mutations/settings";
 import { useAuth } from "../../contexts/AuthContext";
+import { getProgress } from "../../utils/queries/seller";
 const { width } = Dimensions.get("window");
 
 /* ---------- assets ---------- */
 const ASSETS = {
-  topAvatar: require("../../assets/Ellipse 18.png"),
+  topAvatar: require("../../assets/profile_placeholder.png"),
   cover: require("../../assets/Rectangle 30.png"),
-  owner: require("../../assets/Ellipse 18.png"),
+  owner: require("../../assets/profile_placeholder.png"),
   stats_qty: require("../../assets/shop.png"),
   stats_followers: require("../../assets/profile-2user.png"),
   stats_rating: require("../../assets/star.png"),
@@ -45,6 +46,7 @@ const ASSETS = {
   tile_stats: require("../../assets/Vector (28).png"),
   tile_sub: require("../../assets/Vector (29).png"),
   tile_inventory: require("../../assets/Vector (30).png"),
+  tile_visitors: require("../../assets/Vector (11).png"),
 };
 
 /* helpers */
@@ -169,6 +171,22 @@ export default function StoreHomeScreen() {
     enabled: !!token && showRenewalModal,
     staleTime: 10_000,
   });
+
+  /* -------- fetch onboarding progress to check if complete -------- */
+  const {
+    data: progressData,
+    isLoading: progressLoading,
+  } = useQuery({
+    queryKey: ["onboardingProgress"],
+    queryFn: async () => {
+      const token = await getToken();
+      return await getProgress(token);
+    },
+    enabled: !!token,
+    staleTime: 30_000,
+  });
+
+  const isOnboardingComplete = progressData?.is_complete === true;
 
   const walletAmount = useMemo(() => {
     return Number(balanceData?.data?.shopping_balance || 0);
@@ -340,7 +358,7 @@ export default function StoreHomeScreen() {
         })(),
       },
       profile_image: apiStore.profile_image || null,
-      banner_image: apiStore.banner_image || null, // header cover
+      banner_image: (apiStore.banner_image && typeof apiStore.banner_image === 'string' && apiStore.banner_image.trim() !== '') ? apiStore.banner_image : null, // header cover
       theme_color: pick(apiStore.theme_color, placeholders.theme_color, "theme_color"),
       banners: Array.isArray(apiStore.banners) ? apiStore.banners : [],
     };
@@ -363,9 +381,26 @@ export default function StoreHomeScreen() {
   const headerAvatarSource = store.profile_image
     ? { uri: store.profile_image }
     : ASSETS.topAvatar;
-  const coverSource = store.banner_image
-    ? { uri: store.banner_image }
-    : ASSETS.cover;
+  // Check if banner_image exists and is not empty/null/undefined
+  // Also check if it's not a default/placeholder image path
+  const bannerValue = store.banner_image;
+  const isBannerValid = !!(bannerValue && 
+    typeof bannerValue === 'string' && 
+    bannerValue.trim() !== '' &&
+    !bannerValue.includes('Rectangle 30') && // Exclude default placeholder
+    !bannerValue.includes('registermain') && // Exclude registration placeholder
+    !bannerValue.includes('Frame 253')); // Exclude promo placeholder
+  
+  // Debug logging
+  console.log('[HomeScreen] Banner check:', {
+    banner_image: bannerValue,
+    hasBanner: isBannerValid,
+    type: typeof bannerValue
+  });
+  
+  const hasBanner = isBannerValid;
+  
+  const coverSource = hasBanner ? { uri: store.banner_image } : null;
   const ownerAvatarSource = store.profile_image
     ? { uri: store.profile_image }
     : ASSETS.owner;
@@ -378,9 +413,7 @@ export default function StoreHomeScreen() {
     return found || "";
   }, [store.banners]);
 
-  const promoBannerSource = firstBannerUrl
-    ? { uri: firstBannerUrl }
-    : ASSETS.promo_fallback;
+  const hasPromoBanner = !!firstBannerUrl;
 
   /* -------- fetch latest orders (show only 3) -------- */
   const { data: latest3, isLoading: ordersLoading } = useQuery({
@@ -539,7 +572,26 @@ export default function StoreHomeScreen() {
         <View style={styles.card}>
           {/* cover image */}
           <View style={styles.coverWrap}>
-            <Image source={coverSource} style={styles.coverImg} />
+            {hasBanner ? (
+              <Image source={coverSource} style={styles.coverImg} />
+            ) : (
+              <TouchableOpacity
+                style={styles.bannerPlaceholder}
+                onPress={() =>
+                  navigation.navigate("ChatNavigator", {
+                    screen: "Announcements",
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <ThemedText style={styles.bannerPlaceholderTitle}>
+                  Store banner goes here
+                </ThemedText>
+                <ThemedText style={styles.bannerPlaceholderSubtitle}>
+                  Go announcements to create one
+                </ThemedText>
+              </TouchableOpacity>
+            )}
             <Image source={ownerAvatarSource} style={styles.ownerAvatar} />
           </View>
 
@@ -573,10 +625,12 @@ export default function StoreHomeScreen() {
           {/* name + verified */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <ThemedText style={styles.title}>{store.name}</ThemedText>
-            <Image
-              source={require("../../assets/SealCheck.png")}
-              style={styles.iconImg}
-            />
+            {isOnboardingComplete && (
+              <Image
+                source={require("../../assets/SealCheck.png")}
+                style={styles.iconImg}
+              />
+            )}
           </View>
 
           {/* contact rows */}
@@ -694,11 +748,30 @@ export default function StoreHomeScreen() {
         </View>
 
         {/* promo now uses the first item in store.banners[] */}
-        <Image
-          source={promoBannerSource}
-          style={styles.promoFull}
-          resizeMode="cover"
-        />
+        {hasPromoBanner ? (
+          <Image
+            source={{ uri: firstBannerUrl }}
+            style={styles.promoFull}
+            resizeMode="cover"
+          />
+        ) : (
+          <TouchableOpacity
+            style={styles.promoPlaceholder}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Announcements",
+              })
+            }
+            activeOpacity={0.8}
+          >
+            <ThemedText style={styles.promoPlaceholderTitle}>
+              Store banner goes here
+            </ThemedText>
+            <ThemedText style={styles.promoPlaceholderSubtitle}>
+              Go announcements to create one
+            </ThemedText>
+          </TouchableOpacity>
+        )}
 
         {/* --- Menu tiles grid --- */}
         <View style={styles.grid}>
@@ -758,6 +831,18 @@ export default function StoreHomeScreen() {
             onPress={() =>
               navigation.navigate("ChatNavigator", {
                 screen: "Inventory",
+              })
+            }
+          />
+
+          <MenuTile
+            img={ASSETS.tile_visitors}
+            title="Store Visitors"
+            subtitle={"View and track visitors to your store"}
+            color={theme.colors.primary}
+            onPress={() =>
+              navigation.navigate("ChatNavigator", {
+                screen: "Visitors",
               })
             }
           />
@@ -985,7 +1070,7 @@ function MenuTile({ img, title, subtitle, color, onPress }) {
   return (
     <TouchableOpacity style={styles.tile} onPress={onPress} activeOpacity={0.9}>
       <View style={[styles.tileIconCircle, { backgroundColor: "#FFF1F1" }]}>
-        <Image source={img} style={styles.tileImg} />
+        <Image source={img} style={[styles.tileImg, { tintColor: color }]} />
       </View>
       <ThemedText style={[styles.tileTitle, { color }]}>{title}</ThemedText>
       <ThemedText style={styles.tileSub}>{subtitle}</ThemedText>
@@ -1071,6 +1156,31 @@ const styles = StyleSheet.create({
     height: "100%",
     borderTopRightRadius: CARD_RADIUS,
     borderTopLeftRadius: CARD_RADIUS,
+  },
+  bannerPlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderTopRightRadius: CARD_RADIUS,
+    borderTopLeftRadius: CARD_RADIUS,
+    backgroundColor: "#F5F6F8",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  bannerPlaceholderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#6C727A",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  bannerPlaceholderSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
   },
   ownerAvatar: {
     position: "absolute",
@@ -1160,6 +1270,32 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignSelf: "center",
     marginTop: 16,
+  },
+  promoPlaceholder: {
+    width: width - 32,
+    height: 170,
+    borderRadius: 20,
+    backgroundColor: "#F5F6F8",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginTop: 16,
+    paddingHorizontal: 20,
+  },
+  promoPlaceholderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#6C727A",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  promoPlaceholderSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
   },
 
   sectionHeader: {

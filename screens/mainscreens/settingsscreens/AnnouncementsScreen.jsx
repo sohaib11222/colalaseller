@@ -645,11 +645,17 @@ function BannerCard({ C, data, onEdit, onDelete }) {
       </View>
       <View style={[styles.row, { marginBottom: 8 }]}>
         <ThemedText style={styles.kvLabel}>Link</ThemedText>
-        <TouchableOpacity onPress={() => Linking.openURL(data.link)} activeOpacity={0.8}>
-          <ThemedText style={{ color: "#E53935" }} numberOfLines={1}>
-            {data.link}
+        {data.link ? (
+          <TouchableOpacity onPress={() => Linking.openURL(data.link)} activeOpacity={0.8}>
+            <ThemedText style={{ color: "#E53935" }} numberOfLines={1}>
+              {data.link}
+            </ThemedText>
+          </TouchableOpacity>
+        ) : (
+          <ThemedText style={{ color: "#9AA0A6" }} numberOfLines={1}>
+            No link provided
           </ThemedText>
-        </TouchableOpacity>
+        )}
       </View>
 
       <View style={{ flexDirection: "row", gap: 8 }}>
@@ -705,11 +711,11 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C, isLoading
         type: 'image/jpeg',
         name: 'banner.jpg',
       });
-      formData.append('link', link);
+      formData.append('link', link || '');
       onSave(formData);
     } else {
-      // For editing without new image, just send the link
-      onSave({ link });
+      // For editing without new image, just send the link (can be empty)
+      onSave({ link: link || '' });
     }
   };
 
@@ -745,7 +751,7 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C, isLoading
 
           <View style={[styles.inputWrap, { backgroundColor: "#fff", borderColor: "#EAECF0" }]}>
             <TextInput
-              placeholder="Banner Link"
+              placeholder="Banner Link (Optional)"
               placeholderTextColor="#9AA0A6"
               value={link}
               onChangeText={setLink}
@@ -762,11 +768,11 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C, isLoading
               styles.primaryBtn, 
               { 
                 backgroundColor: C.primary,
-                opacity: (!imageUri || !link.trim() || isLoading) ? 0.6 : 1
+                opacity: (!imageUri || isLoading) ? 0.6 : 1
               }
             ]}
             onPress={handleSave}
-            disabled={!imageUri || !link.trim() || isLoading}
+            disabled={!imageUri || isLoading}
           >
             {isLoading ? (
               <ActivityIndicator size="small" color="white" />
