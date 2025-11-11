@@ -11,6 +11,7 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ThemedText from "../../../components/ThemedText";
@@ -53,7 +54,7 @@ const OrdersScreen = ({ navigation }) => {
     card: "#fff",
   };
 
-  const [tab, setTab] = useState("pending"); // 'pending' | 'all' | 'rejected'
+  const [tab, setTab] = useState("pending"); // 'pending' | 'in_process' | 'all' | 'rejected'
   const [q, setQ] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -178,9 +179,34 @@ const OrdersScreen = ({ navigation }) => {
         (order, index, self) => index === self.findIndex((o) => o.id === order.id)
       );
 
-      return { newRows, completedRows, rejectedRows: uniqueRejectedRows };
+      // Filter in-process orders (accepted, paid, out_for_delivery, placed - but not delivered, not rejected, not pending_acceptance)
+      const inProcessStatuses = ["accepted", "paid", "out_for_delivery", "placed"];
+      const inProcessFromNew = Array.isArray(root?.new_orders?.data)
+        ? root.new_orders.data
+            .filter((it) => {
+              const status = it?.status?.toLowerCase() || "";
+              return inProcessStatuses.includes(status) && status !== "rejected" && status !== "pending_acceptance";
+            })
+            .map((it) => mapItem(it, "in_process"))
+        : [];
+      
+      const inProcessFromCompleted = Array.isArray(root?.completed_orders?.data)
+        ? root.completed_orders.data
+            .filter((it) => {
+              const status = it?.status?.toLowerCase() || "";
+              return inProcessStatuses.includes(status) && status !== "rejected" && status !== "delivered";
+            })
+            .map((it) => mapItem(it, "in_process"))
+        : [];
+
+      const allInProcessRows = [...inProcessFromNew, ...inProcessFromCompleted];
+      const uniqueInProcessRows = allInProcessRows.filter(
+        (order, index, self) => index === self.findIndex((o) => o.id === order.id)
+      );
+
+      return { newRows, completedRows, rejectedRows: uniqueRejectedRows, inProcessRows: uniqueInProcessRows };
     },
-    enabled: tab === "all" || tab === "rejected",
+    enabled: tab === "all" || tab === "rejected" || tab === "in_process",
     staleTime: 30_000,
   });
 
@@ -194,8 +220,8 @@ const OrdersScreen = ({ navigation }) => {
         await refetchPending();
       } else {
         await refetch();
-        if (tab === "rejected") {
-          await refetchPending(); // Also refresh pending to get any rejected orders
+        if (tab === "rejected" || tab === "in_process") {
+          await refetchPending(); // Also refresh pending to get any rejected/in-process orders
         }
       }
       console.log("✅ Orders data refreshed successfully");
@@ -210,14 +236,17 @@ const OrdersScreen = ({ navigation }) => {
   const listNew = apiData?.newRows ?? [];
   const listCompleted = apiData?.completedRows ?? [];
   const listRejected = apiData?.rejectedRows ?? [];
+  const listInProcess = apiData?.inProcessRows ?? [];
   const listPending = pendingData ?? [];
-  const allOrders = [...listNew, ...listCompleted, ...listRejected];
+  const allOrders = [...listNew, ...listCompleted, ...listRejected, ...listInProcess];
 
   // Search by customer name and order number
   const source = tab === "pending" 
     ? listPending 
     : tab === "rejected" 
     ? listRejected 
+    : tab === "in_process"
+    ? listInProcess
     : allOrders;
   const orders = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -357,7 +386,12 @@ const OrdersScreen = ({ navigation }) => {
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsWrap}>
+      <View style={styles.tabsContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsWrap}
+        >
         <TouchableOpacity
           onPress={() => setTab("pending")}
           style={[
@@ -367,6 +401,18 @@ const OrdersScreen = ({ navigation }) => {
         >
           <ThemedText style={[styles.tabTxt, { color: tab === "pending" ? "#fff" : "#6B7280" }]}>
             Pending
+          </ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setTab("in_process")}
+          style={[
+            styles.tabBtn,
+            tab === "in_process" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
+          ]}
+        >
+          <ThemedText style={[styles.tabTxt, { color: tab === "in_process" ? "#fff" : "#6B7280" }]}>
+            In Process
           </ThemedText>
         </TouchableOpacity>
 
@@ -393,12 +439,13 @@ const OrdersScreen = ({ navigation }) => {
             Rejected
           </ThemedText>
         </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {/* List */}
-      {(tab === "pending" ? pendingLoading : tab === "rejected" ? isLoading : isLoading) && !(tab === "pending" ? pendingData : tab === "rejected" ? apiData : apiData) ? (
+      {(tab === "pending" ? pendingLoading : tab === "rejected" || tab === "in_process" ? isLoading : isLoading) && !(tab === "pending" ? pendingData : tab === "rejected" || tab === "in_process" ? apiData : apiData) ? (
         <LoadingState />
-      ) : (tab === "pending" ? pendingError : tab === "rejected" ? error : error) ? (
+      ) : (tab === "pending" ? pendingError : tab === "rejected" || tab === "in_process" ? error : error) ? (
         <ErrorState />
       ) : (
         <FlatList
@@ -408,8 +455,8 @@ const OrdersScreen = ({ navigation }) => {
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           contentContainerStyle={{ 
             paddingHorizontal: 12, 
+            paddingTop: 8,
             paddingBottom: 24,
-            flexGrow: 1 
           }}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -429,6 +476,8 @@ const OrdersScreen = ({ navigation }) => {
                   ? "No pending orders at the moment. Check back later!" 
                   : tab === "rejected"
                   ? "No rejected orders found."
+                  : tab === "in_process"
+                  ? "No orders in process at the moment."
                   : "No orders yet. Complete some orders to see them here!"
               }
             />
@@ -446,7 +495,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: Platform.OS === "android" ? 60 : 8,
-    paddingBottom: 18,
+    paddingBottom: 0,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -472,22 +521,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 14,
   },
   searchInput: { flex: 1, fontSize: 14, color: "#101318", marginRight: 8 },
 
-  tabsWrap: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 13,
+  tabsContainer: {
     paddingTop: 14,
     paddingBottom: 20,
   },
+  tabsWrap: {
+    flexDirection: "row",
+    paddingHorizontal: 13,
+  },
   tabBtn: {
-    flex: 1,
     height: 40,
     borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 16,
+    marginRight: 8,
   },
   tabTxt: { fontWeight: "700", fontSize: 10 },
 

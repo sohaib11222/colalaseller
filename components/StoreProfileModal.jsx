@@ -2026,7 +2026,7 @@ export default function StoreProfileModal({
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                 <Ionicons name="star" size={14} color={C.primary} />
                 <ThemedText style={{ color: "#000", fontSize: 12, fontWeight: "700" }}>
-                  {Number(statsRating) > 0 ? statsRating : "Not set"}
+                  {Number(statsRating) > 0 ? statsRating : "0"}
                 </ThemedText>
               </View>
             </View>
@@ -2117,7 +2117,7 @@ export default function StoreProfileModal({
                         {s.label}
                       </ThemedText>
                       <ThemedText style={styles.statValue}>
-                        {Number(s.value) > 0 ? s.value : "Not set"}
+                        {Number(s.value) > 0 ? s.value :0}
                       </ThemedText>
                     </View>
                   </View>

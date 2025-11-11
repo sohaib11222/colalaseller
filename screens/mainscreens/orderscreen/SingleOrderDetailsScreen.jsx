@@ -853,6 +853,45 @@ function TrackOrderModal({
                     },
                   ]}
                 >
+                  <ThemedText style={{ color: C.text }}>
+                    Payment status
+                  </ThemedText>
+                  <View
+                    style={{
+                      backgroundColor:
+                        (detail?.order?.payment_status || detail?.payment_status || "pending")?.toLowerCase() === "paid"
+                          ? "#10B981"
+                          : "#EF4444",
+                      paddingHorizontal: 12,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <ThemedText
+                      style={{
+                        color: "#FFFFFF",
+                        fontSize: 12,
+                        fontWeight: "600",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {(detail?.order?.payment_status || detail?.payment_status || "pending")?.toLowerCase() === "paid"
+                        ? "Paid"
+                        : "Not Paid"}
+                    </ThemedText>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
                   <ThemedText style={{ color: C.text, fontWeight: "700" }}>
                     Total
                   </ThemedText>
@@ -1427,14 +1466,18 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
       ]}
     >
       <ThemedText style={{ color: C.text }}>{left}</ThemedText>
-      <ThemedText
-        style={[
-          { color: C.text },
-          strongRight && { color: C.primary, fontWeight: "800" },
-        ]}
-      >
-        {right}
-      </ThemedText>
+      {typeof right === "string" || typeof right === "number" ? (
+        <ThemedText
+          style={[
+            { color: C.text },
+            strongRight && { color: C.primary, fontWeight: "800" },
+          ]}
+        >
+          {right}
+        </ThemedText>
+      ) : (
+        right
+      )}
     </View>
   );
 
@@ -1590,6 +1633,41 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
               <InfoRow
                 left="Order ID"
                 right={detail?.order?.order_no || String(detail?.id || "—")}
+              />
+              <InfoRow
+                left="Payment method"
+                right={detail?.order?.payment_method || detail?.payment_method || "Shopping Wallet"}
+                topBorder
+              />
+              <InfoRow
+                left="Payment status"
+                right={
+                  <View
+                    style={{
+                      backgroundColor:
+                        (detail?.order?.payment_status || detail?.payment_status || "pending")?.toLowerCase() === "paid"
+                          ? "#10B981"
+                          : "#EF4444",
+                      paddingHorizontal: 12,
+                      paddingVertical: 4,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <ThemedText
+                      style={{
+                        color: "#FFFFFF",
+                        fontSize: 12,
+                        fontWeight: "600",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {(detail?.order?.payment_status || detail?.payment_status || "pending")?.toLowerCase() === "paid"
+                        ? "Paid"
+                        : "Not Paid"}
+                    </ThemedText>
+                  </View>
+                }
+                topBorder
               />
               <InfoRow
                 left="No it items"

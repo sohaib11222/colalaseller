@@ -23,20 +23,39 @@ import { getToken } from "../../../utils/tokenStorage";
 import { getLeaderboardSellers } from "../../../utils/queries/leaderboard";
 import { API_DOMAIN } from "../../../apiConfig";
 
-// Helper function to construct full file URLs
-const fileUrl = (path) => {
-  if (!path) {
-    console.log('fileUrl: No path provided');
-    return null;
+// Helper function to construct full file URLs (same as HomeScreen)
+const API_BASE = API_DOMAIN.replace(/\/api\/?$/, ""); // -> https://colala.hmstech.xyz
+const toAbs = (p) => {
+  if (!p) return "";
+  if (typeof p !== "string") p = String(p || "");
+
+  // already absolute
+  if (/^https?:\/\//i.test(p)) return p;
+
+  // normalize (strip leading slashes)
+  const clean = p.replace(/^\/+/, "");
+
+  // common backend returns:
+  //   - "banners/…"
+  //   - "stores/banner_images/…"
+  //   - "stores/profile_images/…"
+  //   - "storage/…"
+  // public URLs live under /storage/*
+  if (
+    clean.startsWith("banners/") ||
+    clean.startsWith("stores/") ||
+    clean.startsWith("store/") // just in case
+  ) {
+    return `${API_BASE}/storage/${clean}`;
   }
-  if (path.startsWith('http')) {
-    console.log('fileUrl: Already full URL:', path);
-    return path;
+
+  // if backend already included "storage/…"
+  if (clean.startsWith("storage/")) {
+    return `${API_BASE}/${clean}`;
   }
-  const fullUrl = `${API_DOMAIN.replace('/api', '')}/${path}`;
-  console.log('fileUrl: Generated URL:', fullUrl, 'from path:', path);
-  console.log('fileUrl: API_DOMAIN:', API_DOMAIN);
-  return fullUrl;
+
+  // last resort
+  return `${API_BASE}/${clean}`;
 };
 
 // Enable LayoutAnimation on Android
@@ -66,7 +85,7 @@ const OTHERS = [
 
 // ---------- Avatar primitives ----------
 const resolveSource = (src) => {
-  // src can be a local require() (number) or a remote string
+  // src can be a local require() (number), a remote string, or an object with uri
   console.log('resolveSource called with:', src, 'type:', typeof src);
   if (typeof src === "number") {
     console.log('resolveSource: returning local require');
@@ -75,6 +94,10 @@ const resolveSource = (src) => {
   if (typeof src === "string") {
     console.log('resolveSource: returning URI object for:', src);
     return { uri: src };
+  }
+  if (src && typeof src === "object" && src.uri) {
+    console.log('resolveSource: already has uri property');
+    return src;
   }
   console.log('resolveSource: returning null');
   return null;
@@ -124,7 +147,7 @@ const PodiumAvatar = ({ src, size = 84 }) => {
           <AvatarImage 
             src={src}
             style={{ width: "100%", height: "100%" }}
-            fallbackSrc={require("../../../assets/Ellipse 18.png")}
+            fallbackSrc={require("../../../assets/profile_placeholder.png")}
           />
         </View>
       </View>
@@ -155,7 +178,7 @@ const ListAvatar = ({ src, size = 44 }) => {
           <AvatarImage 
             src={src}
             style={{ width: "100%", height: "100%" }}
-            fallbackSrc={require("../../../assets/Ellipse 18.png")}
+            fallbackSrc={require("../../../assets/profile_placeholder.png")}
           />
         </View>
       </View>
@@ -303,12 +326,17 @@ export default function LeaderboardScreen() {
     const processedData = data.map((store, index) => {
       // Use real store profile image from API
       let avatarUrl = null;
-      if (store.profile_image) {
-        avatarUrl = fileUrl(store.profile_image);
-        console.log(`Store ${store.store_name} - Using real image: ${avatarUrl}`);
-      } else {
-        // Only use fallback if no image is provided
-        avatarUrl = require("../../../assets/Ellipse 18.png");
+      // Check multiple possible field names for profile image
+      const profileImage = store.profile_image || store.store_profile_image || store.image || store.avatar;
+      if (profileImage && typeof profileImage === 'string' && profileImage.trim() !== '') {
+        const imageUrl = toAbs(profileImage);
+        avatarUrl = imageUrl || null;
+        console.log(`Store ${store.store_name} - Using real image: ${imageUrl}`);
+      }
+      
+      // Only use fallback if no valid image is provided
+      if (!avatarUrl) {
+        avatarUrl = require("../../../assets/profile_placeholder.png");
         console.log(`Store ${store.store_name} - No image, using fallback`);
       }
       
@@ -330,7 +358,7 @@ export default function LeaderboardScreen() {
         id: `placeholder-${processedData.length}`,
         name: "No Store",
         score: 0,
-        avatar: require("../../../assets/Ellipse 18.png"),
+        avatar: require("../../../assets/profile_placeholder.png"),
         followers: 0,
         rating: 0,
       });
@@ -344,14 +372,20 @@ export default function LeaderboardScreen() {
     const processedOthers = currentData.map((store, index) => {
       // Use real store profile image from API
       let avatarUrl = null;
-      if (store.profile_image) {
-        avatarUrl = fileUrl(store.profile_image);
-        console.log(`Others Store ${store.store_name} - Using real image: ${avatarUrl}`);
-      } else {
-        // Only use fallback if no image is provided
-        avatarUrl = require("../../../assets/Ellipse 18.png");
+      // Check multiple possible field names for profile image
+      const profileImage = store.profile_image || store.store_profile_image || store.image || store.avatar;
+      if (profileImage && typeof profileImage === 'string' && profileImage.trim() !== '') {
+        const imageUrl = toAbs(profileImage);
+        avatarUrl = imageUrl || null;
+        console.log(`Others Store ${store.store_name} - Using real image: ${imageUrl}`);
+      }
+      
+      // Only use fallback if no valid image is provided
+      if (!avatarUrl) {
+        avatarUrl = require("../../../assets/profile_placeholder.png");
         console.log(`Others Store ${store.store_name} - No image, using fallback`);
       }
+      
       return {
         id: store.store_id.toString(),
         name: store.store_name,
