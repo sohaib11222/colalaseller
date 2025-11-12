@@ -28,3 +28,10 @@ export const getStoreCategories = async (token) =>
 
 export const getCatalogCategories = async (token) =>
     await apiCall(API_ENDPOINTS.SELLER.CatalogCategories, "GET", undefined, token);
+
+// Disputes
+export const getDisputes = async (token) =>
+    await apiCall(API_ENDPOINTS.SELLER.Disputes_List, "GET", undefined, token);
+
+export const getDisputeDetails = async (id, token) =>
+    await apiCall(API_ENDPOINTS.SELLER.Dispute_Details(id), "GET", undefined, token);

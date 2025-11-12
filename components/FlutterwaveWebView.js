@@ -12,7 +12,7 @@ const FlutterwaveWebView = ({ route, navigation }) => {
     const handleWebViewMessage = async (event) => {
         try {
             const data = JSON.parse(event.nativeEvent.data);
-
+            console.log('🔍 WebView message:', data);
             if (data.event === 'success') {
                 console.log('✅ Payment Success:', data.data);
 

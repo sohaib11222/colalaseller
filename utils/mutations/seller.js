@@ -77,3 +77,12 @@ export const submitHelpRequest = async (payload, token) =>
 // Submit Onboarding (no body)
 export const submitOnboarding = async (token) =>
   await apiCall(API_ENDPOINTS.SELLER.Submit, "POST", undefined, token);
+
+// Disputes
+// payload = FormData with message (string) and/or image (file)
+export const sendDisputeMessage = async (id, payload, token) =>
+  await apiCall(API_ENDPOINTS.SELLER.Dispute_Send_Message(id), "POST", payload, token);
+
+// Mark dispute messages as read
+export const markDisputeRead = async (id, token) =>
+  await apiCall(API_ENDPOINTS.SELLER.Dispute_Mark_Read(id), "POST", undefined, token);

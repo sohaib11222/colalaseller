@@ -37,7 +37,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getCategories, getBrands } from "../../utils/queries/general";
 import { updateProduct } from "../../utils/mutations/products";
 import { getCoupons, getUserPlan } from "../../utils/queries/settings";
-import { getAddresses, getDeliveries } from "../../utils/queries/seller";
+import { getDeliveries } from "../../utils/queries/seller";
 import { getBulkTemplate } from "../../utils/queries/products";
 
 // handles: require(number) | string uri | { uri }
@@ -82,39 +82,10 @@ const buildVariantSummary = (details, selectedColors, selectedSizes) => {
   // Add debugging
   console.log("buildVariantSummary called with:", {
     details,
-    selectedColors,
     selectedSizes,
     hasDetails: !!details,
-    hasColor: !!details?.color,
     hasSize: !!details?.size,
   });
-
-  if (details?.color) {
-    Object.entries(details.color).forEach(([hex, v]) => {
-      if (!selectedColors.includes(hex)) return;
-
-      // Safe access to variant data
-      const variantData = v || {};
-      const images = variantData.images || [];
-
-      console.log(`Processing color variant ${hex}:`, {
-        variantData,
-        images,
-        price: variantData.price,
-        compare: variantData.compare,
-      });
-
-      items.push({
-        kind: "Color",
-        key: `c-${hex}`,
-        token: hex,
-        price: variantData.price || "—",
-        compare: variantData.compare || "—",
-        image: images[0] || null, // keep object; toSrc handles it
-        count: Math.max(0, images.length - 1),
-      });
-    });
-  }
 
   if (details?.size) {
     Object.entries(details.size).forEach(([s, v]) => {
@@ -148,11 +119,13 @@ const buildVariantSummary = (details, selectedColors, selectedSizes) => {
 };
 
 // Small, shared UI to render rows
-const VariantSummaryList = ({ items, C }) => (
+const VariantSummaryList = ({ items, C, onPress }) => (
   <View style={{ marginTop: 12, gap: 10 }}>
     {items.map((it) => (
-      <View
+      <TouchableOpacity
         key={it.key}
+        onPress={onPress}
+        activeOpacity={0.7}
         style={[
           styles.summaryRow,
           { borderColor: "#E5E7EB", backgroundColor: "#fff" },
@@ -228,7 +201,7 @@ const VariantSummaryList = ({ items, C }) => (
             </ThemedText>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     ))}
   </View>
 );
@@ -318,6 +291,36 @@ export default function AddProductScreen({ navigation, route }) {
       setReferralFee(productData.referral_fee?.toString() || "");
       setReferralPersonLimit(productData.referral_person_limit?.toString() || "");
 
+      // Load key points (tags)
+      console.log("🔍 Loading tags from productData:", {
+        tags: productData.tags,
+        tag1: productData.tag1,
+        tag2: productData.tag2,
+        tag3: productData.tag3,
+      });
+      
+      if (productData.tags && Array.isArray(productData.tags)) {
+        setTag1(productData.tags[0] || "");
+        setTag2(productData.tags[1] || "");
+        setTag3(productData.tags[2] || "");
+        console.log("✅ Loaded tags from array:", {
+          tag1: productData.tags[0] || "",
+          tag2: productData.tags[1] || "",
+          tag3: productData.tags[2] || "",
+        });
+      } else if (productData.tag1 || productData.tag2 || productData.tag3) {
+        setTag1(productData.tag1 || "");
+        setTag2(productData.tag2 || "");
+        setTag3(productData.tag3 || "");
+        console.log("✅ Loaded tags from individual fields:", {
+          tag1: productData.tag1 || "",
+          tag2: productData.tag2 || "",
+          tag3: productData.tag3 || "",
+        });
+      } else {
+        console.log("ℹ️ No tags found in productData");
+      }
+
       // Handle images
       if (productData.images && productData.images.length > 0) {
         const imageUris = productData.images.map((img) => ({
@@ -331,6 +334,89 @@ export default function AddProductScreen({ navigation, route }) {
         setVideo({
           uri: `https://colala.hmstech.xyz/storage/${productData.video}`,
         });
+      }
+
+      // Load variants if they exist
+      // API returns "variations" not "variants", and images are linked via variant_id
+      const variations = productData.variations || productData.variants || [];
+      const allImages = productData.images || [];
+      
+      console.log("🔍 Checking for variants in productData:", {
+        hasVariants: productData.has_variants,
+        variations: variations,
+        variationsType: typeof variations,
+        variationsIsArray: Array.isArray(variations),
+        variationsLength: variations?.length,
+        allImages: allImages,
+        fullProductData: productData,
+      });
+
+      if (variations && Array.isArray(variations) && variations.length > 0) {
+        console.log("✅ Loading variants from productData:", variations);
+        
+        // Extract unique sizes from variations
+        const sizes = [];
+        const sizeMap = {};
+        
+        variations.forEach((variant) => {
+          console.log("Processing variant:", variant);
+          if (variant.size) {
+            const size = variant.size;
+            if (!sizes.includes(size)) {
+              sizes.push(size);
+            }
+            
+            // Build size map with price, compare (discount_price), and images
+            // Images are in separate array, linked by variant_id
+            if (!sizeMap[size]) {
+              // Find images for this variant (matching variant_id)
+              const variantImages = allImages
+                .filter((img) => img.variant_id === variant.id)
+                .map((img) => {
+                  const imagePath = img.path || img;
+                  return {
+                    uri: imagePath.startsWith('http') 
+                      ? imagePath 
+                      : `https://colala.hmstech.xyz/storage/${imagePath}`,
+                  };
+                });
+              
+              sizeMap[size] = {
+                price: variant.price || "",
+                compare: variant.discount_price || "",
+                colors: [],
+                images: variantImages,
+              };
+              
+              console.log(`Size ${size} mapped with ${variantImages.length} images`);
+            }
+          }
+        });
+
+        console.log("📦 Processed variant data:", {
+          sizes,
+          sizeMap,
+        });
+
+        // Set variant types and sizes
+        if (sizes.length > 0) {
+          setVariantTypes(["Size"]);
+          setVariantSizes(sizes);
+          setVariantDetailData({ color: {}, size: sizeMap });
+          setUseDefaultVariantPricing(false);
+          console.log("✅ Variants loaded successfully:", {
+            variantTypes: ["Size"],
+            variantSizes: sizes,
+            variantDetailData: { color: {}, size: sizeMap },
+          });
+        }
+      } else if (productData.has_variants) {
+        // Product has variants but they might not be loaded yet
+        // Set variant types to indicate variants exist
+        console.log("⚠️ Product has_variants=true but variations array is missing or empty");
+        setVariantTypes(["Size"]);
+      } else {
+        console.log("ℹ️ No variants found in productData");
       }
     }
   }, [isEditMode, productData]);
@@ -351,9 +437,7 @@ export default function AddProductScreen({ navigation, route }) {
   const [brandOpen, setBrandOpen] = useState(false);
 
   // locations
-  const [availability, setAvailability] = useState([]); // e.g. ["Lagos State", "Oyo State"]
   const [delivery, setDelivery] = useState([]); // array of {key,state,area,price,free}
-  const [availOpen, setAvailOpen] = useState(false);
   const [delivOpen, setDelivOpen] = useState(false);
 
   // API data for addresses and deliveries (using query data directly)
@@ -403,7 +487,6 @@ export default function AddProductScreen({ navigation, route }) {
     return (
       !!video &&
       images.length >= 3 &&
-      availability.length > 0 &&
       allStringsFilled &&
       categorySelected &&
       brandSelected
@@ -412,7 +495,6 @@ export default function AddProductScreen({ navigation, route }) {
     isEditMode,
     video,
     images,
-    availability,
     name,
     category,
     brand,
@@ -614,17 +696,6 @@ export default function AddProductScreen({ navigation, route }) {
     enabled: !!token,
   });
 
-  // Fetch addresses
-  const {
-    data: addressesData,
-    isLoading: addressesLoading,
-    error: addressesError,
-  } = useQuery({
-    queryKey: ["addresses", token],
-    queryFn: () => getAddresses(token),
-    enabled: !!token,
-  });
-
   // Fetch deliveries
   const {
     data: deliveriesData,
@@ -702,6 +773,24 @@ export default function AddProductScreen({ navigation, route }) {
       formData.append("referral_person_limit", parseInt(referralPersonLimit) || 1);
     }
 
+    // Add key points (tags)
+    console.log("📝 Adding tags to FormData:", { tag1, tag2, tag3 });
+    if (tag1 && tag1.trim() !== "") {
+      formData.append("tag1", tag1.trim());
+      console.log("✅ Added tag1 to FormData:", tag1.trim());
+    }
+    if (tag2 && tag2.trim() !== "") {
+      formData.append("tag2", tag2.trim());
+      console.log("✅ Added tag2 to FormData:", tag2.trim());
+    }
+    if (tag3 && tag3.trim() !== "") {
+      formData.append("tag3", tag3.trim());
+      console.log("✅ Added tag3 to FormData:", tag3.trim());
+    }
+    if (!tag1 && !tag2 && !tag3) {
+      console.log("ℹ️ No tags to add (all empty)");
+    }
+
     // Add loyalty points if applicable
     if (usePoints) {
       formData.append("loyality_points_applicable", "1");
@@ -743,85 +832,66 @@ export default function AddProductScreen({ navigation, route }) {
       }
     });
 
-    // Add variants if they exist
-    if (variantTypes.length > 0 && variantDetailData) {
-      console.log("Adding variants to FormData:", variantDetailData);
+    // Add variants if they exist - only size variants
+    // Check all conditions: variantTypes, variantDetailData, variantSizes must all exist
+    const hasVariants = variantTypes.length > 0 && variantDetailData && variantSizes.length > 0 && variantDetailData.size;
+    
+    if (hasVariants) {
+      console.log("Adding variants to FormData:", {
+        variantTypes,
+        variantSizes,
+        variantDetailData,
+      });
 
-      // Process color variants
-      if (variantDetailData.color) {
-        Object.entries(variantDetailData.color).forEach(
-          ([colorHex, colorData], index) => {
-            if (variantColors.includes(colorHex)) {
-              formData.append(
-                `variants[${index}][sku]`,
-                `${name.trim()}-${colorHex}`
-              );
-              formData.append(`variants[${index}][color]`, colorHex);
-              formData.append(
-                `variants[${index}][price]`,
-                (colorData.price || price).toString()
-              );
-              formData.append(
-                `variants[${index}][discount_price]`,
-                (colorData.compare || discountPrice).toString()
-              );
-              formData.append(`variants[${index}][stock]`, "100"); // Default stock
+      // Process size variants only - use proper index counter
+      let variantIndex = 0;
+      Object.entries(variantDetailData.size).forEach(
+        ([size, sizeData]) => {
+          // Only include sizes that are in variantSizes (user selected)
+          if (variantSizes.includes(size)) {
+            formData.append(
+              `variants[${variantIndex}][sku]`,
+              `${name.trim()}-${size}`
+            );
+            formData.append(`variants[${variantIndex}][size]`, size);
+            formData.append(
+              `variants[${variantIndex}][price]`,
+              (sizeData.price || price).toString()
+            );
+            formData.append(
+              `variants[${variantIndex}][discount_price]`,
+              (sizeData.compare || discountPrice).toString()
+            );
+            formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
 
-              // Add variant images if they exist
-              if (colorData.images && colorData.images.length > 0) {
-                colorData.images.forEach((image, imgIndex) => {
-                  if (image?.uri) {
-                    formData.append(`variants[${index}][images][]`, {
-                      uri: image.uri,
-                      type: "image/jpeg",
-                      name: `variant_${colorHex}_${imgIndex}.jpg`,
-                    });
-                  }
-                });
-              }
-            }
-          }
-        );
-      }
-
-      // Process size variants
-      if (variantDetailData.size) {
-        Object.entries(variantDetailData.size).forEach(
-          ([size, sizeData], index) => {
-            if (variantSizes.includes(size)) {
-              const variantIndex =
-                Object.keys(variantDetailData.color || {}).length + index;
-              formData.append(
-                `variants[${variantIndex}][sku]`,
-                `${name.trim()}-${size}`
-              );
-              formData.append(`variants[${variantIndex}][size]`, size);
-              formData.append(
-                `variants[${variantIndex}][price]`,
-                (sizeData.price || price).toString()
-              );
-              formData.append(
-                `variants[${variantIndex}][discount_price]`,
-                (sizeData.compare || discountPrice).toString()
-              );
-              formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
-
-              // Add variant images if they exist
-              if (sizeData.images && sizeData.images.length > 0) {
-                sizeData.images.forEach((image, imgIndex) => {
-                  if (image?.uri) {
+            // Add variant images if they exist (only local files, not remote URLs)
+            if (sizeData.images && sizeData.images.length > 0) {
+              sizeData.images.forEach((image, imgIndex) => {
+                if (image?.uri) {
+                  // Only send local file URIs, skip remote URLs (they're already on server)
+                  const isLocalFile = !image.uri.startsWith('http://') && !image.uri.startsWith('https://');
+                  if (isLocalFile) {
                     formData.append(`variants[${variantIndex}][images][]`, {
                       uri: image.uri,
                       type: "image/jpeg",
                       name: `variant_${size}_${imgIndex}.jpg`,
                     });
                   }
-                });
-              }
+                }
+              });
             }
+            variantIndex++;
           }
-        );
-      }
+        }
+      );
+      console.log(`✅ Added ${variantIndex} variants to FormData`);
+    } else {
+      console.log("❌ No variants to add:", {
+        variantTypesLength: variantTypes.length,
+        hasVariantDetailData: !!variantDetailData,
+        variantSizesLength: variantSizes.length,
+        hasSizeData: !!variantDetailData?.size,
+      });
     }
 
     return formData;
@@ -863,6 +933,18 @@ export default function AddProductScreen({ navigation, route }) {
       formData.append("referral_person_limit", parseInt(referralPersonLimit) || 1);
     }
 
+    // Add key points (tags)
+    // For update, always send tags (even if empty) so backend can clear them if needed
+    console.log("📝 Adding tags to FormData (update):", { tag1, tag2, tag3 });
+    formData.append("tag1", (tag1 && tag1.trim() !== "") ? tag1.trim() : "");
+    formData.append("tag2", (tag2 && tag2.trim() !== "") ? tag2.trim() : "");
+    formData.append("tag3", (tag3 && tag3.trim() !== "") ? tag3.trim() : "");
+    console.log("✅ Added tags to FormData (update):", {
+      tag1: (tag1 && tag1.trim() !== "") ? tag1.trim() : "(empty)",
+      tag2: (tag2 && tag2.trim() !== "") ? tag2.trim() : "(empty)",
+      tag3: (tag3 && tag3.trim() !== "") ? tag3.trim() : "(empty)",
+    });
+
     // Add loyalty points if applicable
     if (usePoints) {
       formData.append("loyality_points_applicable", "1");
@@ -904,85 +986,66 @@ export default function AddProductScreen({ navigation, route }) {
       }
     });
 
-    // Add variants if they exist
-    if (variantTypes.length > 0 && variantDetailData) {
-      console.log("Adding variants to FormData:", variantDetailData);
+    // Add variants if they exist - only size variants
+    // Check all conditions: variantTypes, variantDetailData, variantSizes must all exist
+    const hasVariants = variantTypes.length > 0 && variantDetailData && variantSizes.length > 0 && variantDetailData.size;
+    
+    if (hasVariants) {
+      console.log("Adding variants to FormData:", {
+        variantTypes,
+        variantSizes,
+        variantDetailData,
+      });
 
-      // Process color variants
-      if (variantDetailData.color) {
-        Object.entries(variantDetailData.color).forEach(
-          ([colorHex, colorData], index) => {
-            if (variantColors.includes(colorHex)) {
-              formData.append(
-                `variants[${index}][sku]`,
-                `${name.trim()}-${colorHex}`
-              );
-              formData.append(`variants[${index}][color]`, colorHex);
-              formData.append(
-                `variants[${index}][price]`,
-                (colorData.price || price).toString()
-              );
-              formData.append(
-                `variants[${index}][discount_price]`,
-                (colorData.compare || discountPrice).toString()
-              );
-              formData.append(`variants[${index}][stock]`, "100"); // Default stock
+      // Process size variants only - use proper index counter
+      let variantIndex = 0;
+      Object.entries(variantDetailData.size).forEach(
+        ([size, sizeData]) => {
+          // Only include sizes that are in variantSizes (user selected)
+          if (variantSizes.includes(size)) {
+            formData.append(
+              `variants[${variantIndex}][sku]`,
+              `${name.trim()}-${size}`
+            );
+            formData.append(`variants[${variantIndex}][size]`, size);
+            formData.append(
+              `variants[${variantIndex}][price]`,
+              (sizeData.price || price).toString()
+            );
+            formData.append(
+              `variants[${variantIndex}][discount_price]`,
+              (sizeData.compare || discountPrice).toString()
+            );
+            formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
 
-              // Add variant images if they exist
-              if (colorData.images && colorData.images.length > 0) {
-                colorData.images.forEach((image, imgIndex) => {
-                  if (image?.uri) {
-                    formData.append(`variants[${index}][images][]`, {
-                      uri: image.uri,
-                      type: "image/jpeg",
-                      name: `variant_${colorHex}_${imgIndex}.jpg`,
-                    });
-                  }
-                });
-              }
-            }
-          }
-        );
-      }
-
-      // Process size variants
-      if (variantDetailData.size) {
-        Object.entries(variantDetailData.size).forEach(
-          ([size, sizeData], index) => {
-            if (variantSizes.includes(size)) {
-              const variantIndex =
-                Object.keys(variantDetailData.color || {}).length + index;
-              formData.append(
-                `variants[${variantIndex}][sku]`,
-                `${name.trim()}-${size}`
-              );
-              formData.append(`variants[${variantIndex}][size]`, size);
-              formData.append(
-                `variants[${variantIndex}][price]`,
-                (sizeData.price || price).toString()
-              );
-              formData.append(
-                `variants[${variantIndex}][discount_price]`,
-                (sizeData.compare || discountPrice).toString()
-              );
-              formData.append(`variants[${variantIndex}][stock]`, "100"); // Default stock
-
-              // Add variant images if they exist
-              if (sizeData.images && sizeData.images.length > 0) {
-                sizeData.images.forEach((image, imgIndex) => {
-                  if (image?.uri) {
+            // Add variant images if they exist (only local files, not remote URLs)
+            if (sizeData.images && sizeData.images.length > 0) {
+              sizeData.images.forEach((image, imgIndex) => {
+                if (image?.uri) {
+                  // Only send local file URIs, skip remote URLs (they're already on server)
+                  const isLocalFile = !image.uri.startsWith('http://') && !image.uri.startsWith('https://');
+                  if (isLocalFile) {
                     formData.append(`variants[${variantIndex}][images][]`, {
                       uri: image.uri,
                       type: "image/jpeg",
                       name: `variant_${size}_${imgIndex}.jpg`,
                     });
                   }
-                });
-              }
+                }
+              });
             }
+            variantIndex++;
           }
-        );
-      }
+        }
+      );
+      console.log(`✅ Added ${variantIndex} variants to FormData`);
+    } else {
+      console.log("❌ No variants to add:", {
+        variantTypesLength: variantTypes.length,
+        hasVariantDetailData: !!variantDetailData,
+        variantSizesLength: variantSizes.length,
+        hasSizeData: !!variantDetailData?.size,
+      });
     }
 
     return formData;
@@ -1613,18 +1676,29 @@ export default function AddProductScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Add Variants section */}
+        {/* Add/Edit Variants section */}
         <ThemedText
           style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}
         >
-          Add Variants (*)
+          {isEditMode ? "Edit Variants" : "Add Variants"} (*)
         </ThemedText>
         <ThemedText style={{ color: C.sub, fontSize: 11, marginBottom: 8 }}>
-          Variants include colors and size.
+          Variants include size variations.
         </ThemedText>
         <PickerField
-          label="Add New Variant"
-          empty
+          label={
+            screenVariantSummary.length > 0
+              ? isEditMode
+                ? "Edit Variants"
+                : "Edit Variants"
+              : "Add New Variant"
+          }
+          empty={screenVariantSummary.length === 0}
+          subLabel={
+            screenVariantSummary.length > 0
+              ? `${screenVariantSummary.length} variant${screenVariantSummary.length > 1 ? "s" : ""} configured`
+              : undefined
+          }
           onPress={() => setVariantOpen(true)}
           C={C}
         />
@@ -1632,19 +1706,44 @@ export default function AddProductScreen({ navigation, route }) {
         {/* Show selected variants summary below the input */}
         {screenVariantSummary.length > 0 && (
           <>
-            <VariantSummaryList items={screenVariantSummary} C={C} />
-            <TouchableOpacity
-              onPress={() => {
-                setVariantDetailData(null);
-                setVariantTypes([]);
-                setVariantColors([]);
-                setVariantSizes([]);
-              }}
-              style={{ alignSelf: "flex-end", marginTop: 6 }}
-              activeOpacity={0.8}
+            <ThemedText
+              style={{ color: C.sub, fontSize: 11, marginTop: 8, marginBottom: 4 }}
             >
-              <ThemedText style={{ color: C.primary }}>Delete All</ThemedText>
-            </TouchableOpacity>
+              Tap on variants below to edit them
+            </ThemedText>
+            <VariantSummaryList
+              items={screenVariantSummary}
+              C={C}
+              onPress={() => setVariantOpen(true)}
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 8,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setVariantOpen(true)}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={{ color: C.primary, fontWeight: "600" }}>
+                  Edit Variants
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setVariantDetailData(null);
+                  setVariantTypes([]);
+                  setVariantColors([]);
+                  setVariantSizes([]);
+                }}
+                activeOpacity={0.8}
+              >
+                <ThemedText style={{ color: "#EF4444" }}>Delete All</ThemedText>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -1714,21 +1813,6 @@ export default function AddProductScreen({ navigation, route }) {
           value={tag3}
           onChangeText={setTag3}
           placeholder="Information tag 3 (optional)"
-          C={C}
-          style={{ marginTop: 10 }}
-        />
-
-        {/* Availability locations */}
-        <PickerField
-          label="Availability locations"
-          subLabel={
-            availability.length ? `${availability.length} Selected` : undefined
-          }
-          empty={availability.length === 0}
-          onPress={() => {
-            console.log("Opening availability modal");
-            setAvailOpen(true);
-          }}
           C={C}
           style={{ marginTop: 10 }}
         />
@@ -1925,30 +2009,13 @@ export default function AddProductScreen({ navigation, route }) {
       />
 
       {/* Location sheets */}
-      <AvailableLocationsSheet
-        C={C}
-        visible={availOpen}
-        onClose={() => {
-          console.log("Closing availability modal");
-          setAvailOpen(false);
-        }}
-        selected={availability}
-        setSelected={setAvailability}
-        addressesData={addressesData}
-        isLoading={addressesLoading}
-        error={addressesError}
-      />
       <DeliveryPriceSheet
         C={C}
         visible={delivOpen}
         onClose={() => setDelivOpen(false)}
         selected={delivery}
         setSelected={setDelivery}
-        statesSource={
-          availability.length
-            ? availability
-            : ALL_NIGERIAN_STATES
-        }
+        statesSource={ALL_NIGERIAN_STATES}
         deliveriesData={deliveriesData}
         isLoading={deliveriesLoading}
         error={deliveriesError}
@@ -1961,8 +2028,6 @@ export default function AddProductScreen({ navigation, route }) {
         onClose={() => setVariantOpen(false)}
         selectedTypes={variantTypes}
         setSelectedTypes={setVariantTypes}
-        selectedColors={variantColors}
-        setSelectedColors={setVariantColors}
         selectedSizes={variantSizes}
         setSelectedSizes={setVariantSizes}
         useDefault={useDefaultVariantPricing}
@@ -2464,235 +2529,6 @@ const ALL_NIGERIAN_STATES = [
   "Zamfara State",
 ];
 
-function AvailableLocationsSheet({
-  visible,
-  onClose,
-  selected,
-  setSelected,
-  C,
-  addressesData,
-  isLoading,
-  error,
-}) {
-  console.log(
-    "AvailableLocationsSheet visible:",
-    visible,
-    "selected:",
-    selected
-  );
-
-  const [q, setQ] = useState("");
-
-  // Use complete list of all Nigerian states
-  const allStates = ALL_NIGERIAN_STATES;
-  
-  // "All locations" option (first in the list)
-  const ALL_LOCATIONS_OPTION = "All locations";
-
-  const toggle = (opt) => {
-    console.log("Location toggle clicked:", opt, "Current selected:", selected);
-    setSelected((prev) => {
-      const newSelection = prev.includes(opt)
-        ? prev.filter((x) => x !== opt)
-        : [...prev, opt];
-      console.log("New location selection:", newSelection);
-      return newSelection;
-    });
-  };
-
-  const filter = (list) =>
-    list.filter((s) => s.toLowerCase().includes(q.trim().toLowerCase()));
-
-  // Handle loading state
-  if (isLoading) {
-    return (
-      <Modal
-        visible={visible}
-        animationType="slide"
-        transparent
-        onRequestClose={onClose}
-      >
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <View style={{ flex: 1 }}>
-                <ThemedText
-                  font="oleo"
-                  style={[styles.sheetTitle, { color: C.text }]}
-                >
-                  Select Available Location
-                </ThemedText>
-              </View>
-              <TouchableOpacity
-                onPress={onClose}
-                style={[styles.sheetClose, { borderColor: C.line }]}
-              >
-                <Ionicons name="close" size={18} color={C.text} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-              <ActivityIndicator size="large" color={C.primary} />
-              <ThemedText style={{ color: C.sub, marginTop: 10 }}>
-                Loading addresses...
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-
-  // Handle error state
-  if (error) {
-    return (
-      <Modal
-        visible={visible}
-        animationType="slide"
-        transparent
-        onRequestClose={onClose}
-      >
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <View style={{ flex: 1 }}>
-                <ThemedText
-                  font="oleo"
-                  style={[styles.sheetTitle, { color: C.text }]}
-                >
-                  Select Available Location
-                </ThemedText>
-              </View>
-              <TouchableOpacity
-                onPress={onClose}
-                style={[styles.sheetClose, { borderColor: C.line }]}
-              >
-                <Ionicons name="close" size={18} color={C.text} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-              <ThemedText style={{ color: C.error, textAlign: "center" }}>
-                Error loading addresses. Please try again.
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <View style={styles.sheetOverlay}>
-        <View style={[styles.sheetTall, { backgroundColor: "#fff" }]}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View style={{ flex: 1 }}>
-              <ThemedText
-                font="oleo"
-                style={[styles.sheetTitle, { color: C.text }]}
-              >
-                Select Available Location
-              </ThemedText>
-              <ThemedText style={{ color: C.sub, fontSize: 12, marginTop: 2 }}>
-                {selected.length} selected
-              </ThemedText>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.sheetClose, { borderColor: C.line }]}
-            >
-              <Ionicons name="close" size={18} color={C.text} />
-            </TouchableOpacity>
-          </View>
-
-          <View
-            style={[
-              styles.searchBar,
-              { borderColor: C.line, backgroundColor: "#F3F4F6" },
-            ]}
-          >
-            <TextInput
-              value={q}
-              onChangeText={setQ}
-              placeholder="Search location"
-              placeholderTextColor="#9BA0A6"
-              style={{ flex: 1, color: C.text }}
-            />
-          </View>
-
-          {/* All locations option */}
-          {(!q.trim() || ALL_LOCATIONS_OPTION.toLowerCase().includes(q.trim().toLowerCase())) && (
-            <TouchableOpacity
-              onPress={() => toggle(ALL_LOCATIONS_OPTION)}
-              activeOpacity={0.9}
-              style={[
-                styles.locationRow,
-                {
-                  borderColor: selected.includes(ALL_LOCATIONS_OPTION) ? C.primary : C.line,
-                  backgroundColor: selected.includes(ALL_LOCATIONS_OPTION) ? "#E3F2FD" : "#F3F4F6",
-                  borderWidth: selected.includes(ALL_LOCATIONS_OPTION) ? 2 : 1,
-                  marginTop: 12,
-                },
-              ]}
-            >
-              <ThemedText style={{ color: C.text, flex: 1 }}>
-                {ALL_LOCATIONS_OPTION}
-              </ThemedText>
-              <Check checked={selected.includes(ALL_LOCATIONS_OPTION)} C={C} />
-            </TouchableOpacity>
-          )}
-
-          <ThemedText style={[styles.sheetSection, { color: C.text }]}>
-            All States
-          </ThemedText>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {filter(allStates).map((opt, index) => {
-              const checked = selected.includes(opt);
-              return (
-                <TouchableOpacity
-                  key={`all-${opt}-${index}`}
-                  onPress={() => toggle(opt)}
-                  activeOpacity={0.9}
-                  style={[
-                    styles.locationRow,
-                    {
-                      borderColor: checked ? C.primary : C.line,
-                      backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
-                      borderWidth: checked ? 2 : 1,
-                    },
-                  ]}
-                >
-                  <ThemedText style={{ color: C.text, flex: 1 }}>
-                    {opt}
-                  </ThemedText>
-                  <Check checked={checked} C={C} />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          <TouchableOpacity
-            onPress={onClose}
-            activeOpacity={0.9}
-            style={[styles.applyBtn, { backgroundColor: C.primary }]}
-          >
-            <ThemedText style={{ color: "#fff", fontWeight: "800" }}>
-              Apply
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 /* ───────────────────────── Delivery Price/Location Sheet ───────────────────────── */
 
 function DeliveryPriceSheet({
@@ -3089,8 +2925,6 @@ function AddVariantModal({
   onClose,
   selectedTypes,
   setSelectedTypes,
-  selectedColors,
-  setSelectedColors,
   selectedSizes,
   setSelectedSizes,
   useDefault,
@@ -3111,7 +2945,6 @@ function AddVariantModal({
     );
   };
 
-  const [colorSheetOpen, setColorSheetOpen] = useState(false);
   const [sizeSheetOpen, setSizeSheetOpen] = useState(false);
 
   const Card = ({ label }) => {
@@ -3151,13 +2984,12 @@ function AddVariantModal({
     </TouchableOpacity>
   );
 
-  const haveTypes =
-    selectedTypes.includes("Color") || selectedTypes.includes("Size");
+  const haveTypes = selectedTypes.includes("Size");
 
   // build summary list from 'details'
   const summary = React.useMemo(
-    () => buildVariantSummary(details, selectedColors, selectedSizes),
-    [details, selectedColors, selectedSizes]
+    () => buildVariantSummary(details, [], selectedSizes),
+    [details, selectedSizes]
   );
 
   return (
@@ -3197,46 +3029,10 @@ function AddVariantModal({
             You can select one or more than one variant
           </ThemedText>
 
-          {/* Two big cards */}
+          {/* Size card only */}
           <View style={{ flexDirection: "row", gap: 16, marginTop: 16 }}>
-            <Card label="Color" />
             <Card label="Size" />
           </View>
-
-          {selectedTypes.includes("Color") && (
-            <>
-              <ActionRow
-                label="Select Colors"
-                onPress={() => {
-                  console.log("Opening color sheet");
-                  setColorSheetOpen(true);
-                }}
-              />
-              <View
-                style={[
-                  styles.previewBox,
-                  { borderColor: "#E5E7EB", backgroundColor: "#fff" },
-                ]}
-              >
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {selectedColors.map((hex, i) => (
-                    <View
-                      key={`${hex}-${i}`}
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 19,
-                        backgroundColor: hex,
-                        marginRight: 12,
-                        borderWidth: 1,
-                        borderColor: "#E5E7EB",
-                      }}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            </>
-          )}
 
           {selectedTypes.includes("Size") && (
             <>
@@ -3293,7 +3089,7 @@ function AddVariantModal({
           </TouchableOpacity>
 
           {!useDefault && summary.length > 0 && (
-            <VariantSummaryList items={summary} C={C} />
+            <VariantSummaryList items={summary} C={C} onPress={() => setDetailsOpen(true)} />
           )}
         </ScrollView>
 
@@ -3309,14 +3105,7 @@ function AddVariantModal({
           </TouchableOpacity>
         </View>
 
-        {/* Color / Size selection sheets */}
-        <ColorPickerSheet
-          C={C}
-          visible={colorSheetOpen}
-          onClose={() => setColorSheetOpen(false)}
-          selected={selectedColors}
-          setSelected={setSelectedColors}
-        />
+        {/* Size selection sheet */}
         <SizePickerSheet
           C={C}
           visible={sizeSheetOpen}
@@ -3330,7 +3119,7 @@ function AddVariantModal({
           C={C}
           visible={detailsOpen}
           onClose={() => setDetailsOpen(false)}
-          colors={selectedTypes.includes("Color") ? selectedColors : []}
+          colors={[]}
           sizes={selectedTypes.includes("Size") ? selectedSizes : []}
           initial={details}
           onSave={(d) => {
@@ -3535,7 +3324,12 @@ function ColorPickerSheet({ visible, onClose, selected, setSelected, C }) {
 function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
   console.log("SizePickerSheet visible:", visible, "selected:", selected);
 
-  const sizes = ["S", "M", "L", "XL", "XXL"];
+  const standardSizes = ["S", "M", "L", "XL", "XXL"];
+  const [customSizes, setCustomSizes] = useState([]);
+  const [customSizeInput, setCustomSizeInput] = useState("");
+
+  // Combine standard and custom sizes
+  const allSizes = [...standardSizes, ...customSizes];
 
   const toggle = (s) => {
     console.log("Size toggle clicked:", s, "Current selected:", selected);
@@ -3547,6 +3341,26 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
       return newSelection;
     });
   };
+
+  const addCustomSize = () => {
+    const trimmed = customSizeInput.trim();
+    if (!trimmed) return;
+    if (allSizes.includes(trimmed)) {
+      // Size already exists
+      setCustomSizeInput("");
+      return;
+    }
+    setCustomSizes((prev) => [...prev, trimmed]);
+    setSelected((prev) => [...prev, trimmed]);
+    setCustomSizeInput("");
+  };
+
+  // Reset custom sizes when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setCustomSizeInput("");
+    }
+  }, [visible]);
 
   return (
     <Modal
@@ -3617,7 +3431,8 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
           </View>
 
           <ScrollView>
-            {sizes.map((s) => {
+            {/* Standard sizes */}
+            {standardSizes.map((s) => {
               const checked = selected.includes(s);
               return (
                 <TouchableOpacity
@@ -3641,6 +3456,109 @@ function SizePickerSheet({ visible, onClose, selected, setSelected, C }) {
                 </TouchableOpacity>
               );
             })}
+
+            {/* Custom sizes */}
+            {customSizes.length > 0 && (
+              <>
+                <ThemedText
+                  style={{
+                    color: C.sub,
+                    fontSize: 12,
+                    fontWeight: "600",
+                    marginTop: 16,
+                    marginBottom: 8,
+                  }}
+                >
+                  Custom Sizes
+                </ThemedText>
+                {customSizes.map((s) => {
+                  const checked = selected.includes(s);
+                  return (
+                    <TouchableOpacity
+                      key={`custom-${s}`}
+                      onPress={() => toggle(s)}
+                      style={[
+                        styles.sheetRow,
+                        {
+                          borderColor: C.line,
+                          backgroundColor: checked ? "#E3F2FD" : "#F3F4F6",
+                          borderWidth: checked ? 2 : 1,
+                          borderColor: checked ? C.primary : C.line,
+                        },
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <ThemedText style={{ color: C.text, flex: 1 }}>
+                        {s}
+                      </ThemedText>
+                      <Check checked={checked} C={C} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Add custom size input */}
+            <View
+              style={{
+                marginTop: 16,
+                paddingTop: 16,
+                borderTopWidth: 1,
+                borderTopColor: C.line,
+              }}
+            >
+              <ThemedText
+                style={{
+                  color: C.text,
+                  fontSize: 12,
+                  fontWeight: "600",
+                  marginBottom: 8,
+                }}
+              >
+                Add Custom Size
+              </ThemedText>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <TextInput
+                  value={customSizeInput}
+                  onChangeText={setCustomSizeInput}
+                  placeholder="Enter custom size (e.g., small, 28, etc.)"
+                  placeholderTextColor="#9CA3AF"
+                  style={{
+                    flex: 1,
+                    height: 46,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: C.line,
+                    paddingHorizontal: 12,
+                    color: C.text,
+                    backgroundColor: "#fff",
+                  }}
+                  onSubmitEditing={addCustomSize}
+                />
+                <TouchableOpacity
+                  onPress={addCustomSize}
+                  style={{
+                    paddingHorizontal: 16,
+                    height: 46,
+                    borderRadius: 12,
+                    backgroundColor: C.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                    Add
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
           </ScrollView>
 
           <TouchableOpacity
@@ -3669,56 +3587,53 @@ function VariantDetailsModal({
   onSave,
   C,
 }) {
-  // normalize initial data
-  const initColorMap = React.useMemo(() => {
-    const base = {};
-    colors.forEach((hex) => {
-      base[hex] = {
-        price: "",
-        compare: "",
-        sizes: [],
-        images: [],
-        ...(initial?.color?.[hex] || {}),
-      };
-    });
-    return base;
-  }, [colors, initial]);
-
+  // normalize initial data - only size variants
   const initSizeMap = React.useMemo(() => {
+    console.log("🔍 VariantDetailsModal - Building initSizeMap:", {
+      sizes,
+      initial,
+      initialSize: initial?.size,
+    });
     const base = {};
     sizes.forEach((s) => {
+      const existingData = initial?.size?.[s] || {};
       base[s] = {
         price: "",
         compare: "",
         colors: [],
         images: [],
-        ...(initial?.size?.[s] || {}),
+        ...existingData,
       };
+      console.log(`Size ${s} data:`, {
+        existingData,
+        finalData: base[s],
+      });
     });
+    console.log("📦 Final initSizeMap:", base);
     return base;
   }, [sizes, initial]);
 
-  const [colorMap, setColorMap] = useState(initColorMap);
   const [sizeMap, setSizeMap] = useState(initSizeMap);
+  const [showPriceTable, setShowPriceTable] = useState(false);
+
   useEffect(() => {
     if (visible) {
-      setColorMap(initColorMap);
       setSizeMap(initSizeMap);
+      // Show price table if there's existing data with prices
+      const hasExistingPrices = sizes.some((s) => {
+        const sizeData = initSizeMap[s];
+        return sizeData && (sizeData.price || sizeData.compare);
+      });
+      setShowPriceTable(hasExistingPrices);
     }
-  }, [visible, initColorMap, initSizeMap]);
-
-  const [activeColor, setActiveColor] = useState(colors[0]);
-  const [activeSize, setActiveSize] = useState(sizes[0]);
-
-  const [sizeSheetForColor, setSizeSheetForColor] = useState(false);
-  const [colorSheetForSize, setColorSheetForSize] = useState(false);
+  }, [visible, initSizeMap, sizes]);
 
   async function ensurePerms() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     return status === "granted";
   }
 
-  const pickFor = async (forKey) => {
+  const pickFor = async (size) => {
     if (!(await ensurePerms())) return;
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -3728,43 +3643,23 @@ function VariantDetailsModal({
     });
     if (res.canceled) return;
     const added = res.assets.map((a) => ({ uri: a.uri }));
-    if (forKey === "color") {
-      setColorMap((m) => ({
-        ...m,
-        [activeColor]: {
-          ...m[activeColor],
-          images: [...(m[activeColor].images || []), ...added].slice(0, 6),
-        },
-      }));
-    } else {
-      setSizeMap((m) => ({
-        ...m,
-        [activeSize]: {
-          ...m[activeSize],
-          images: [...(m[activeSize].images || []), ...added].slice(0, 6),
-        },
-      }));
-    }
+    setSizeMap((m) => ({
+      ...m,
+      [size]: {
+        ...m[size],
+        images: [...(m[size].images || []), ...added].slice(0, 6),
+      },
+    }));
   };
 
-  const removeImg = (forKey, idx) => {
-    if (forKey === "color") {
-      setColorMap((m) => ({
-        ...m,
-        [activeColor]: {
-          ...m[activeColor],
-          images: (m[activeColor].images || []).filter((_, i) => i !== idx),
-        },
-      }));
-    } else {
-      setSizeMap((m) => ({
-        ...m,
-        [activeSize]: {
-          ...m[activeSize],
-          images: (m[activeSize].images || []).filter((_, i) => i !== idx),
-        },
-      }));
-    }
+  const removeImg = (size, idx) => {
+    setSizeMap((m) => ({
+      ...m,
+      [size]: {
+        ...m[size],
+        images: (m[size].images || []).filter((_, i) => i !== idx),
+      },
+    }));
   };
 
   return (
@@ -3797,177 +3692,21 @@ function VariantDetailsModal({
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 24 }}>
-          {/* Color Variant */}
-          {colors.length > 0 && (
-            <>
-              <ThemedText style={{ color: "#111827", fontWeight: "700" }}>
-                Color Variant
-              </ThemedText>
-              <ThemedText
-                style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 6 }}
-              >
-                Select each color variant and add corresponding price and images
-              </ThemedText>
-
-              <View
-                style={[
-                  styles.previewBox,
-                  { borderColor: "#E5E7EB", backgroundColor: "#fff" },
-                ]}
-              >
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {colors.map((hex) => {
-                    const active = activeColor === hex;
-                    return (
-                      <TouchableOpacity
-                        key={hex}
-                        onPress={() => setActiveColor(hex)}
-                        style={{ marginRight: 12, alignItems: "center" }}
-                      >
-                        <View
-                          style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 19,
-                            backgroundColor: hex,
-                            borderWidth: active ? 3 : 1,
-                            borderColor: active ? C.primary : "#E5E7EB",
-                          }}
-                        />
-                        {active && (
-                          <View
-                            style={{
-                              width: 30,
-                              height: 3,
-                              backgroundColor: C.primary,
-                              borderRadius: 999,
-                              marginTop: 6,
-                            }}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-
-              {/* two price fields */}
-              <Field
-                C={C}
-                value={colorMap[activeColor]?.price || ""}
-                onChangeText={(v) =>
-                  setColorMap((m) => ({
-                    ...m,
-                    [activeColor]: { ...m[activeColor], price: v },
-                  }))
-                }
-                placeholder="₦500,000"
-                keyboardType="numeric"
-                style={{ marginTop: 10 }}
-              />
-              <Field
-                C={C}
-                value={colorMap[activeColor]?.compare || ""}
-                onChangeText={(v) =>
-                  setColorMap((m) => ({
-                    ...m,
-                    [activeColor]: { ...m[activeColor], compare: v },
-                  }))
-                }
-                placeholder="₦490,000"
-                keyboardType="numeric"
-                style={{ marginTop: 10 }}
-              />
-
-              {/* choose sizes for this color */}
-              <PickerField
-                C={C}
-                label="Choose available size for selected color"
-                onPress={() => setSizeSheetForColor(true)}
-                empty={false}
-                style={{ marginTop: 10 }}
-              />
-              {/* chips preview */}
-              {colorMap[activeColor]?.sizes?.length ? (
-                <View
-                  style={[
-                    styles.previewBox,
-                    { borderColor: "#E5E7EB", backgroundColor: "#fff" },
-                  ]}
-                >
-                  <View
-                    style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
-                  >
-                    {colorMap[activeColor].sizes.map((s) => (
-                      <View key={s} style={styles.sizeChip}>
-                        <ThemedText style={{ color: "#111827" }}>
-                          {s}
-                        </ThemedText>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-
-              {/* images */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  marginTop: 10,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => pickFor("color")}
-                  activeOpacity={0.85}
-                  style={[
-                    styles.imageTile,
-                    {
-                      borderColor: "#E5E7EB",
-                      backgroundColor: "#fff",
-                      width: 86,
-                      height: 86,
-                    },
-                  ]}
-                >
-                  <Ionicons name="camera-outline" size={20} color="#6B7280" />
-                </TouchableOpacity>
-                {(colorMap[activeColor]?.images || []).map((img, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.imageTile,
-                      { width: 86, height: 86, backgroundColor: "#000" },
-                    ]}
-                  >
-                    <Image source={toSrc(img.uri)} style={styles.imageImg} />
-                    <TouchableOpacity
-                      style={styles.closeDot}
-                      onPress={() => removeImg("color", i)}
-                    >
-                      <Ionicons name="close" size={16} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
-
           {/* Size Variant */}
           {sizes.length > 0 && (
             <>
               <ThemedText
-                style={{ color: "#111827", fontWeight: "700", marginTop: 16 }}
+                style={{ color: "#111827", fontWeight: "700" }}
               >
                 Size Variant
               </ThemedText>
               <ThemedText
                 style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 6 }}
               >
-                Select each size variant and add corresponding price and images
+                Selected sizes: {sizes.join(", ")}
               </ThemedText>
 
+              {/* Selected sizes preview */}
               <View
                 style={[
                   styles.previewBox,
@@ -3979,135 +3718,242 @@ function VariantDetailsModal({
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingVertical: 4 }}
                 >
-                  {sizes.map((s) => {
-                    const active = activeSize === s;
-                    return (
-                      <TouchableOpacity
-                        key={s}
-                        onPress={() => setActiveSize(s)}
-                        style={[
-                          styles.sizeChip,
-                          {
-                            marginRight: 10,
-                            borderColor: active ? C.primary : "#E5E7EB",
-                            backgroundColor: "#fff",
-                          },
-                        ]}
-                      >
-                        <ThemedText style={{ color: "#111827" }}>
-                          {s}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {sizes.map((s) => (
+                    <View
+                      key={s}
+                      style={[
+                        styles.sizeChip,
+                        {
+                          marginRight: 10,
+                          borderColor: "#E5E7EB",
+                          backgroundColor: "#fff",
+                        },
+                      ]}
+                    >
+                      <ThemedText style={{ color: "#111827" }}>
+                        {s}
+                      </ThemedText>
+                    </View>
+                  ))}
                 </ScrollView>
               </View>
 
-              <Field
-                C={C}
-                value={formatNumberWithSeparator(sizeMap[activeSize]?.price || "")}
-                onChangeText={(v) => {
-                  const rawValue = removeNumberSeparators(v);
-                  setSizeMap((m) => ({
-                    ...m,
-                    [activeSize]: { ...m[activeSize], price: rawValue },
-                  }));
-                }}
-                placeholder="₦600,000"
-                keyboardType="numeric"
-                style={{ marginTop: 10 }}
-              />
-              <Field
-                C={C}
-                value={formatNumberWithSeparator(sizeMap[activeSize]?.compare || "")}
-                onChangeText={(v) => {
-                  const rawValue = removeNumberSeparators(v);
-                  setSizeMap((m) => ({
-                    ...m,
-                    [activeSize]: { ...m[activeSize], compare: rawValue },
-                  }));
-                }}
-                placeholder="₦580,000"
-                keyboardType="numeric"
-                style={{ marginTop: 10 }}
-              />
-
-              <PickerField
-                C={C}
-                label="Choose available color for selected size"
-                onPress={() => setColorSheetForSize(true)}
-                empty={false}
-                style={{ marginTop: 10 }}
-              />
-              {sizeMap[activeSize]?.colors?.length ? (
-                <View
-                  style={[
-                    styles.previewBox,
-                    { borderColor: "#E5E7EB", backgroundColor: "#fff" },
-                  ]}
+              {/* Add Prices Button */}
+              {!showPriceTable && (
+                <TouchableOpacity
+                  onPress={() => setShowPriceTable(true)}
+                  activeOpacity={0.85}
+                  style={{
+                    marginTop: 16,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    backgroundColor: C.primary,
+                    alignItems: "center",
+                  }}
                 >
-                  <View
+                  <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                    Add Prices
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+
+              {/* Price Table */}
+              {showPriceTable && (
+                <View style={{ marginTop: 16 }}>
+                  <ThemedText
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 10,
+                      color: "#111827",
+                      fontWeight: "700",
+                      marginBottom: 12,
                     }}
                   >
-                    {sizeMap[activeSize].colors.map((hex) => (
+                    Set Prices for Each Size
+                  </ThemedText>
+                  <View
+                    style={{
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: "#E5E7EB",
+                      backgroundColor: "#fff",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Table Header */}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        backgroundColor: "#F9FAFB",
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#E5E7EB",
+                      }}
+                    >
                       <View
-                        key={hex}
                         style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 9,
-                          backgroundColor: hex,
-                          borderWidth: 1,
-                          borderColor: "#E5E7EB",
+                          flex: 1,
+                          paddingVertical: 12,
+                          paddingHorizontal: 12,
+                          borderRightWidth: 1,
+                          borderRightColor: "#E5E7EB",
                         }}
-                      />
+                      >
+                        <ThemedText
+                          style={{
+                            color: "#111827",
+                            fontWeight: "700",
+                            fontSize: 12,
+                          }}
+                        >
+                          Size
+                        </ThemedText>
+                      </View>
+                      <View
+                        style={{
+                          flex: 1,
+                          paddingVertical: 12,
+                          paddingHorizontal: 12,
+                        }}
+                      >
+                        <ThemedText
+                          style={{
+                            color: "#111827",
+                            fontWeight: "700",
+                            fontSize: 12,
+                          }}
+                        >
+                          Price
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    {/* Table Rows */}
+                    {sizes.map((size, index) => (
+                      <View
+                        key={size}
+                        style={{
+                          flexDirection: "row",
+                          borderBottomWidth: index < sizes.length - 1 ? 1 : 0,
+                          borderBottomColor: "#E5E7EB",
+                        }}
+                      >
+                        <View
+                          style={{
+                            flex: 1,
+                            paddingVertical: 14,
+                            paddingHorizontal: 12,
+                            borderRightWidth: 1,
+                            borderRightColor: "#E5E7EB",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <ThemedText style={{ color: "#111827" }}>
+                            {size}
+                          </ThemedText>
+                        </View>
+                        <View
+                          style={{
+                            flex: 1,
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            justifyContent: "center",
+                          }}
+                        >
+                          <TextInput
+                            value={formatNumberWithSeparator(
+                              sizeMap[size]?.price || ""
+                            )}
+                            onChangeText={(v) => {
+                              const rawValue = removeNumberSeparators(v);
+                              setSizeMap((m) => ({
+                                ...m,
+                                [size]: { ...m[size], price: rawValue },
+                              }));
+                            }}
+                            placeholder="₦0"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="numeric"
+                            style={{
+                              color: C.text,
+                              fontSize: 14,
+                              paddingVertical: 6,
+                            }}
+                          />
+                        </View>
+                      </View>
                     ))}
                   </View>
                 </View>
-              ) : null}
+              )}
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  marginTop: 10,
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => pickFor("size")}
-                  activeOpacity={0.85}
-                  style={[
-                    styles.imageTile,
-                    {
-                      borderColor: "#E5E7EB",
-                      backgroundColor: "#fff",
-                      width: 86,
-                      height: 86,
-                    },
-                  ]}
+              {/* Images Section - Per Size Variant */}
+              <View style={{ marginTop: 20 }}>
+                <ThemedText
+                  style={{ color: "#111827", fontWeight: "700", marginBottom: 8 }}
                 >
-                  <Ionicons name="camera-outline" size={20} color="#6B7280" />
-                </TouchableOpacity>
-                {(sizeMap[activeSize]?.images || []).map((img, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.imageTile,
-                      { width: 86, height: 86, backgroundColor: "#000" },
-                    ]}
-                  >
-                    <Image source={toSrc(img.uri)} style={styles.imageImg} />
-                    <TouchableOpacity
-                      style={styles.closeDot}
-                      onPress={() => removeImg("size", i)}
+                  Add Images for Each Size (Optional)
+                </ThemedText>
+                <ThemedText
+                  style={{ color: "#9CA3AF", fontSize: 11, marginBottom: 12 }}
+                >
+                  Add separate images for each size variant
+                </ThemedText>
+
+                {sizes.map((size) => (
+                  <View key={size} style={{ marginBottom: 20 }}>
+                    <ThemedText
+                      style={{
+                        color: "#111827",
+                        fontWeight: "600",
+                        fontSize: 13,
+                        marginBottom: 8,
+                      }}
                     >
-                      <Ionicons name="close" size={16} color="#fff" />
-                    </TouchableOpacity>
+                      {size} Images
+                    </ThemedText>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => pickFor(size)}
+                        activeOpacity={0.85}
+                        style={[
+                          styles.imageTile,
+                          {
+                            borderColor: "#E5E7EB",
+                            backgroundColor: "#fff",
+                            width: 86,
+                            height: 86,
+                          },
+                        ]}
+                      >
+                        <Ionicons name="camera-outline" size={20} color="#6B7280" />
+                      </TouchableOpacity>
+                      {(sizeMap[size]?.images || []).map((img, i) => (
+                        <View
+                          key={`${size}-${i}`}
+                          style={[
+                            styles.imageTile,
+                            { width: 86, height: 86, backgroundColor: "#000" },
+                          ]}
+                        >
+                          <Image
+                            source={toSrc(img.uri)}
+                            style={styles.imageImg}
+                          />
+                          <TouchableOpacity
+                            style={styles.closeDot}
+                            onPress={() => removeImg(size, i)}
+                          >
+                            <Ionicons name="close" size={16} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 ))}
               </View>
@@ -4119,20 +3965,8 @@ function VariantDetailsModal({
           <TouchableOpacity
             onPress={() => {
               console.log("Saving variant details:", {
-                colorMap,
                 sizeMap,
-                colorMapKeys: Object.keys(colorMap),
                 sizeMapKeys: Object.keys(sizeMap),
-              });
-
-              // Debug each color variant
-              Object.entries(colorMap).forEach(([hex, data]) => {
-                console.log(`Color ${hex} data:`, {
-                  price: data.price,
-                  compare: data.compare,
-                  images: data.images,
-                  imagesLength: data.images?.length,
-                });
               });
 
               // Debug each size variant
@@ -4145,7 +3979,8 @@ function VariantDetailsModal({
                 });
               });
 
-              onSave({ color: colorMap, size: sizeMap });
+              // Save only size variants, maintain same structure for backend
+              onSave({ color: {}, size: sizeMap });
             }}
             activeOpacity={0.9}
             style={[styles.saveBtn, { backgroundColor: C.primary }]}
@@ -4153,39 +3988,6 @@ function VariantDetailsModal({
             <ThemedText style={{ color: "#fff" }}>Save</ThemedText>
           </TouchableOpacity>
         </View>
-
-        {/* reuse the size/color sheets for these context-specific selections */}
-        <SizePickerSheet
-          C={C}
-          visible={sizeSheetForColor}
-          onClose={() => setSizeSheetForColor(false)}
-          selected={colorMap[activeColor]?.sizes || []}
-          setSelected={(updater) =>
-            setColorMap((m) => {
-              const current = m[activeColor]?.sizes || [];
-              const next =
-                typeof updater === "function" ? updater(current) : updater;
-              return {
-                ...m,
-                [activeColor]: { ...m[activeColor], sizes: next },
-              };
-            })
-          }
-        />
-        <ColorPickerSheet
-          C={C}
-          visible={colorSheetForSize}
-          onClose={() => setColorSheetForSize(false)}
-          selected={sizeMap[activeSize]?.colors || []}
-          setSelected={(updater) =>
-            setSizeMap((m) => {
-              const current = m[activeSize]?.colors || [];
-              const next =
-                typeof updater === "function" ? updater(current) : updater;
-              return { ...m, [activeSize]: { ...m[activeSize], colors: next } };
-            })
-          }
-        />
       </SafeAreaView>
     </Modal>
   );

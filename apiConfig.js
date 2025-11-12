@@ -42,6 +42,12 @@ const API_ENDPOINTS = {
     Inventory: `${API_DOMAIN}/seller/inventory`, // GET
     Help_Request: `${API_DOMAIN}/seller/help/request`, // POST
 
+    // Disputes
+    Disputes_List: `${API_DOMAIN}/seller/disputes`, // GET
+    Dispute_Details: (id) => `${API_DOMAIN}/seller/disputes/${id}`, // GET
+    Dispute_Send_Message: (id) => `${API_DOMAIN}/seller/disputes/${id}/message`, // POST
+    Dispute_Mark_Read: (id) => `${API_DOMAIN}/seller/disputes/${id}/mark-read`, // POST
+
   },
 
   PRODUCTS: {

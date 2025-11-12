@@ -396,6 +396,12 @@ const SettingsScreen = () => {
       leftColor: "#E5863E",
     },
     {
+      key: "disputes",
+      label: "Disputes",
+      img: require("../../../assets/Vector (13).png"),
+      leftColor: "#EF4444",
+    },
+    {
       key: "faqs",
       label: "FAQs",
       img: require("../../../assets/Question.png"),
@@ -484,6 +490,7 @@ const SettingsScreen = () => {
       announcements: ["ChatNavigator", { screen: "Announcements" }],
       reviews: ["ChatNavigator", { screen: "MyReviews" }],
       referrals: ["SettingsNavigator", { screen: "Referrals" }],
+      disputes: ["ChatNavigator", { screen: "DisputesList" }],
       faqs: ["ChatNavigator", { screen: "FAQs" }],
 
       sellerLeaderboard: ["ChatNavigator", { screen: "SellerLeaderBoard" }],
@@ -818,7 +825,7 @@ const SettingsScreen = () => {
           style={[styles.primaryBtn, { backgroundColor: C.primary }]}
           onPress={() => onPressRow("shopUpgrade")}
         >
-          <ThemedText style={styles.primaryBtnText}>Shop Upgrade</ThemedText>
+          <ThemedText style={styles.primaryBtnText}>Store Kyc</ThemedText>
         </TouchableOpacity>
 
         {/* Main options */}
