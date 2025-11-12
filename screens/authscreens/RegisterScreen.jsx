@@ -247,6 +247,8 @@ export default function RegisterStoreScreen() {
   const [storeEmail, setStoreEmail] = useState("");
   const [storePhone, setStorePhone] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [avatarUri, setAvatarUri] = useState("");
   const [bannerUri, setBannerUri] = useState("");
@@ -704,43 +706,28 @@ export default function RegisterStoreScreen() {
   };
 
   const handleSetBusinessDetails = () => {
-    if (!businessName.trim() || !businessType.trim() || !ninNumber.trim()) {
-      Alert.alert("Error", "Please fill in all required business details");
-      return;
-    }
-
-    // Validate based on business type
-    if (businessType === "BN" && !bnNumber.trim()) {
-      Alert.alert("Error", "Please enter BN Number");
-      return;
-    }
-
-    if (businessType === "LTD" && !cacNumber.trim()) {
-      Alert.alert("Error", "Please enter RC Number");
-      return;
-    }
-
+    // All fields are optional - allow submission with empty fields
     setBusinessDetailsMutation.mutate({
-      registered_name: businessName.trim(),
-      business_type: businessType.trim(),
-      nin_number: ninNumber.trim(),
-      bn_number: businessType === "BN" ? bnNumber.trim() : null,
-      cac_number: businessType === "LTD" ? cacNumber.trim() : null,
+      registered_name: businessName.trim() || null,
+      business_type: businessType.trim() || null,
+      nin_number: ninNumber.trim() || null,
+      bn_number: businessType === "BN" && bnNumber.trim() ? bnNumber.trim() : null,
+      cac_number: businessType === "LTD" && cacNumber.trim() ? cacNumber.trim() : null,
     });
   };
 
   const handleUploadDocuments = () => {
-    if (!ninSlipUri) {
-      Alert.alert("Error", "Please upload your NIN slip");
-      return;
-    }
-
+    // All documents are optional - allow submission without any documents
     const formData = new FormData();
-    formData.append("nin_document", {
-      uri: ninSlipUri,
-      type: "image/jpeg",
-      name: "nin_document.jpg",
-    });
+    
+    // NIN document is optional - only append if provided
+    if (ninSlipUri) {
+      formData.append("nin_document", {
+        uri: ninSlipUri,
+        type: "image/jpeg",
+        name: "nin_document.jpg",
+      });
+    }
     
     // CAC document is optional - only append if provided
     if (cacCertUri) {
@@ -751,6 +738,7 @@ export default function RegisterStoreScreen() {
       });
     }
 
+    // Submit even if no documents are provided
     uploadDocumentsMutation.mutate(formData);
   };
 
@@ -1068,11 +1056,12 @@ export default function RegisterStoreScreen() {
                     onPress={() => setShowLocation(true)}
                     filled={!!selectedLocation}
                   />
-                  <Field
+                  <PasswordField
                     placeholder="Password"
-                    secureTextEntry
                     value={password}
                     onChangeText={setPassword}
+                    showPassword={showPassword}
+                    onTogglePassword={() => setShowPassword(!showPassword)}
                   />
                   <Field
                     placeholder="Referral Code (Optional)"
@@ -1179,32 +1168,32 @@ export default function RegisterStoreScreen() {
                     Add Social Links
                   </ThemedText>
                   <Field
-                    placeholder="Add Whatsapp link"
+                    placeholder="Add Whatsapp link (Optional)"
                     value={links.whatsapp}
                     onChangeText={(t) => setLinks({ ...links, whatsapp: t })}
                   />
                   <Field
-                    placeholder="Add Instagram link"
+                    placeholder="Add Instagram link (Optional)"
                     value={links.instagram}
                     onChangeText={(t) => setLinks({ ...links, instagram: t })}
                   />
                   <Field
-                    placeholder="Add Facebook link"
+                    placeholder="Add Facebook link (Optional)"
                     value={links.facebook}
                     onChangeText={(t) => setLinks({ ...links, facebook: t })}
                   />
                   <Field
-                    placeholder="Add X (formerly twitter) link"
+                    placeholder="Add X (formerly twitter) link (Optional)"
                     value={links.x}
                     onChangeText={(t) => setLinks({ ...links, x: t })}
                   />
                   <Field
-                    placeholder="Add tiktok link"
+                    placeholder="Add tiktok link (Optional)"
                     value={links.tiktok}
                     onChangeText={(t) => setLinks({ ...links, tiktok: t })}
                   />
                   <Field
-                    placeholder="Add LinkedIn link"
+                    placeholder="Add LinkedIn link (Optional)"
                     value={links.linkedin}
                     onChangeText={(t) => setLinks({ ...links, linkedin: t })}
                   />
@@ -1219,30 +1208,30 @@ export default function RegisterStoreScreen() {
               {phase === 1 && (
                 <>
                   <Field
-                    placeholder="Registered Business Name"
+                    placeholder="Registered Business Name (Optional)"
                     value={businessName}
                     onChangeText={setBusinessName}
                   />
                   <PickerRow
-                    label={businessType || "Business Type"}
+                    label={businessType || "Business Type (Optional)"}
                     onPress={() => setShowBusinessType(true)}
                     filled={!!businessType}
                   />
                   <Field
-                    placeholder="NIN Number"
+                    placeholder="NIN Number (Optional)"
                     value={ninNumber}
                     onChangeText={setNinNumber}
                   />
                   {businessType === "BN" && (
                     <Field
-                      placeholder="BN Number"
+                      placeholder="BN Number (Optional)"
                       value={bnNumber}
                       onChangeText={setBnNumber}
                     />
                   )}
                   {businessType === "LTD" && (
                     <Field
-                      placeholder="RC Number"
+                      placeholder="RC Number (Optional)"
                       value={cacNumber}
                       onChangeText={setCacNumber}
                     />
@@ -1253,7 +1242,7 @@ export default function RegisterStoreScreen() {
               {phase === 2 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
-                    Upload a copy of your NIN Slip
+                    Upload a copy of your NIN Slip <ThemedText style={{ color: "#6C727A", fontSize: 12 }}>(Optional)</ThemedText>
                   </ThemedText>
                   <TouchableOpacity
                     style={styles.docPicker}
@@ -1564,7 +1553,13 @@ export default function RegisterStoreScreen() {
         <BottomSheet
           visible={showCategory}
           title="Select Category"
-          onClose={() => setShowCategory(false)}
+          onClose={() => {
+            setShowCategory(false);
+            setCategorySearch("");
+          }}
+          searchValue={categorySearch}
+          onSearch={setCategorySearch}
+          showCheckMark={true}
         >
           {categoriesLoading ? (
             <View style={{ padding: 20, alignItems: "center" }}>
@@ -1590,27 +1585,38 @@ export default function RegisterStoreScreen() {
             </View>
           ) : (
             <View style={{ paddingVertical: 6 }}>
-              {categories.map((category) => {
-                const categoryId = category.id ? Number(category.id) : null;
-                if (!categoryId) return null;
-                const active = selectedCategories.includes(categoryId);
-                return (
-                  <TouchableOpacity
-                    key={categoryId}
-                    style={[
-                      styles.modalItem,
-                      active && {
-                        backgroundColor: theme.colors.primary100,
-                        borderColor: theme.colors.primary,
-                        borderWidth: 1,
-                      },
-                    ]}
-                    onPress={() => toggleCategory(categoryId)}
-                  >
-                    <ThemedText>{category.title || category.name || `Category ${categoryId}`}</ThemedText>
-                  </TouchableOpacity>
-                );
-              })}
+              {categories
+                .filter((category) => {
+                  if (!categorySearch.trim()) return true;
+                  const searchTerm = categorySearch.toLowerCase();
+                  const title = (category.title || category.name || "").toLowerCase();
+                  return title.includes(searchTerm);
+                })
+                .map((category) => {
+                  const categoryId = category.id ? Number(category.id) : null;
+                  if (!categoryId) return null;
+                  const active = selectedCategories.includes(categoryId);
+                  return (
+                    <TouchableOpacity
+                      key={categoryId}
+                      style={[
+                        styles.modalItem,
+                        { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+                        active && {
+                          backgroundColor: theme.colors.primary100,
+                          borderColor: theme.colors.primary,
+                          borderWidth: 1,
+                        },
+                      ]}
+                      onPress={() => toggleCategory(categoryId)}
+                    >
+                      <ThemedText>{category.title || category.name || `Category ${categoryId}`}</ThemedText>
+                      {active && (
+                        <Ionicons name="checkmark" size={20} color={theme.colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
             </View>
           )}
         </BottomSheet>
@@ -1842,6 +1848,77 @@ function Field(props) {
         style={styles.input}
         {...props}
       />
+    </View>
+  );
+}
+
+// Password strength checker
+const getPasswordStrength = (password) => {
+  if (!password) return { strength: 0, label: "", color: "#E4E4E4" };
+  
+  let strength = 0;
+  if (password.length >= 8) strength++;
+  if (password.length >= 12) strength++;
+  if (/[a-z]/.test(password)) strength++;
+  if (/[A-Z]/.test(password)) strength++;
+  if (/[0-9]/.test(password)) strength++;
+  if (/[^a-zA-Z0-9]/.test(password)) strength++;
+  
+  if (strength <= 2) return { strength: 1, label: "Weak", color: "#EF4444" };
+  if (strength <= 4) return { strength: 2, label: "Medium", color: "#F59E0B" };
+  return { strength: 3, label: "Strong", color: "#10B981" };
+};
+
+function PasswordField({ placeholder, value, onChangeText, showPassword, onTogglePassword }) {
+  const { theme } = useTheme();
+  const passwordStrength = getPasswordStrength(value);
+  
+  return (
+    <View>
+      <View style={[styles.inputWrapper, { flexDirection: "row", alignItems: "center" }]}>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#9AA0A6"
+          style={[styles.input, { flex: 1, paddingRight: 8 }]}
+          secureTextEntry={!showPassword}
+          value={value}
+          onChangeText={onChangeText}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TouchableOpacity
+          onPress={onTogglePassword}
+          style={{ padding: 8 }}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={showPassword ? "eye-off-outline" : "eye-outline"}
+            size={20}
+            color="#9AA0A6"
+          />
+        </TouchableOpacity>
+      </View>
+      
+      {/* Password Strength Indicator */}
+      {value.length > 0 && (
+        <View style={{ marginTop: 8, marginBottom: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+            <View style={{ flex: 1, height: 4, backgroundColor: "#E4E4E4", borderRadius: 2, overflow: "hidden" }}>
+              <View
+                style={{
+                  width: `${(passwordStrength.strength / 3) * 100}%`,
+                  height: "100%",
+                  backgroundColor: passwordStrength.color,
+                  borderRadius: 2,
+                }}
+              />
+            </View>
+            <ThemedText style={{ marginLeft: 8, fontSize: 12, color: passwordStrength.color, fontWeight: "600" }}>
+              {passwordStrength.label}
+            </ThemedText>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -2293,7 +2370,9 @@ function BottomSheet({
   searchValue,
   onSearch,
   children,
+  showCheckMark = false,
 }) {
+  const { theme } = useTheme();
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="slide">
@@ -2305,16 +2384,23 @@ function BottomSheet({
               {title}
             </ThemedText>
             <TouchableOpacity style={styles.modalClose} onPress={onClose}>
-              <Ionicons name="close" size={18} />
+              <Ionicons 
+                name={showCheckMark ? "checkmark" : "close"} 
+                size={showCheckMark ? 24 : 18}
+                color={showCheckMark ? theme.colors.primary : "#000"}
+              />
             </TouchableOpacity>
           </View>
           {onSearch && (
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search"
-              value={searchValue}
-              onChangeText={onSearch}
-            />
+            <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search categories..."
+                placeholderTextColor="#9AA0A6"
+                value={searchValue}
+                onChangeText={onSearch}
+              />
+            </View>
           )}
           <ScrollView showsVerticalScrollIndicator={false}>
             {children}
@@ -2611,8 +2697,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#EDEDED",
     borderRadius: 14,
     padding: 12,
-    marginTop: 12,
     fontSize: 15,
+    color: "#101318",
   },
   sectionLabel: {
     marginTop: 16,

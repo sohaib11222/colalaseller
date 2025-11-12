@@ -744,7 +744,7 @@ function ItemCard({ item, C, onPress, onMore, onEdit }) {
               fontSize: 12,
             }}
           >
-            {priceFmt(item.minPrice)} - {priceFmt(item.maxPrice)}
+            {priceFmt(item.minPrice)}
           </ThemedText>
 
           <View style={[styles.metrics, { borderTopColor: C.line }]}>

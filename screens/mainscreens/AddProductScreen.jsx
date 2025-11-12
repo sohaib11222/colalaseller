@@ -1347,6 +1347,12 @@ export default function AddProductScreen({ navigation, route }) {
         <ThemedText style={[styles.label, { color: C.text }]}>
           Upload Video of your product <ThemedText style={{ color: "#EF4444" }}>(Required)</ThemedText>
         </ThemedText>
+        <ThemedText style={[styles.label, { color: C.sub, fontSize: 11, marginTop: -4, marginBottom: 4 }]}>
+          Max of 200MB, max of 1 minute video
+        </ThemedText>
+        <ThemedText style={[styles.label, { color: C.sub, fontSize: 10, marginTop: -4, marginBottom: 8, fontStyle: "italic" }]}>
+          Note: Compress your video before upload for faster upload time
+        </ThemedText>
         <View style={{ flexDirection: "row", gap: 12 }}>
           {/* video tile */}
           <TouchableOpacity
@@ -1611,7 +1617,7 @@ export default function AddProductScreen({ navigation, route }) {
         <ThemedText
           style={[styles.blockTitle, { color: C.text, marginTop: 16 }]}
         >
-          Add Variants
+          Add Variants (*)
         </ThemedText>
         <ThemedText style={{ color: C.sub, fontSize: 11, marginBottom: 8 }}>
           Variants include colors and size.
