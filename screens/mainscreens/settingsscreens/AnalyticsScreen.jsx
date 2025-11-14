@@ -298,9 +298,9 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
 
         {/* second filter */}
-        <View style={{ marginTop: 16 }}>
+        {/* <View style={{ marginTop: 16 }}>
           <FilterPill C={C} open={f2Open} onToggle={() => setF2Open((p) => !p)} />
-        </View>
+        </View> */}
 
         {/* sections */}
         {analyticsLoading ? (

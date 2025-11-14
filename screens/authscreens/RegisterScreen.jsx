@@ -645,6 +645,17 @@ export default function RegisterStoreScreen() {
       return;
     }
 
+    // Check password strength
+    const passwordStrength = getPasswordStrength(password.trim());
+    if (passwordStrength.label === "Weak") {
+      Alert.alert(
+        "Weak Password",
+        "Your password is too weak. Please use a stronger password with:\n• At least 8 characters\n• Mix of uppercase and lowercase letters\n• Numbers\n• Special characters",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     startOnboardingMutation.mutate({
       full_name: fullName.trim(),
       store_name: storeName.trim(),
@@ -1495,11 +1506,11 @@ export default function RegisterStoreScreen() {
           </TouchableOpacity>
 
           {/* Promo image inside card (no colored bg) */}
-          <Image
+          {/* <Image
             source={require("../../assets/Frame 231.png")}
             style={styles.bottomPromo}
             resizeMode="cover"
-          />
+          /> */}
 
           {/* Terms */}
           <ThemedText style={styles.footerText}>

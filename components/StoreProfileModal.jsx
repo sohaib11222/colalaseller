@@ -317,6 +317,7 @@ export default function StoreProfileModal({
     cover: hasBanner
       ? toFileUrl(storeApi.banner_image)
       : null,
+    banner_link: storeApi.link || storeApi.banner_link || null, // link field for banner
   };
 
   // stats (present in API)
@@ -1934,10 +1935,29 @@ export default function StoreProfileModal({
           {/* Cover */}
           <View style={styles.coverWrap}>
             {hasBanner ? (
-              <Image
-                source={src(store.cover)}
-                style={styles.cover}
-              />
+              store.banner_link ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (store.banner_link) {
+                      Linking.openURL(store.banner_link).catch((err) => {
+                        console.error("Failed to open URL:", err);
+                        Alert.alert("Error", "Could not open the link");
+                      });
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={src(store.cover)}
+                    style={styles.cover}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <Image
+                  source={src(store.cover)}
+                  style={styles.cover}
+                />
+              )
             ) : (
               <TouchableOpacity
                 style={styles.bannerPlaceholder}

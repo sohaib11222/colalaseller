@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -359,6 +360,7 @@ export default function StoreHomeScreen() {
       },
       profile_image: apiStore.profile_image || null,
       banner_image: (apiStore.banner_image && typeof apiStore.banner_image === 'string' && apiStore.banner_image.trim() !== '') ? apiStore.banner_image : null, // header cover
+      banner_link: apiStore.link || apiStore.banner_link || null, // link field for banner
       theme_color: pick(apiStore.theme_color, placeholders.theme_color, "theme_color"),
       banners: Array.isArray(apiStore.banners) ? apiStore.banners : [],
     };
@@ -573,7 +575,23 @@ export default function StoreHomeScreen() {
           {/* cover image */}
           <View style={styles.coverWrap}>
             {hasBanner ? (
-              <Image source={coverSource} style={styles.coverImg} />
+              store.banner_link ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (store.banner_link) {
+                      Linking.openURL(store.banner_link).catch((err) => {
+                        console.error("Failed to open URL:", err);
+                        Alert.alert("Error", "Could not open the link");
+                      });
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Image source={coverSource} style={styles.coverImg} />
+                </TouchableOpacity>
+              ) : (
+                <Image source={coverSource} style={styles.coverImg} />
+              )
             ) : (
               <TouchableOpacity
                 style={styles.bannerPlaceholder}
