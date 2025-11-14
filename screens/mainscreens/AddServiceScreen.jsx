@@ -593,16 +593,52 @@ export default function AddServiceScreen({ navigation, route }) {
 
   const pickImages = async () => {
     if (!(await ensurePerms())) return;
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: 6,
-      quality: 0.8,
-    });
-    if (!res.canceled) {
-      const added = res.assets.map((a) => ({ uri: a.uri }));
-      setImages((prev) => [...prev, ...added].slice(0, 6));
-    }
+    
+    Alert.alert(
+      "Select Image Source",
+      "Choose how you want to add images",
+      [
+        {
+          text: "Gallery",
+          onPress: async () => {
+            const res = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsMultipleSelection: true,
+              selectionLimit: 6,
+              quality: 0.8,
+            });
+            if (!res.canceled) {
+              const added = res.assets.map((a) => ({ uri: a.uri }));
+              setImages((prev) => [...prev, ...added].slice(0, 6));
+            }
+          },
+        },
+        {
+          text: "Camera",
+          onPress: async () => {
+            const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+            if (cameraStatus.status !== "granted") {
+              Alert.alert("Permission needed", "Please grant camera access");
+              return;
+            }
+            const res = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsMultipleSelection: true,
+              selectionLimit: 6,
+              quality: 0.8,
+            });
+            if (!res.canceled) {
+              const added = res.assets.map((a) => ({ uri: a.uri }));
+              setImages((prev) => [...prev, ...added].slice(0, 6));
+            }
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
   };
 
   const removeImage = (idx) =>

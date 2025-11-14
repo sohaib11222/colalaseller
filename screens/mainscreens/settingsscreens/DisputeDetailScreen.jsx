@@ -102,6 +102,7 @@ export default function DisputeDetailScreen() {
   const [inputText, setInputText] = useState("");
   const [imageUri, setImageUri] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const listRef = useRef(null);
   const scrollToEnd = () =>
@@ -159,22 +160,58 @@ export default function DisputeDetailScreen() {
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission needed", "Please grant camera roll access");
-        return;
-      }
+      Alert.alert(
+        "Select Image Source",
+        "Choose how you want to add image",
+        [
+          {
+            text: "Gallery",
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert("Permission needed", "Please grant camera roll access");
+                return;
+              }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-        aspect: [4, 3],
-      });
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+                aspect: [4, 3],
+              });
 
-      if (!result.canceled && result.assets[0]) {
-        setImageUri(result.assets[0].uri);
-      }
+              if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: "Camera",
+            onPress: async () => {
+              const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+              if (cameraStatus.status !== "granted") {
+                Alert.alert("Permission needed", "Please grant camera access");
+                return;
+              }
+
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+                aspect: [4, 3],
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
     } catch (error) {
       console.error("Image picker error:", error);
       Alert.alert("Error", "Failed to pick image");
@@ -502,6 +539,21 @@ export default function DisputeDetailScreen() {
             </View>
           )}
 
+          {/* View Order Button */}
+          {storeOrder && (
+            <TouchableOpacity
+              style={[styles.viewOrderButton, { backgroundColor: C.primary }]}
+              onPress={() => setShowOrderModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="receipt-outline" size={18} color="#fff" />
+              <ThemedText style={styles.viewOrderButtonText}>
+                View Order Details
+              </ThemedText>
+              <Ionicons name="chevron-forward" size={18} color="#fff" />
+            </TouchableOpacity>
+          )}
+
           {dispute.won_by && (
             <View style={styles.resolutionRow}>
               <Ionicons
@@ -663,7 +715,284 @@ export default function DisputeDetailScreen() {
           />
         </View>
       </Modal>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        visible={showOrderModal}
+        onClose={() => setShowOrderModal(false)}
+        order={storeOrder}
+        C={C}
+      />
     </SafeAreaView>
+  );
+}
+
+/* ───────── Order Details Modal ───────── */
+function OrderDetailsModal({ visible, onClose, order, C }) {
+  if (!order) return null;
+
+  const items = order.items || [];
+  const itemsSubtotal = parseFloat(order.items_subtotal || 0);
+  const shippingFee = parseFloat(order.shipping_fee || 0);
+  const discount = parseFloat(order.discount || 0);
+  const total = parseFloat(order.subtotal_with_shipping || 0);
+
+  const formatCurrency = (amount) => {
+    return `₦${parseFloat(amount || 0).toLocaleString()}`;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "N/A";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "placed":
+        return "#3B82F6";
+      case "accepted":
+        return "#10B981";
+      case "rejected":
+        return "#EF4444";
+      case "delivered":
+        return "#10B981";
+      case "cancelled":
+        return "#6B7280";
+      default:
+        return C.sub;
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+        {/* Header */}
+        <View style={[styles.orderModalHeader, { backgroundColor: C.primary }]}>
+          <TouchableOpacity onPress={onClose} style={styles.orderModalBackBtn}>
+            <Ionicons name="chevron-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <ThemedText style={styles.orderModalTitle}>Order Details</ThemedText>
+          <View style={{ width: 36 }} />
+        </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Order Info */}
+          <View style={[styles.orderInfoCard, { backgroundColor: C.card }]}>
+            <View style={styles.orderInfoRow}>
+              <ThemedText style={[styles.orderInfoLabel, { color: C.sub }]}>
+                Order ID:
+              </ThemedText>
+              <ThemedText style={[styles.orderInfoValue, { color: C.text }]}>
+                #{order.order_id || order.id}
+              </ThemedText>
+            </View>
+            <View style={styles.orderInfoRow}>
+              <ThemedText style={[styles.orderInfoLabel, { color: C.sub }]}>
+                Status:
+              </ThemedText>
+              <View
+                style={[
+                  styles.orderStatusBadge,
+                  { backgroundColor: getStatusColor(order.status) + "20" },
+                ]}
+              >
+                <ThemedText
+                  style={[
+                    styles.orderStatusText,
+                    { color: getStatusColor(order.status) },
+                  ]}
+                >
+                  {order.status?.charAt(0).toUpperCase() + order.status?.slice(1) || "N/A"}
+                </ThemedText>
+              </View>
+            </View>
+            <View style={styles.orderInfoRow}>
+              <ThemedText style={[styles.orderInfoLabel, { color: C.sub }]}>
+                Order Date:
+              </ThemedText>
+              <ThemedText style={[styles.orderInfoValue, { color: C.text }]}>
+                {formatDate(order.created_at)}
+              </ThemedText>
+            </View>
+            {order.estimated_delivery_date && (
+              <View style={styles.orderInfoRow}>
+                <ThemedText style={[styles.orderInfoLabel, { color: C.sub }]}>
+                  Estimated Delivery:
+                </ThemedText>
+                <ThemedText style={[styles.orderInfoValue, { color: C.text }]}>
+                  {formatDate(order.estimated_delivery_date)}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+
+          {/* Order Items */}
+          {items.length > 0 && (
+            <View style={[styles.orderItemsCard, { backgroundColor: C.card }]}>
+              <ThemedText
+                style={[styles.orderSectionTitle, { color: C.text }]}
+              >
+                Order Items ({items.length})
+              </ThemedText>
+              {items.map((item, index) => (
+                <View
+                  key={item.id || index}
+                  style={[
+                    styles.orderItemRow,
+                    index > 0 && {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      paddingTop: 12,
+                      marginTop: 12,
+                    },
+                  ]}
+                >
+                  <View style={styles.orderItemInfo}>
+                    <ThemedText
+                      style={[styles.orderItemName, { color: C.text }]}
+                      numberOfLines={2}
+                    >
+                      {item.name || "Product"}
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.orderItemPrice, { color: C.primary }]}
+                    >
+                      {formatCurrency(item.unit_price)}
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.orderItemQty, { color: C.sub }]}
+                    >
+                      Quantity: {item.qty || 0}
+                    </ThemedText>
+                    {item.sku && (
+                      <ThemedText
+                        style={[styles.orderItemSku, { color: C.sub }]}
+                      >
+                        SKU: {item.sku}
+                      </ThemedText>
+                    )}
+                  </View>
+                  <View style={styles.orderItemTotal}>
+                    <ThemedText
+                      style={[styles.orderItemTotalText, { color: C.text }]}
+                    >
+                      {formatCurrency(item.line_total || item.unit_price * (item.qty || 0))}
+                    </ThemedText>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Order Summary */}
+          <View style={[styles.orderSummaryCard, { backgroundColor: C.card }]}>
+            <ThemedText
+              style={[styles.orderSectionTitle, { color: C.text }]}
+            >
+              Order Summary
+            </ThemedText>
+
+            <View style={styles.orderSummaryRow}>
+              <ThemedText style={[styles.orderSummaryLabel, { color: C.sub }]}>
+                Items Subtotal:
+              </ThemedText>
+              <ThemedText
+                style={[styles.orderSummaryValue, { color: C.text }]}
+              >
+                {formatCurrency(itemsSubtotal)}
+              </ThemedText>
+            </View>
+
+            {discount > 0 && (
+              <View style={styles.orderSummaryRow}>
+                <ThemedText
+                  style={[styles.orderSummaryLabel, { color: C.sub }]}
+                >
+                  Discount:
+                </ThemedText>
+                <ThemedText
+                  style={[styles.orderSummaryValue, { color: "#10B981" }]}
+                >
+                  -{formatCurrency(discount)}
+                </ThemedText>
+              </View>
+            )}
+
+            {shippingFee > 0 && (
+              <View style={styles.orderSummaryRow}>
+                <ThemedText
+                  style={[styles.orderSummaryLabel, { color: C.sub }]}
+                >
+                  Shipping Fee:
+                </ThemedText>
+                <ThemedText
+                  style={[styles.orderSummaryValue, { color: C.text }]}
+                >
+                  {formatCurrency(shippingFee)}
+                </ThemedText>
+              </View>
+            )}
+
+            <View
+              style={[
+                styles.orderSummaryRow,
+                {
+                  borderTopWidth: 1,
+                  borderTopColor: C.line,
+                  marginTop: 8,
+                  paddingTop: 12,
+                },
+              ]}
+            >
+              <ThemedText
+                style={[styles.orderSummaryLabel, { color: C.text, fontWeight: "700", fontSize: 16 }]}
+              >
+                Total:
+              </ThemedText>
+              <ThemedText
+                style={[styles.orderSummaryValue, { color: C.primary, fontWeight: "700", fontSize: 16 }]}
+              >
+                {formatCurrency(total)}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Delivery Notes */}
+          {order.delivery_notes && (
+            <View style={[styles.orderNotesCard, { backgroundColor: C.card }]}>
+              <ThemedText
+                style={[styles.orderSectionTitle, { color: C.text }]}
+              >
+                Delivery Notes
+              </ThemedText>
+              <ThemedText style={[styles.orderNotesText, { color: C.sub }]}>
+                {order.delivery_notes}
+              </ThemedText>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -894,6 +1223,166 @@ const styles = StyleSheet.create({
   modalImage: {
     width: "90%",
     height: "70%",
+  },
+  // View Order Button
+  viewOrderButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8,
+  },
+  viewOrderButtonText: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  // Order Modal Styles
+  orderModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === "ios" ? 8 : 12,
+  },
+  orderModalBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  orderModalTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+  },
+  orderInfoCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  orderInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  orderInfoLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  orderInfoValue: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  orderStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  orderStatusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  orderItemsCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  orderSectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  orderItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  orderItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  orderItemName: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  orderItemPrice: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  orderItemQty: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  orderItemSku: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  orderItemTotal: {
+    alignItems: "flex-end",
+  },
+  orderItemTotalText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  orderSummaryCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  orderSummaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  orderSummaryLabel: {
+    fontSize: 14,
+  },
+  orderSummaryValue: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  orderNotesCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  orderNotesText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
   },
 });
 

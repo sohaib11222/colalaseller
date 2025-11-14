@@ -243,6 +243,7 @@ export default function RegisterStoreScreen() {
   const [showLocation, setShowLocation] = useState(false);
   const [locationSearch, setLocationSearch] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [fullName, setFullName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [storeEmail, setStoreEmail] = useState("");
   const [storePhone, setStorePhone] = useState("");
@@ -633,6 +634,7 @@ export default function RegisterStoreScreen() {
 
   const handleStartOnboarding = () => {
     if (
+      !fullName.trim() ||
       !storeName.trim() ||
       !storeEmail.trim() ||
       !storePhone.trim() ||
@@ -644,6 +646,7 @@ export default function RegisterStoreScreen() {
     }
 
     startOnboardingMutation.mutate({
+      full_name: fullName.trim(),
       store_name: storeName.trim(),
       store_email: storeEmail.trim(),
       store_phone: storePhone.trim(),
@@ -654,34 +657,36 @@ export default function RegisterStoreScreen() {
   };
 
   const handleUploadProfileMedia = () => {
-    if (!avatarUri || !bannerUri) {
-      Alert.alert("Error", "Please upload both profile image and banner image");
-      return;
+    // Profile photo and banner are now optional
+    const formData = new FormData();
+    
+    // Only append profile image if provided
+    if (avatarUri) {
+      formData.append("profile_image", {
+        uri: avatarUri,
+        type: "image/jpeg",
+        name: "profile_image.jpg",
+      });
+    }
+    
+    // Only append banner image if provided
+    if (bannerUri) {
+      formData.append("banner_image", {
+        uri: bannerUri,
+        type: "image/jpeg",
+        name: "banner_image.jpg",
+      });
     }
 
-    const formData = new FormData();
-    formData.append("profile_image", {
-      uri: avatarUri,
-      type: "image/jpeg",
-      name: "profile_image.jpg",
-    });
-    formData.append("banner_image", {
-      uri: bannerUri,
-      type: "image/jpeg",
-      name: "banner_image.jpg",
-    });
-
+    // Submit even if no images are provided
     uploadProfileMediaMutation.mutate(formData);
   };
 
   const handleSetCategoriesSocial = () => {
     console.log("selectedCategories", selectedCategories);
     console.log("links", links);
-    if (selectedCategories.length === 0) {
-      Alert.alert("Error", "Please select at least one category");
-      return;
-    }
-
+    
+    // Categories are now optional - allow submission even if no category is selected
     // selectedCategories already contains IDs
     const categoryIds = selectedCategories.map(id => Number(id));
 
@@ -700,7 +705,7 @@ export default function RegisterStoreScreen() {
     });
 
     setCategoriesSocialMutation.mutate({
-      categories: categoryIds,
+      categories: categoryIds.length > 0 ? categoryIds : [],
       social_links: socialLinks,
     });
   };
@@ -1035,6 +1040,11 @@ export default function RegisterStoreScreen() {
               {phase === 1 && (
                 <>
                   <Field
+                    placeholder="Full Name"
+                    value={fullName}
+                    onChangeText={setFullName}
+                  />
+                  <Field
                     placeholder="Store Name"
                     value={storeName}
                     onChangeText={setStoreName}
@@ -1074,7 +1084,7 @@ export default function RegisterStoreScreen() {
               {phase === 2 && (
                 <>
                   <ThemedText style={styles.uploadLabel}>
-                    Upload a profile picture for your store
+                    Upload a profile picture for your store <ThemedText style={{ color: "#6C727A", fontSize: 12 }}>(Optional)</ThemedText>
                   </ThemedText>
                   <TouchableOpacity
                     style={styles.avatarPicker}
@@ -1098,7 +1108,7 @@ export default function RegisterStoreScreen() {
                   </TouchableOpacity>
 
                   <ThemedText style={[styles.uploadLabel, { marginTop: 22 }]}>
-                    Upload a banner for your store
+                    Upload a banner for your store <ThemedText style={{ color: "#6C727A", fontSize: 12 }}>(Optional)</ThemedText>
                   </ThemedText>
                   <TouchableOpacity
                     style={styles.bannerPicker}
@@ -1129,13 +1139,13 @@ export default function RegisterStoreScreen() {
               {phase === 3 && (
                 <>
                   <ThemedText style={styles.sectionTitle}>
-                    Add Category
+                    Add Category <ThemedText style={{ color: "#6C727A", fontSize: 12 }}>(Optional)</ThemedText>
                   </ThemedText>
                   <PickerRow
                     label={
                       selectedCategories.length
                         ? `${selectedCategories.length} selected`
-                        : "Select Category"
+                        : "Select Category (Optional)"
                     }
                     onPress={() => setShowCategory(true)}
                     filled={!!selectedCategories.length}
@@ -1730,7 +1740,7 @@ export default function RegisterStoreScreen() {
           setHelpNotes={setHelpNotes}
           email={storeEmail}
           phone={storePhone}
-          fullName={storeName}
+          fullName={fullName || storeName}
           onboardingToken={onboardingToken}
         />
 

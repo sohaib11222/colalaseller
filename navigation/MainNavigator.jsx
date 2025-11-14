@@ -1,5 +1,5 @@
 // navigation/MainNavigator.jsx
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoleAccess } from "../hooks/useRoleAccess";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getToken } from "../utils/tokenStorage";
+import { getUnreadCount } from "../utils/queries/chats";
 
 import HomeScreen from "../screens/mainscreens/HomeScreen";
 import FeedScreen from "../screens/mainscreens/FeedScreen";
@@ -40,6 +43,32 @@ const COLOR = {
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
   const { screenAccess } = useRoleAccess();
+  const queryClient = useQueryClient();
+
+  // Fetch unread count
+  const { data: unreadData } = useQuery({
+    queryKey: ["chat", "unread-count"],
+    queryFn: async () => {
+      const token = await getToken();
+      const res = await getUnreadCount(token);
+      return res?.data || { total_unread: 0, regular_chat_unread: 0, dispute_chat_unread: 0 };
+    },
+    staleTime: 0, // Always consider stale
+    refetchInterval: 2_000, // Auto-refetch every 2 seconds
+  });
+
+  const unreadCount = unreadData?.total_unread || 0;
+
+  // Refetch unread count when navigating to Chat tab
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("state", () => {
+      const currentRoute = navigation.getState()?.routes[navigation.getState()?.index]?.name;
+      if (currentRoute === "Chat") {
+        queryClient.invalidateQueries({ queryKey: ["chat", "unread-count"] });
+      }
+    });
+    return unsubscribe;
+  }, [navigation, queryClient]);
 
   const onPress = (route, isFocused, index) => {
     // Check access based on route name
@@ -142,10 +171,20 @@ function CustomTabBar({ state, descriptors, navigation }) {
                 style={styles.tabBtn}
                 activeOpacity={0.8}
               >
-                <Image
-                  source={TAB_ICONS[route.name]}
-                  style={[styles.icon, { tintColor: color }]}
-                />
+                <View style={styles.iconContainer}>
+                  <Image
+                    source={TAB_ICONS[route.name]}
+                    style={[styles.icon, { tintColor: color }]}
+                  />
+                  {/* Show unread badge on Chat icon */}
+                  {route.name === "Chat" && unreadCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[styles.label, { color }]} numberOfLines={1}>
                   {route.name}
                 </Text>
@@ -232,8 +271,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
+  iconContainer: {
+    position: "relative",
+  },
   icon: { width: 22, height: 22, resizeMode: "contain" },
   label: { fontSize: 11, fontWeight: "400" },
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -8,
+    backgroundColor: COLOR.active,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: COLOR.barBg,
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+  },
 
   // Raised Home
   homeBadge: {

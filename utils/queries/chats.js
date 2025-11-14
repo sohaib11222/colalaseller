@@ -26,3 +26,10 @@ export const getUserStatus = async (userId, token) => {
     if (!userId) throw new Error("userId is required");
     return apiCall(API_ENDPOINTS.USERS.GetStatus(userId), "GET", undefined, token);
 };
+
+/**
+ * Get unread message count
+ * response: { status: "success", data: { total_unread: 0, regular_chat_unread: 0, dispute_chat_unread: 0 }, message }
+ */
+export const getUnreadCount = async (token) =>
+    await apiCall(API_ENDPOINTS.CHATS.Unread_Count, "GET", undefined, token);

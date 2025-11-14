@@ -146,25 +146,61 @@ export default function ChatDetailsScreen() {
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Please grant permission to access your photo library."
-        );
-        return;
-      }
+      Alert.alert(
+        "Select Image Source",
+        "Choose how you want to add image",
+        [
+          {
+            text: "Gallery",
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== "granted") {
+                Alert.alert(
+                  "Permission Required",
+                  "Please grant permission to access your photo library."
+                );
+                return;
+              }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+              });
 
-      if (!result.canceled && result.assets[0]) {
-        setImageUri(result.assets[0].uri);
-      }
+              if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: "Camera",
+            onPress: async () => {
+              const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+              if (cameraStatus.status !== "granted") {
+                Alert.alert("Permission needed", "Please grant camera access");
+                return;
+              }
+
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets[0]) {
+                setImageUri(result.assets[0].uri);
+              }
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
     } catch (error) {
       console.log("Image picker error:", error);
       Alert.alert("Error", "Failed to pick image. Please try again.");

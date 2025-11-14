@@ -224,6 +224,7 @@ const API_ENDPOINTS = {
     List: `${API_DOMAIN}/seller/chat`,
     Details: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/messages`,
     Send: (chatId) => `${API_DOMAIN}/seller/chat/${chatId}/send`,
+    Unread_Count: `${API_DOMAIN}/seller/chat/unread-count`,
   },
   USERS: {
     GetStatus: (userId) => `${API_DOMAIN}/users/${userId}/status`, // GET

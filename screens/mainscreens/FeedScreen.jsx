@@ -236,23 +236,65 @@ function CreatePostModal({
 
   const pickImages = async () => {
     try {
-      const res = await ImagePicker.launchImageLibraryAsync({
-        allowsMultipleSelection: true,
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.9,
-      });
-      if (res.canceled) return;
-      const assets = res.assets || [];
-      setNewFiles((prev) => [
-        ...prev,
-        ...assets
-          .filter((a) => a.uri)
-          .map((a, idx) => ({
-            uri: a.uri,
-            name: a.fileName || `photo_${Date.now()}_${idx}.jpg`,
-            type: a.mimeType || "image/jpeg",
-          })),
-      ]);
+      Alert.alert(
+        "Select Image Source",
+        "Choose how you want to add images",
+        [
+          {
+            text: "Gallery",
+            onPress: async () => {
+              const res = await ImagePicker.launchImageLibraryAsync({
+                allowsMultipleSelection: true,
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.9,
+              });
+              if (res.canceled) return;
+              const assets = res.assets || [];
+              setNewFiles((prev) => [
+                ...prev,
+                ...assets
+                  .filter((a) => a.uri)
+                  .map((a, idx) => ({
+                    uri: a.uri,
+                    name: a.fileName || `photo_${Date.now()}_${idx}.jpg`,
+                    type: a.mimeType || "image/jpeg",
+                  })),
+              ]);
+            },
+          },
+          {
+            text: "Camera",
+            onPress: async () => {
+              const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+              if (cameraStatus.status !== "granted") {
+                Alert.alert("Permission needed", "Please grant camera access");
+                return;
+              }
+              const res = await ImagePicker.launchCameraAsync({
+                allowsMultipleSelection: true,
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.9,
+              });
+              if (res.canceled) return;
+              const assets = res.assets || [];
+              setNewFiles((prev) => [
+                ...prev,
+                ...assets
+                  .filter((a) => a.uri)
+                  .map((a, idx) => ({
+                    uri: a.uri,
+                    name: a.fileName || `photo_${Date.now()}_${idx}.jpg`,
+                    type: a.mimeType || "image/jpeg",
+                  })),
+              ]);
+            },
+          },
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+        ]
+      );
     } catch (e) {
       console.log("pick error", e);
     }

@@ -407,6 +407,12 @@ const SettingsScreen = () => {
       img: require("../../../assets/Question.png"),
       leftColor: "#3EC9E5",
     },
+    {
+      key: "shopOnColala",
+      label: "Shop on Colala",
+      img: require("../../../assets/shop.png"),
+      leftColor: "#8B5CF6",
+    },
   ];
     
     // Debug logging for subscriptions item
@@ -476,6 +482,16 @@ const SettingsScreen = () => {
     // Handle support separately to show modal
     if (key === "support") {
       setShowSupportModal(true);
+      return;
+    }
+
+    // Handle external link for Shop on Colala
+    if (key === "shopOnColala") {
+      const url = "https://download.colalamall.com/";
+      Linking.openURL(url).catch((err) => {
+        console.error("Failed to open URL:", err);
+        Alert.alert("Error", "Unable to open the link. Please try again.");
+      });
       return;
     }
 

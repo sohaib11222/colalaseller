@@ -690,16 +690,51 @@ function CreateBannerModal({ visible, onClose, onSave, initialData, C, isLoading
   }, []);
 
   const pickBanner = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.9,
-    });
-    if (!res.canceled && res.assets?.[0]?.uri) {
-      setImageUri(res.assets[0].uri);
-      setImageFile(res.assets[0]);
-    }
+    Alert.alert(
+      "Select Image Source",
+      "Choose how you want to add image",
+      [
+        {
+          text: "Gallery",
+          onPress: async () => {
+            const res = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [16, 9],
+              quality: 0.9,
+            });
+            if (!res.canceled && res.assets?.[0]?.uri) {
+              setImageUri(res.assets[0].uri);
+              setImageFile(res.assets[0]);
+            }
+          },
+        },
+        {
+          text: "Camera",
+          onPress: async () => {
+            const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+            if (cameraStatus.status !== "granted") {
+              Alert.alert("Permission needed", "Please grant camera access");
+              return;
+            }
+            const res = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [16, 9],
+              quality: 0.9,
+            });
+            if (!res.canceled && res.assets?.[0]?.uri) {
+              setImageUri(res.assets[0].uri);
+              setImageFile(res.assets[0]);
+            }
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
   };
 
   const handleSave = () => {

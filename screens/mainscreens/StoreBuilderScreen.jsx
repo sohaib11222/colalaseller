@@ -193,13 +193,45 @@ export default function StoreBuilderScreen() {
     })();
   }, []);
   const pickImage = async (setter, aspect = [1, 1]) => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect,
-      quality: 0.9,
-    });
-    if (!res.canceled && res.assets?.[0]?.uri) setter(res.assets[0].uri);
+    Alert.alert(
+      "Select Image Source",
+      "Choose how you want to add image",
+      [
+        {
+          text: "Gallery",
+          onPress: async () => {
+            const res = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect,
+              quality: 0.9,
+            });
+            if (!res.canceled && res.assets?.[0]?.uri) setter(res.assets[0].uri);
+          },
+        },
+        {
+          text: "Camera",
+          onPress: async () => {
+            const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+            if (cameraStatus.status !== "granted") {
+              Alert.alert("Permission needed", "Please grant camera access");
+              return;
+            }
+            const res = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect,
+              quality: 0.9,
+            });
+            if (!res.canceled && res.assets?.[0]?.uri) setter(res.assets[0].uri);
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
   };
 
   const catNameById = (id) => {
