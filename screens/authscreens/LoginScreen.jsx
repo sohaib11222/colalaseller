@@ -95,15 +95,17 @@ const LoginScreen = () => {
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Top Image Banner */}
-          <Image
-            source={require("../../assets/mainimage2.png")}
-            style={styles.topImage}
-          />
+          <View style={styles.topRedSection}>
+            <Image
+              source={require("../../assets/mainimage2.png")}
+              style={styles.topImage}
+            />
+          </View>
 
           {/* White Card Container */}
           <View style={styles.card}>
@@ -225,7 +227,13 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#F9F9F9",
+  },
+  topRedSection: {
     backgroundColor: "#D5232C",
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   topImage: {
     width: "100%",
@@ -239,6 +247,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     padding: 24,
     marginTop: -40,
+    overflow: "hidden",
   },
   title: {
     fontSize: 24,

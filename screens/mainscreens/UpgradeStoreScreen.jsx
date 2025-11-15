@@ -30,10 +30,7 @@ const BRAND_COLORS = [
   "#0047FF",
   "#7A1C87",
   "#0BA84C",
-  "#FFA500",
-  "#00FF48",
   "#4C1066",
-  "#FBFF00",
   "#FF2B70",
   "#374F23",
 ];
@@ -56,7 +53,7 @@ import {
   storeOnboardingData,
   getOnboardingToken,
 } from "../../utils/tokenStorage";
-import { getProgress } from "../../utils/queries/seller";
+import { getProgress, getLevelDetail } from "../../utils/queries/seller";
 import { getCategories } from "../../utils/queries/general";
 
 export default function UpgradeStoreScreen({ navigation }) {
@@ -83,6 +80,25 @@ export default function UpgradeStoreScreen({ navigation }) {
     staleTime: 0, // Always consider stale to refetch on focus
   });
 
+  // Fetch all level data to validate actual completeness
+  const { data: level1Data } = useQuery({
+    queryKey: ["level1-detail-validation", token],
+    queryFn: () => getLevelDetail(1, token),
+    enabled: !!token && !!progressData?.steps,
+  });
+
+  const { data: level2Data } = useQuery({
+    queryKey: ["level2-detail-validation", token],
+    queryFn: () => getLevelDetail(2, token),
+    enabled: !!token && !!progressData?.steps,
+  });
+
+  const { data: level3Data } = useQuery({
+    queryKey: ["level3-detail-validation", token],
+    queryFn: () => getLevelDetail(3, token),
+    enabled: !!token && !!progressData?.steps,
+  });
+
   // Refetch progress every time screen is focused
   useFocusEffect(
     React.useCallback(() => {
@@ -98,8 +114,72 @@ export default function UpgradeStoreScreen({ navigation }) {
   const currentPercent = progressData?.percent || 0;
   const statusLabel = progressData?.status_label || "draft";
   
-  // Check if onboarding is complete
-  const isOnboardingComplete = progressSteps.every(step => step.status === "done");
+  // Validate actual data completeness (not just step status)
+  const validateActualCompleteness = useMemo(() => {
+    // Level 1 validation
+    const level1Complete = !!(
+      level1Data?.status &&
+      level1Data?.profile_image &&
+      level1Data?.banner_image &&
+      level1Data?.selected_category_ids &&
+      level1Data.selected_category_ids.length > 0
+    );
+
+    // Level 2 validation
+    const business = level2Data?.business || {};
+    const hasBusinessNumber = business.business_type === "RC" 
+      ? !!business.cac_number 
+      : business.business_type === "BN" 
+        ? !!business.bn_number 
+        : !!(business.bn_number || business.cac_number);
+    
+    const hasRequiredDocument = business.business_type === "RC"
+      ? !!(business.nin_document_url && business.cac_document_url) // Both required for RC
+      : !!business.nin_document_url; // Only NIN required for BN/LTD
+    
+    const level2Complete = !!(
+      level2Data?.status &&
+      business.registered_name &&
+      business.business_type &&
+      business.nin_number &&
+      hasBusinessNumber &&
+      hasRequiredDocument
+    );
+
+    // Level 3 validation
+    const physical = level3Data?.physical_store || {};
+    const level3Complete = !!(
+      level3Data?.status &&
+      level3Data?.theme_color &&
+      physical.utility_bill_url &&
+      level3Data?.addresses &&
+      level3Data.addresses.length > 0 &&
+      physical.has_physical_store !== undefined
+    );
+
+    return {
+      level1: level1Complete,
+      level2: level2Complete,
+      level3: level3Complete,
+      allComplete: level1Complete && level2Complete && level3Complete,
+    };
+  }, [level1Data, level2Data, level3Data]);
+
+  // Check if onboarding is complete - must have both step status AND actual data
+  // Only show completion if all data has been validated
+  const isOnboardingComplete = useMemo(() => {
+    // First check if all steps are marked as done
+    const allStepsDone = progressSteps.length > 0 && progressSteps.every(step => step.status === "done");
+    
+    // Then verify actual data exists (wait for data to load)
+    if (!allStepsDone) return false;
+    
+    // If we don't have level data yet, don't show completion (data is still loading)
+    if (!level1Data || !level2Data || !level3Data) return false;
+    
+    // Now check actual data completeness
+    return validateActualCompleteness.allComplete;
+  }, [progressSteps, level1Data, level2Data, level3Data, validateActualCompleteness]);
   
   // If all levels are complete, show current level as 3
   if (isOnboardingComplete) {
@@ -660,6 +740,76 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
     password: "",
     referral_code: "",
   });
+
+  // Always fetch Level 1 data when modal is visible (if user has any progress)
+  const shouldFetchLevel1 = useMemo(() => {
+    if (!progressData?.steps) return false;
+    // Always fetch if modal is visible and user has any progress
+    return true;
+  }, [progressData]);
+
+  // Fetch Level 1 data
+  const { data: level1Data } = useQuery({
+    queryKey: ["level1-detail", token],
+    queryFn: () => getLevelDetail(1, token),
+    enabled: visible && !!token && shouldFetchLevel1,
+  });
+
+  // Populate Level 1 data when loaded
+  useEffect(() => {
+    if (level1Data?.status && level1Data) {
+      // Load profile and banner images
+      if (level1Data.profile_image) {
+        const API_BASE = "https://colala.hmstech.xyz";
+        const profileUrl = level1Data.profile_image.startsWith("http") 
+          ? level1Data.profile_image 
+          : `${API_BASE}${level1Data.profile_image}`;
+        setAvatar(profileUrl);
+      }
+      if (level1Data.banner_image) {
+        const API_BASE = "https://colala.hmstech.xyz";
+        const bannerUrl = level1Data.banner_image.startsWith("http") 
+          ? level1Data.banner_image 
+          : `${API_BASE}${level1Data.banner_image}`;
+        setBanner(bannerUrl);
+      }
+      
+      // Load categories
+      if (level1Data.selected_category_ids && Array.isArray(level1Data.selected_category_ids)) {
+        setSelectedCats(level1Data.selected_category_ids);
+      }
+      
+      // Load social links
+      if (level1Data.social_links && Array.isArray(level1Data.social_links)) {
+        setLinks(prevLinks => {
+          const newLinks = { ...prevLinks };
+          level1Data.social_links.forEach(link => {
+            if (link.type && link.url) {
+              newLinks[link.type] = link.url;
+            }
+          });
+          return newLinks;
+        });
+      }
+    }
+  }, [level1Data]);
+
+  // Validate Level 1 completeness (check actual data, not just step status)
+  const validateLevel1Completeness = useMemo(() => {
+    const validation = {
+      profile_media: {
+        hasProfile: !!level1Data?.profile_image,
+        hasBanner: !!level1Data?.banner_image,
+        isComplete: !!(level1Data?.profile_image && level1Data?.banner_image),
+      },
+      categories_social: {
+        hasCategories: !!(level1Data?.selected_category_ids && level1Data.selected_category_ids.length > 0),
+        hasSocialLinks: !!(level1Data?.social_links && level1Data.social_links.length > 0),
+        isComplete: !!(level1Data?.selected_category_ids && level1Data.selected_category_ids.length > 0),
+      },
+    };
+    return validation;
+  }, [level1Data]);
 
   // Mutations
   const startOnboardingMutation = useMutation({
@@ -1301,9 +1451,172 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
     cac_number: "",
   });
 
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState({
+    nin_number: "",
+    bn_number: "",
+    cac_number: "",
+  });
+
   // Document uploads
   const [ninDocument, setNinDocument] = useState(null);
   const [cacDocument, setCacDocument] = useState(null);
+
+  // Always fetch Level 2 data when modal is visible (if user has any progress)
+  const shouldFetchLevel2 = useMemo(() => {
+    if (!progressData?.steps) return false;
+    // Always fetch if modal is visible and user has any progress
+    return true;
+  }, [progressData]);
+
+  // Fetch Level 2 data
+  const { data: level2Data } = useQuery({
+    queryKey: ["level2-detail", token],
+    queryFn: () => getLevelDetail(2, token),
+    enabled: visible && !!token && shouldFetchLevel2,
+  });
+
+  // Populate Level 2 data when loaded
+  useEffect(() => {
+    if (level2Data?.status && level2Data?.business) {
+      const business = level2Data.business;
+      setBusinessData(prev => ({
+        registered_name: business.registered_name || prev.registered_name,
+        business_type: business.business_type || prev.business_type,
+        nin_number: business.nin_number || prev.nin_number,
+        bn_number: business.bn_number || prev.bn_number,
+        cac_number: business.cac_number || prev.cac_number,
+      }));
+      
+      if (business.business_type) {
+        setBizType(business.business_type);
+      }
+      
+      // Load documents
+      const API_BASE = "https://colala.hmstech.xyz";
+      if (business.nin_document_url) {
+        const ninUrl = business.nin_document_url.startsWith("http") 
+          ? business.nin_document_url 
+          : `${API_BASE}${business.nin_document_url}`;
+        setNinDocument(ninUrl);
+      }
+      if (business.cac_document_url) {
+        const cacUrl = business.cac_document_url.startsWith("http") 
+          ? business.cac_document_url 
+          : `${API_BASE}${business.cac_document_url}`;
+        setCacDocument(cacUrl);
+      }
+    }
+  }, [level2Data]);
+
+  // Validate Level 2 completeness (check actual data, not just step status)
+  const validateLevel2Completeness = useMemo(() => {
+    const business = level2Data?.business || {};
+    const validation = {
+      business_details: {
+        hasRegisteredName: !!business.registered_name,
+        hasBusinessType: !!business.business_type,
+        hasNinNumber: !!business.nin_number,
+        hasBnOrCac: !!(business.bn_number || business.cac_number),
+        isComplete: !!(business.registered_name && business.business_type && business.nin_number && (business.bn_number || business.cac_number)),
+      },
+      documents: {
+        hasNinDocument: !!business.nin_document_url,
+        hasCacDocument: business.business_type === "RC" ? !!business.cac_document_url : true, // CAC only required for RC
+        isComplete: !!business.nin_document_url && (business.business_type === "RC" ? !!business.cac_document_url : true),
+      },
+    };
+    return validation;
+  }, [level2Data]);
+
+  // Validation functions
+  const validateNIN = (value) => {
+    // NIN should be digits only
+    if (value && !/^\d+$/.test(value)) {
+      return "NIN number must contain only digits";
+    }
+    return "";
+  };
+
+  const validateRC = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Must start with RC followed by exactly 7 digits
+    if (!/^RC\d{0,7}$/.test(upperValue)) {
+      if (!upperValue.startsWith("RC")) {
+        return "RC Number must start with 'RC'";
+      }
+      const digits = upperValue.replace("RC", "");
+      if (digits.length < 7) {
+        return "RC Number must have exactly 7 digits after 'RC'";
+      }
+      if (digits.length > 7) {
+        return "RC Number must have exactly 7 digits after 'RC'";
+      }
+    }
+    return "";
+  };
+
+  const validateBN = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Must start with BN followed by exactly 7 digits
+    if (!/^BN\d{0,7}$/.test(upperValue)) {
+      if (!upperValue.startsWith("BN")) {
+        return "BN Number must start with 'BN'";
+      }
+      const digits = upperValue.replace("BN", "");
+      if (digits.length < 7) {
+        return "BN Number must have exactly 7 digits after 'BN'";
+      }
+      if (digits.length > 7) {
+        return "BN Number must have exactly 7 digits after 'BN'";
+      }
+    }
+    return "";
+  };
+
+  // Format RC number (uppercase prefix, digits only)
+  const formatRC = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Remove all non-alphanumeric except RC prefix
+    const cleaned = upperValue.replace(/[^RC\d]/g, "");
+    // Ensure RC prefix
+    if (!cleaned.startsWith("RC")) {
+      // If it starts with digits, add RC prefix
+      if (/^\d/.test(cleaned)) {
+        return "RC" + cleaned.replace(/\D/g, "").slice(0, 7);
+      }
+      // Otherwise, add RC and keep only digits
+      return "RC" + cleaned.replace(/\D/g, "").slice(0, 7);
+    }
+    // Keep RC prefix and only digits after it, max 7 digits
+    const prefix = "RC";
+    const digits = cleaned.replace("RC", "").replace(/\D/g, "").slice(0, 7);
+    return prefix + digits;
+  };
+
+  // Format BN number (uppercase prefix, digits only)
+  const formatBN = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Remove all non-alphanumeric except BN prefix
+    const cleaned = upperValue.replace(/[^BN\d]/g, "");
+    // Ensure BN prefix
+    if (!cleaned.startsWith("BN")) {
+      // If it starts with digits, add BN prefix
+      if (/^\d/.test(cleaned)) {
+        return "BN" + cleaned.replace(/\D/g, "").slice(0, 7);
+      }
+      // Otherwise, add BN and keep only digits
+      return "BN" + cleaned.replace(/\D/g, "").slice(0, 7);
+    }
+    // Keep BN prefix and only digits after it, max 7 digits
+    const prefix = "BN";
+    const digits = cleaned.replace("BN", "").replace(/\D/g, "").slice(0, 7);
+    return prefix + digits;
+  };
 
   // Mutations
   const setBusinessDetailsMutation = useMutation({
@@ -1452,8 +1765,10 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
   useEffect(() => {
     if (bizType === "BN") {
       setBusinessData(prev => ({ ...prev, cac_number: "" })); // Clear RC Number if switching to BN
+      setValidationErrors(prev => ({ ...prev, cac_number: "" })); // Clear RC validation error
     } else if (bizType === "LTD") {
       setBusinessData(prev => ({ ...prev, bn_number: "" })); // Clear BN Number if switching to LTD
+      setValidationErrors(prev => ({ ...prev, bn_number: "" })); // Clear BN validation error
     }
   }, [bizType]);
 
@@ -1558,27 +1873,67 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
                 label={bizType ? bizType : "Business Type"}
                 onPress={() => setBizTypeOpen(true)}
               />
-              <ControlledInputBox 
-                C={C} 
-                placeholder="NIN Number" 
-                value={businessData.nin_number}
-                onChangeText={(text) => setBusinessData(prev => ({ ...prev, nin_number: text }))}
-              />
-              {bizType === "BN" && (
+              <View>
                 <ControlledInputBox 
                   C={C} 
-                  placeholder="BN Number" 
-                  value={businessData.bn_number}
-                  onChangeText={(text) => setBusinessData(prev => ({ ...prev, bn_number: text }))}
+                  placeholder="NIN Number" 
+                  value={businessData.nin_number}
+                  onChangeText={(text) => {
+                    // Only allow digits
+                    const digitsOnly = text.replace(/\D/g, "");
+                    setBusinessData(prev => ({ ...prev, nin_number: digitsOnly }));
+                    // Validate
+                    const error = validateNIN(digitsOnly);
+                    setValidationErrors(prev => ({ ...prev, nin_number: error }));
+                  }}
                 />
+                {validationErrors.nin_number ? (
+                  <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                    {validationErrors.nin_number}
+                  </ThemedText>
+                ) : null}
+              </View>
+              {bizType === "BN" && (
+                <View>
+                  <ControlledInputBox 
+                    C={C} 
+                    placeholder="BN Number (e.g., BN1234567)" 
+                    value={businessData.bn_number}
+                    onChangeText={(text) => {
+                      const formatted = formatBN(text);
+                      setBusinessData(prev => ({ ...prev, bn_number: formatted }));
+                      // Validate
+                      const error = validateBN(formatted);
+                      setValidationErrors(prev => ({ ...prev, bn_number: error }));
+                    }}
+                  />
+                  {validationErrors.bn_number ? (
+                    <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                      {validationErrors.bn_number}
+                    </ThemedText>
+                  ) : null}
+                </View>
               )}
               {bizType === "LTD" && (
-                <ControlledInputBox 
-                  C={C} 
-                  placeholder="RC Number" 
-                  value={businessData.cac_number}
-                  onChangeText={(text) => setBusinessData(prev => ({ ...prev, cac_number: text }))}
-                />
+                <View>
+                  <ControlledInputBox 
+                    C={C} 
+                    placeholder="RC Number (e.g., RC1234567)" 
+                    value={businessData.cac_number}
+                    onChangeText={(text) => {
+                      const formatted = formatRC(text);
+                      setBusinessData(prev => ({ ...prev, cac_number: formatted }));
+                      // Validate
+                      const error = validateRC(formatted);
+                      setValidationErrors(prev => ({ ...prev, cac_number: error }));
+                    }}
+                  />
+                  {validationErrors.cac_number ? (
+                    <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                      {validationErrors.cac_number}
+                    </ThemedText>
+                  ) : null}
+                </View>
               )}
 
               <View
@@ -1670,12 +2025,27 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
             <>
               <ThemedText style={{ color: C.text, marginBottom: 8 }}>
                 Upload a copy of your NIN Slip
+                {validateLevel2Completeness?.documents?.hasNinDocument ? (
+                  <ThemedText style={{ color: "#10B981", fontSize: 12, marginLeft: 8 }}>✓ Uploaded</ThemedText>
+                ) : (
+                  <ThemedText style={{ color: "#EF4444", fontSize: 12, marginLeft: 8 }}>⚠ Missing</ThemedText>
+                )}
               </ThemedText>
               <UploadBox label="NIN Slip" type="nin" documentUri={ninDocument} />
               <ThemedText
                 style={{ color: C.text, marginTop: 16, marginBottom: 8 }}
               >
                 Upload a copy of your CAC Certificate
+                {businessData.business_type === "RC" && (
+                  validateLevel2Completeness?.documents?.hasCacDocument ? (
+                    <ThemedText style={{ color: "#10B981", fontSize: 12, marginLeft: 8 }}>✓ Uploaded</ThemedText>
+                  ) : (
+                    <ThemedText style={{ color: "#EF4444", fontSize: 12, marginLeft: 8 }}>⚠ Missing (Required for RC)</ThemedText>
+                  )
+                )}
+                {businessData.business_type !== "RC" && businessData.business_type && (
+                  <ThemedText style={{ color: "#6B7280", fontSize: 12, marginLeft: 8 }}>(Optional for {businessData.business_type})</ThemedText>
+                )}
               </ThemedText>
               <UploadBox label="CAC Certificate" type="cac" documentUri={cacDocument} />
 
@@ -1783,6 +2153,77 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
   const [themeColor, setThemeColor] = useState("");
   const [utilityBillUri, setUtilityBillUri] = useState("");
   const [isSavingAndExiting, setIsSavingAndExiting] = useState(false);
+
+  // Always fetch Level 3 data when modal is visible (if user has any progress)
+  const shouldFetchLevel3 = useMemo(() => {
+    if (!progressData?.steps) return false;
+    // Always fetch if modal is visible and user has any progress
+    return true;
+  }, [progressData]);
+
+  // Fetch Level 3 data
+  const { data: level3Data } = useQuery({
+    queryKey: ["level3-detail", token],
+    queryFn: () => getLevelDetail(3, token),
+    enabled: visible && !!token && shouldFetchLevel3,
+  });
+
+  // Populate Level 3 data when loaded
+  useEffect(() => {
+    if (level3Data?.status && level3Data) {
+      // Load physical store data
+      if (level3Data.physical_store) {
+        const physical = level3Data.physical_store;
+        if (physical.has_physical_store !== undefined) {
+          setPhysicalAns(physical.has_physical_store ? "Yes i have a physical store" : "No i don't have a physical store");
+        }
+        if (physical.store_video_url) {
+          const API_BASE = "https://colala.hmstech.xyz";
+          const videoUrl = physical.store_video_url.startsWith("http") 
+            ? physical.store_video_url 
+            : `${API_BASE}${physical.store_video_url}`;
+          setVideoUri(videoUrl);
+        }
+        if (physical.utility_bill_url) {
+          const API_BASE = "https://colala.hmstech.xyz";
+          const utilityUrl = physical.utility_bill_url.startsWith("http") 
+            ? physical.utility_bill_url 
+            : `${API_BASE}${physical.utility_bill_url}`;
+          setUtilityBillUri(utilityUrl);
+        }
+      }
+      
+      // Load theme color
+      if (level3Data.theme_color) {
+        setThemeColor(level3Data.theme_color);
+      }
+    }
+  }, [level3Data]);
+
+  // Validate Level 3 completeness (check actual data, not just step status)
+  const validateLevel3Completeness = useMemo(() => {
+    const physical = level3Data?.physical_store || {};
+    const validation = {
+      physical_store: {
+        hasAnswer: physical.has_physical_store !== undefined,
+        hasVideo: !!physical.store_video_url,
+        isComplete: physical.has_physical_store !== undefined,
+      },
+      utility_bill: {
+        hasUtilityBill: !!physical.utility_bill_url,
+        isComplete: !!physical.utility_bill_url,
+      },
+      theme: {
+        hasTheme: !!level3Data?.theme_color,
+        isComplete: !!level3Data?.theme_color,
+      },
+      addresses: {
+        hasAddresses: !!(level3Data?.addresses && level3Data.addresses.length > 0),
+        isComplete: !!(level3Data?.addresses && level3Data.addresses.length > 0),
+      },
+    };
+    return validation;
+  }, [level3Data]);
 
   // Check step completion
   const isStepCompleted = (stepKey) => {

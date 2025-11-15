@@ -277,12 +277,65 @@ export default function AddProductScreen({ navigation, route }) {
   const [referralFee, setReferralFee] = useState("");
   const [referralPersonLimit, setReferralPersonLimit] = useState("");
 
+  // Helper function to flatten nested categories
+  const flattenCategories = (categories, depth = 0, result = []) => {
+    if (!Array.isArray(categories)) return result;
+    categories.forEach(category => {
+      result.push({ ...category, depth });
+      if (category.children && category.children.length > 0) {
+        flattenCategories(category.children, depth + 1, result);
+      }
+    });
+    return result;
+  };
+
+  // Get flattened categories for display
+  const flattenedCategories = useMemo(() => {
+    const categoriesTree = categoriesData?.data || [];
+    return flattenCategories(categoriesTree);
+  }, [categoriesData]);
+
+  // Helper to get category name by ID
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return null;
+    const id = Number(categoryId);
+    const category = flattenedCategories.find(c => Number(c.id) === id);
+    return category?.title || null;
+  };
+
   // Pre-fill form when in edit mode
   useEffect(() => {
     if (isEditMode && productData) {
       setName(productData.name || "");
+      // Category ID should be stored as string for consistency
       setCategory(productData.category_id?.toString() || "");
-      setBrand(productData.brand || "");
+      // Brand is stored as string (brand name) directly
+      // Check if productData.brand is a number (ID) or string (name)
+      let brandValue = "";
+      if (productData.brand) {
+        // Check if brand is a number (ID) or string (name)
+        if (typeof productData.brand === "number" || (typeof productData.brand === "string" && /^\d+$/.test(productData.brand))) {
+          // It's an ID, look up the brand name
+          const brandId = Number(productData.brand);
+          if (brandsData?.data) {
+            const brandObj = brandsData.data.find(b => Number(b.id) === brandId);
+            brandValue = brandObj?.name || "";
+          }
+        } else {
+          // It's already a brand name string
+          brandValue = productData.brand;
+        }
+      }
+      // Fallback to brand_name or brand_id lookup
+      if (!brandValue) {
+        brandValue = productData.brand_name || "";
+        if (!brandValue && productData.brand_id && brandsData?.data) {
+          // Look up brand name from brand_id
+          const brandObj = brandsData.data.find(b => Number(b.id) === Number(productData.brand_id));
+          brandValue = brandObj?.name || "";
+        }
+      }
+      setBrand(brandValue);
       setShortDesc(productData.description || "");
       setFullDesc(productData.description || "");
       setPrice(productData.price || "");
@@ -419,7 +472,7 @@ export default function AddProductScreen({ navigation, route }) {
         console.log("ℹ️ No variants found in productData");
       }
     }
-  }, [isEditMode, productData]);
+  }, [isEditMode, productData, brandsData]);
 
   const [tag1, setTag1] = useState("");
   const [tag2, setTag2] = useState("");
@@ -569,15 +622,6 @@ export default function AddProductScreen({ navigation, route }) {
         finalProductId,
       });
       return updateProduct(id, payload, token);
-    },
-    onSuccess: (data) => {
-      console.log("Product updated successfully:", data);
-      if (data.status === "success") {
-        Alert.alert("Success", "Product updated successfully!");
-        queryClient.invalidateQueries(["products"]);
-        queryClient.invalidateQueries(["productDetails"]);
-        navigation.goBack();
-      }
     },
     onError: (error) => {
       console.error("Error updating product:", error);
@@ -755,7 +799,11 @@ export default function AddProductScreen({ navigation, route }) {
     // Basic product information
     formData.append("name", name.trim());
     formData.append("category_id", category); // Category ID
-    formData.append("brand", brand); // Brand name (not brand_id)
+    // Ensure brand is always a name string, not an ID
+    const brandName = typeof brand === "string" && !/^\d+$/.test(brand) 
+      ? brand 
+      : (brandsData?.data?.find(b => Number(b.id) === Number(brand))?.name || brand || "");
+    formData.append("brand", brandName); // Brand name (not brand_id)
     formData.append("description", fullDesc.trim());
     formData.append("price", removeNumberSeparators(price.toString()));
     formData.append("discount_price", discountPrice ? removeNumberSeparators(discountPrice.toString()) : "");
@@ -915,7 +963,11 @@ export default function AddProductScreen({ navigation, route }) {
     // Basic product information
     formData.append("name", name.trim());
     formData.append("category_id", category); // Category ID
-    formData.append("brand", brand); // Brand name (not brand_id)
+    // Ensure brand is always a name string, not an ID
+    const brandName = typeof brand === "string" && !/^\d+$/.test(brand) 
+      ? brand 
+      : (brandsData?.data?.find(b => Number(b.id) === Number(brand))?.name || brand || "");
+    formData.append("brand", brandName); // Brand name (not brand_id)
     formData.append("description", fullDesc.trim());
     formData.append("price", removeNumberSeparators(price.toString()));
     formData.append("discount_price", discountPrice ? removeNumberSeparators(discountPrice.toString()) : "");
@@ -1101,79 +1153,109 @@ export default function AddProductScreen({ navigation, route }) {
           id: finalProductId,
           payload: productFormData,
         });
+        
+        // For updates, check response structure (could be status: "success" or status: true)
+        const isSuccess = productResult?.status === "success" || productResult?.status === true;
+        if (!isSuccess) {
+          throw new Error(
+            productResult?.message ||
+              "Failed to update product"
+          );
+        }
+        
+        // For updates, use the existing product ID
+        const productId = finalProductId;
+        console.log("Product updated with ID:", productId);
+        
+        // Invalidate queries after successful update
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        queryClient.invalidateQueries({ queryKey: ["productDetails", finalProductId] });
+        
+        // Show success and navigate
+        Alert.alert(
+          "Success",
+          "Product updated successfully!",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+        return; // Exit early for updates - don't continue with bulk prices/delivery
       } else {
         productFormData = createProductFormData();
         console.log("Create FormData created");
         productResult = await createProductMutation.mutateAsync(
           productFormData
         );
-      }
+        
+        if (productResult?.status !== "success" && productResult?.status !== true) {
+          throw new Error(
+            productResult?.message ||
+              "Failed to create product"
+          );
+        }
 
-      if (productResult?.status !== "success") {
-        throw new Error(
-          productResult?.message ||
-            `Failed to ${isEditMode ? "update" : "create"} product`
+        const productId = productResult?.data?.id || productResult?.id;
+        if (!productId) {
+          throw new Error("Product ID not returned from server");
+        }
+
+        console.log("Product created with ID:", productId);
+        console.log(
+          "Product creation completed successfully - all data sent in single request"
         );
-      }
 
-      const productId = productResult?.data?.id;
-      if (!productId) {
-        throw new Error("Product ID not returned from server");
-      }
+        // Step 3: Set bulk prices if tiers exist
+        if (tiers.length > 0) {
+          console.log("Setting bulk prices...");
+          const bulkPricesPayload = {
+            prices: tiers.map((tier) => ({
+              min_quantity: parseInt(tier.minQuantity) || 10,
+              amount: parseFloat(tier.amount) || 0,
+              discount_percent: parseFloat(tier.discount) || 0,
+            })),
+          };
 
-      console.log("Product created with ID:", productId);
-      console.log(
-        "Product creation completed successfully - all data sent in single request"
-      );
-
-      // Step 3: Set bulk prices if tiers exist
-      if (tiers.length > 0) {
-        console.log("Setting bulk prices...");
-        const bulkPricesPayload = {
-          prices: tiers.map((tier) => ({
-            min_quantity: parseInt(tier.minQuantity) || 10,
-            amount: parseFloat(tier.amount) || 0,
-            discount_percent: parseFloat(tier.discount) || 0,
-          })),
-        };
-
-        await setBulkPricesMutation.mutateAsync({
-          productId,
-          payload: bulkPricesPayload,
-        });
-      }
-
-      // Step 4: Attach delivery options
-      if (delivery.length > 0) {
-        console.log("Attaching delivery options...");
-        const deliveryOptionIds = delivery.map((d) => d.id).filter((id) => id);
-
-        if (deliveryOptionIds.length > 0) {
-          await attachDeliveryMutation.mutateAsync({
+          await setBulkPricesMutation.mutateAsync({
             productId,
-            payload: { delivery_option_ids: deliveryOptionIds },
+            payload: bulkPricesPayload,
           });
         }
-      }
 
-      console.log("Product operation completed successfully!");
+        // Step 4: Attach delivery options
+        if (delivery.length > 0) {
+          console.log("Attaching delivery options...");
+          const deliveryOptionIds = delivery.map((d) => d.id).filter((id) => id);
 
-      // Show success message to user
-      Alert.alert(
-        "Success",
-        isEditMode
-          ? "Product updated successfully!"
-          : "Product created successfully!",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Navigate back or reset form
-              navigation.goBack();
+          if (deliveryOptionIds.length > 0) {
+            await attachDeliveryMutation.mutateAsync({
+              productId,
+              payload: { delivery_option_ids: deliveryOptionIds },
+            });
+          }
+        }
+
+        console.log("Product operation completed successfully!");
+
+        // Show success message to user (only for create mode, update already handled above)
+        Alert.alert(
+          "Success",
+          "Product created successfully!",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Navigate back or reset form
+                navigation.goBack();
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      }
     } catch (error) {
       console.error("Product operation failed:", error);
       Alert.alert(
@@ -1535,9 +1617,8 @@ export default function AddProductScreen({ navigation, route }) {
         {/* Category (modal) */}
         <PickerField
           label={
-            category
-              ? categoriesData?.data?.find((c) => c.id === category)?.title ||
-                "Category"
+            category && getCategoryName(category)
+              ? getCategoryName(category)
               : "Category"
           }
           empty={!category}
@@ -1548,11 +1629,7 @@ export default function AddProductScreen({ navigation, route }) {
 
         {/* Brand (modal) */}
         <PickerField
-          label={
-            brand
-              ? brandsData?.data?.find((b) => b.id === brand)?.name || "Brand"
-              : "Brand"
-          }
+          label={brand || "Brand"}
           empty={!brand}
           onPress={() => setBrandOpen(true)}
           C={C}
@@ -2009,13 +2086,14 @@ export default function AddProductScreen({ navigation, route }) {
         visible={catOpen}
         onClose={() => setCatOpen(false)}
         onSelect={(v) => {
-          setCategory(v);
+          setCategory(v.toString());
           setCatOpen(false);
         }}
         C={C}
         categoriesData={categoriesData}
         isLoading={categoriesLoading}
         error={categoriesError}
+        selectedCategoryId={category ? Number(category) : null}
       />
       <BrandSheet
         visible={brandOpen}
@@ -2028,6 +2106,7 @@ export default function AddProductScreen({ navigation, route }) {
         brandsData={brandsData}
         isLoading={brandsLoading}
         error={brandsError}
+        selectedBrand={brand}
       />
 
       {/* Coupon selection modal */}
@@ -2153,6 +2232,7 @@ function CategoriesSheet({
   categoriesData,
   isLoading,
   error,
+  selectedCategoryId,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -2163,11 +2243,46 @@ function CategoriesSheet({
     }
   }, [visible]);
 
+  // Helper function to flatten nested categories with depth
+  const flattenCategories = (categories, depth = 0, result = []) => {
+    if (!Array.isArray(categories)) return result;
+    categories.forEach(category => {
+      result.push({ ...category, depth });
+      if (category.children && category.children.length > 0) {
+        flattenCategories(category.children, depth + 1, result);
+      }
+    });
+    return result;
+  };
+
+  // Get flattened categories - MUST be before any conditional returns
+  const categories = useMemo(() => {
+    const categoriesTree = categoriesData?.data || [];
+    return flattenCategories(categoriesTree);
+  }, [categoriesData]);
+
+  // Filter categories based on search query - MUST be before any conditional returns
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    const query = searchQuery.toLowerCase().trim();
+    return categories.filter((category) =>
+      category.title?.toLowerCase().includes(query)
+    );
+  }, [categories, searchQuery]);
+
+  // Helper to format category label with indentation
+  const getCategoryLabel = (category) => {
+    const indent = "   ".repeat(category.depth || 0);
+    return `${indent}${category.title}`;
+  };
+
   console.log(
     "CategoriesSheet visible:",
     visible,
     "categoriesData:",
-    categoriesData
+    categoriesData,
+    "selectedCategoryId:",
+    selectedCategoryId
   );
 
   // Handle loading state
@@ -2248,14 +2363,6 @@ function CategoriesSheet({
     );
   }
 
-  // Get categories from API data
-  const categories = categoriesData?.data || [];
-
-  // Filter categories based on search query
-  const filteredCategories = categories.filter((category) =>
-    category.title?.toLowerCase().includes(searchQuery.toLowerCase().trim())
-  );
-
   return (
     <Modal
       visible={visible}
@@ -2306,21 +2413,39 @@ function CategoriesSheet({
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
-              {filteredCategories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  onPress={() => onSelect(category.id)}
-                  style={[
-                    styles.sheetRow,
-                    { borderColor: C.line, backgroundColor: "#F3F4F6" },
-                  ]}
-                  activeOpacity={0.9}
-                >
-                  <ThemedText style={{ color: C.text }}>
-                    {category.title}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
+              {filteredCategories.map((category) => {
+                const categoryId = Number(category.id);
+                const isSelected = selectedCategoryId !== null && categoryId === selectedCategoryId;
+                return (
+                  <TouchableOpacity
+                    key={category.id}
+                    onPress={() => onSelect(category.id)}
+                    style={[
+                      styles.sheetRow,
+                      { 
+                        borderColor: C.line, 
+                        backgroundColor: isSelected ? C.primary + "20" : "#F3F4F6",
+                        borderLeftWidth: category.depth > 0 ? 3 : 0,
+                        borderLeftColor: category.depth > 0 ? C.primary : "transparent",
+                        paddingLeft: 12 + (category.depth || 0) * 16,
+                      },
+                    ]}
+                    activeOpacity={0.9}
+                  >
+                    <ThemedText 
+                      style={{ 
+                        color: isSelected ? C.primary : C.text,
+                        fontWeight: isSelected ? "600" : "400",
+                      }}
+                    >
+                      {getCategoryLabel(category)}
+                    </ThemedText>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={20} color={C.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           )}
         </View>
@@ -2337,8 +2462,30 @@ function BrandSheet({
   brandsData,
   isLoading,
   error,
+  selectedBrand,
 }) {
-  console.log("BrandSheet visible:", visible, "brandsData:", brandsData);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Reset search when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setSearchQuery("");
+    }
+  }, [visible]);
+
+  // Get brands from API data
+  const brands = brandsData?.data || [];
+
+  // Filter brands based on search query - MUST be before any early returns
+  const filteredBrands = useMemo(() => {
+    if (!searchQuery.trim()) return brands;
+    const query = searchQuery.toLowerCase().trim();
+    return brands.filter((brand) =>
+      brand.name?.toLowerCase().includes(query)
+    );
+  }, [brands, searchQuery]);
+
+  console.log("BrandSheet visible:", visible, "brandsData:", brandsData, "selectedBrand:", selectedBrand);
 
   // Handle loading state
   if (isLoading) {
@@ -2418,28 +2565,44 @@ function BrandSheet({
     );
   }
 
-  // Get brands from API data
-  const brands = brandsData?.data || [];
-
-  const Row = ({ brand }) => (
-    <TouchableOpacity
-      onPress={() => onSelect(brand.id)}
-      style={[
-        styles.sheetRow,
-        { borderColor: C.line, backgroundColor: "#F3F4F6" },
-      ]}
-      activeOpacity={0.9}
-    >
-      <View style={{ flex: 1 }}>
-        <ThemedText style={{ color: C.text }}>{brand.name}</ThemedText>
-        {brand.description && (
-          <ThemedText style={{ color: C.sub, fontSize: 11, marginTop: 2 }}>
-            {brand.description}
+  const Row = ({ brand }) => {
+    const isSelected = selectedBrand && selectedBrand.toLowerCase() === brand.name?.toLowerCase();
+    return (
+      <TouchableOpacity
+        onPress={() => onSelect(brand.name)}
+        style={[
+          styles.sheetRow,
+          { 
+            borderColor: C.line, 
+            backgroundColor: isSelected ? C.primary + "20" : "#F3F4F6",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          },
+        ]}
+        activeOpacity={0.9}
+      >
+        <View style={{ flex: 1 }}>
+          <ThemedText 
+            style={{ 
+              color: isSelected ? C.primary : C.text,
+              fontWeight: isSelected ? "600" : "400",
+            }}
+          >
+            {brand.name}
           </ThemedText>
+          {brand.description && (
+            <ThemedText style={{ color: C.sub, fontSize: 11, marginTop: 2 }}>
+              {brand.description}
+            </ThemedText>
+          )}
+        </View>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={20} color={C.primary} />
         )}
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal
@@ -2471,16 +2634,18 @@ function BrandSheet({
               placeholder="Search Brand"
               placeholderTextColor="#9BA0A6"
               style={{ flex: 1, color: C.text }}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
           </View>
 
-          {brands.length === 0 ? (
+          {filteredBrands.length === 0 ? (
             <View style={{ padding: 20, alignItems: "center" }}>
               <Ionicons name="business-outline" size={48} color={C.sub} />
               <ThemedText
                 style={{ color: C.sub, marginTop: 10, textAlign: "center" }}
               >
-                No brands available
+                {searchQuery.trim() ? "No brands found" : "No brands available"}
               </ThemedText>
             </View>
           ) : (
@@ -2489,7 +2654,7 @@ function BrandSheet({
                 Available Brands
               </ThemedText>
               <ScrollView showsVerticalScrollIndicator={false}>
-                {brands.map((brand) => (
+                {filteredBrands.map((brand) => (
                   <Row key={brand.id} brand={brand} />
                 ))}
               </ScrollView>

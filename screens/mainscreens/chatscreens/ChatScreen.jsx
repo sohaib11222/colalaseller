@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
 
   dropBtn: {
-    height: 50,
+    height: 60,
     minWidth: 120,
     paddingHorizontal: 12,
     borderRadius: 15,

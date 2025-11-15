@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import {
   Modal,
   Alert,
   Linking,
+  FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -24,6 +25,7 @@ import { API_DOMAIN } from "../../apiConfig"; // add this import
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getToken } from "../../utils/tokenStorage";
 import { getStoreBuilder } from "../../utils/queries/stores";
+import * as SellerQueries from "../../utils/queries/seller";
 import * as OrderQueries from "../../utils/queries/orders"; // latest 3 orders
 import { useQueryClient } from "@tanstack/react-query";
 import { getUserPlan, getBalance } from "../../utils/queries/settings";
@@ -100,7 +102,12 @@ const toAbs = (p) => {
 /** Extracts a usable URL from a banner object or string */
 const getBannerUrl = (b) => {
   if (!b) return "";
-  if (typeof b === "string") return toAbs(b);
+  if (typeof b === "string") {
+    // Use toFileUrl for consistency with StoreProfileModal
+    if (/^https?:\/\//i.test(b)) return b;
+    if (b.startsWith("/storage/")) return `${API_BASE}${b}`;
+    return `${API_BASE}/storage/${b}`;
+  }
 
   // Try all likely keys (your payload uses image_path)
   const raw =
@@ -112,7 +119,12 @@ const getBannerUrl = (b) => {
     b.banner_image ||
     "";
 
-  return toAbs(raw);
+  if (!raw) return "";
+  
+  // Use toFileUrl logic for consistency
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("/storage/")) return `${API_BASE}${raw}`;
+  return `${API_BASE}/storage/${raw}`;
 };
 
 // and keep this part the same, it will now resolve correctly:
@@ -142,7 +154,26 @@ export default function StoreHomeScreen() {
     staleTime: 60_000,
   });
 
-  const apiStore = builder?.store;
+  /* -------- fetch store overview for promotional banners -------- */
+  const {
+    data: overviewRes,
+    isLoading: overviewLoading,
+  } = useQuery({
+    queryKey: ["seller", "store_overview"],
+    queryFn: async () => {
+      const token = await getToken();
+      return await SellerQueries.getStoreOverview(token);
+    },
+    staleTime: 30_000,
+  });
+
+  // Handle different response structures
+  // API returns: { status: true, store: { permotaional_banners: [...] } }
+  const apiStore = builder?.store || builder?.data?.store || builder;
+  
+  // Get store data from overview (for promotional banners)
+  const overviewRoot = overviewRes?.data ?? overviewRes ?? {};
+  const overviewStore = overviewRoot.store || {};
 
   /* -------- fetch user plan for renewal check -------- */
   const {
@@ -214,12 +245,28 @@ export default function StoreHomeScreen() {
 
   /* -------- check if renewal is needed or free trial is available -------- */
   useEffect(() => {
+    // Don't check if userPlanData is still loading
+    if (!userPlanData || planLoading) {
+      return;
+    }
+    
     if (userPlanData?.data) {
       const planData = userPlanData.data;
       const isFreeTrialClaimed = planData.is_free_trial_claimed || false;
       
-      // Check if user is eligible for free trial (any plan + free trial not claimed)
-      if (!isFreeTrialClaimed) {
+      // Check if user has an active subscription (even if free trial flag isn't updated yet)
+      // This includes checking for subscription status, plan_id existence, and expiry status
+      const hasActiveSubscription = 
+        planData.subscription?.status === 'active' || 
+        (planData.subscription?.plan_id && !planData.is_expired) ||
+        (planData.subscription?.start_date && !planData.is_expired);
+      
+      // Only redirect to subscription if:
+      // 1. Free trial is NOT claimed
+      // 2. AND user does NOT have an active subscription
+      // 3. AND userPlanData is not loading (to avoid race conditions)
+      // This prevents redirecting users who just claimed free trial but API hasn't updated yet
+      if (!isFreeTrialClaimed && !hasActiveSubscription && !planLoading) {
         console.log("🆓 Free trial available - navigating to subscription");
         // Navigate to subscription page for free trial
         navigation.navigate("ChatNavigator", {
@@ -228,7 +275,7 @@ export default function StoreHomeScreen() {
         return;
       }
       
-      // If free trial is already claimed, check for renewal
+      // If free trial is already claimed OR user has active subscription, check for renewal
       const needsRenewal = planData.needs_renewal || false;
       const endDate = planData.subscription?.end_date;
       const isExpired = planData.is_expired || false;
@@ -362,9 +409,22 @@ export default function StoreHomeScreen() {
       banner_image: (apiStore.banner_image && typeof apiStore.banner_image === 'string' && apiStore.banner_image.trim() !== '') ? apiStore.banner_image : null, // header cover
       banner_link: apiStore.link || apiStore.banner_link || null, // link field for banner
       theme_color: pick(apiStore.theme_color, placeholders.theme_color, "theme_color"),
-      banners: Array.isArray(apiStore.banners) ? apiStore.banners : [],
+      banners: Array.isArray(apiStore?.permotaional_banners) ? apiStore.permotaional_banners : [],
     };
   }, [apiStore, theme?.colors?.primary]);
+  
+  // Debug: Log banner data
+  useEffect(() => {
+    console.log('[HomeScreen] Banner Debug:', {
+      overviewStore,
+      overviewStorePermotaionalBanners: overviewStore?.permotaional_banners,
+      apiStorePermotaionalBanners: apiStore?.permotaional_banners,
+      storeBanners: store.banners,
+      storeBannersLength: store.banners?.length,
+      promoBannersLength: promoBanners.length,
+      hasPromoBanner: promoBanners.length > 0
+    });
+  }, [overviewStore, apiStore, store.banners, promoBanners]);
 
   // Debug: Log the final store object to see what's being displayed
   useEffect(() => {
@@ -375,9 +435,21 @@ export default function StoreHomeScreen() {
       phone: store.phone,
       categories: store.categories,
       stats: store.stats,
-      theme_color: store.theme_color
+      theme_color: store.theme_color,
+      banners: store.banners,
+      bannersLength: store.banners?.length
     });
   }, [store]);
+  
+  // Debug: Log promo banners
+  useEffect(() => {
+    console.log('[StoreHome] Promo banners:', {
+      storeBanners: store.banners,
+      promoBanners: promoBanners,
+      hasPromoBanner: hasPromoBanner,
+      apiStoreBanners: apiStore?.permotaional_banners
+    });
+  }, [store.banners, promoBanners, hasPromoBanner, apiStore]);
 
   // sources (API if present, else local assets)
   const headerAvatarSource = store.profile_image
@@ -407,15 +479,36 @@ export default function StoreHomeScreen() {
     ? { uri: store.profile_image }
     : ASSETS.owner;
 
-  // promo below the card → use first store.banners[] item (falls back when empty)
-  const firstBannerUrl = useMemo(() => {
-    if (!store.banners?.length) return "";
-    // prefer the first banner that actually has a URL
-    const found = store.banners.map(getBannerUrl).find(Boolean);
-    return found || "";
-  }, [store.banners]);
+  // promo banners carousel - use overviewStore (from store overview API)
+  const promoBanners = useMemo(() => {
+    // Get banners from overviewStore (store overview API) - this is the correct source
+    const bannersArray = Array.isArray(overviewStore?.permotaional_banners) 
+      ? overviewStore.permotaional_banners 
+      : (Array.isArray(apiStore?.permotaional_banners) 
+          ? apiStore.permotaional_banners 
+          : (Array.isArray(store.banners) ? store.banners : []));
+    
+    if (!bannersArray?.length) {
+      return [];
+    }
+    
+    const filtered = bannersArray.filter(banner => {
+      if (!banner) return false;
+      const url = getBannerUrl(banner);
+      return !!url && url.trim() !== '';
+    });
+    
+    return filtered;
+  }, [overviewStore?.permotaional_banners, apiStore?.permotaional_banners, store.banners]);
 
-  const hasPromoBanner = !!firstBannerUrl;
+  const hasPromoBanner = promoBanners.length > 0;
+  
+  // Carousel state
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const bannerCarouselRef = useRef(null);
+  
+  // Banner item width (accounting for margins)
+  const bannerItemWidth = width - 32;
 
   /* -------- fetch latest orders (show only 3) -------- */
   const { data: latest3, isLoading: ordersLoading } = useQuery({
@@ -597,7 +690,7 @@ export default function StoreHomeScreen() {
                 style={styles.bannerPlaceholder}
                 onPress={() =>
                   navigation.navigate("ChatNavigator", {
-                    screen: "Announcements",
+                    screen: "StoreBuilder",
                   })
                 }
                 activeOpacity={0.8}
@@ -765,13 +858,72 @@ export default function StoreHomeScreen() {
           </View>
         </View>
 
-        {/* promo now uses the first item in store.banners[] */}
+        {/* Promotional banners carousel */}
         {hasPromoBanner ? (
-          <Image
-            source={{ uri: firstBannerUrl }}
-            style={styles.promoFull}
-            resizeMode="cover"
-          />
+          <View style={[styles.promoCarouselContainer, { marginHorizontal: 16, marginTop: 12 }]}>
+            <FlatList
+              ref={bannerCarouselRef}
+              data={promoBanners}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={bannerItemWidth}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              keyExtractor={(item, index) => `banner-${item.id || index}`}
+              getItemLayout={(data, index) => ({
+                length: bannerItemWidth,
+                offset: bannerItemWidth * index,
+                index,
+              })}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(
+                  event.nativeEvent.contentOffset.x / bannerItemWidth
+                );
+                setCurrentBannerIndex(index);
+              }}
+              renderItem={({ item }) => {
+                const bannerUrl = getBannerUrl(item);
+                const bannerLink = item.link || item.url || null;
+                
+                return (
+                  <TouchableOpacity
+                    style={[styles.promoBannerItem, { width: bannerItemWidth }]}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      if (bannerLink) {
+                        Linking.openURL(bannerLink).catch((err) => {
+                          console.error("Failed to open URL:", err);
+                          Alert.alert("Error", "Could not open the link");
+                        });
+                      }
+                    }}
+                    disabled={!bannerLink}
+                  >
+                    <Image
+                      source={{ uri: bannerUrl }}
+                      style={styles.promoFull}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+            {/* Pagination dots */}
+            {promoBanners.length > 1 && (
+              <View style={styles.paginationDots}>
+                {promoBanners.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.paginationDot,
+                      index === currentBannerIndex && styles.paginationDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
         ) : (
           <TouchableOpacity
             style={styles.promoPlaceholder}
@@ -1281,13 +1433,33 @@ const styles = StyleSheet.create({
   },
   actionBtnText: { color: "#fff", fontWeight: "600", fontSize: 12 },
 
-  promoFull: {
-    width: width - 32,
+  promoCarouselContainer: {
+    position: "relative",
+  },
+  promoBannerItem: {
     height: 170,
+  },
+  promoFull: {
+    width: "100%",
+    height: "100%",
     borderRadius: 20,
-    overflow: "hidden",
-    alignSelf: "center",
-    marginTop: 16,
+  },
+  paginationDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 12,
+    gap: 6,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#D1D5DB",
+  },
+  paginationDotActive: {
+    backgroundColor: "#E53E3E",
+    width: 20,
   },
   promoPlaceholder: {
     width: width - 32,

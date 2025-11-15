@@ -306,14 +306,27 @@ export default function StoreProfileModal({
     hasBanner,
     type: typeof bannerValue
   });
+  // Helper to get initials from name
+  const getInitials = (name) => {
+    if (!name || name === "Not set") return "?";
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return name[0].toUpperCase();
+  };
+
+  // Check if profile image exists and is valid
+  const hasProfileImage = !!(storeApi.profile_image && 
+    typeof storeApi.profile_image === 'string' && 
+    storeApi.profile_image.trim() !== '');
+
   const store = {
     name: storeApi.name || "Not set", // API
     email: storeApi.email || "Not set", // API
     phone: storeApi.phone || "Not set", // API
     location: storeApi.location || "Not set", // API
-    avatar:
-      toFileUrl(storeApi.profile_image) ||
-      require("../assets/Ellipse 18.png"),
+    avatar: hasProfileImage ? toFileUrl(storeApi.profile_image) : null,
     cover: hasBanner
       ? toFileUrl(storeApi.banner_image)
       : null,
@@ -331,15 +344,24 @@ export default function StoreProfileModal({
     0
   ); // API with fallback
 
-  const promoUrl = React.useMemo(() => {
+  const promoBanners = React.useMemo(() => {
     const arr = Array.isArray(storeApi?.permotaional_banners)
       ? storeApi.permotaional_banners
       : [];
-    const first = arr.map(getPromoUrl).find(Boolean);
-    return first || "";
+    return arr.filter(banner => {
+      const url = getPromoUrl(banner);
+      return !!url;
+    });
   }, [storeApi?.permotaional_banners]);
 
-  const hasPromoBanner = !!promoUrl;
+  const hasPromoBanner = promoBanners.length > 0;
+  
+  // Carousel state
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const bannerCarouselRef = useRef(null);
+  
+  // Banner item width (accounting for margins)
+  const bannerItemWidth = width - 32;
 
   /* tabs */
   const [tab, setTab] = useState("Products");
@@ -2003,10 +2025,18 @@ export default function StoreProfileModal({
                 </TouchableOpacity>
               </View>
             </View>
-            <Image
-              source={src(store.avatar) || require("../assets/Ellipse 18.png")}
-              style={styles.avatar}
-            />
+            {store.avatar ? (
+              <Image
+                source={src(store.avatar)}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <ThemedText style={styles.avatarInitials}>
+                  {getInitials(store.name)}
+                </ThemedText>
+              </View>
+            )}
           </View>
 
           {/* Open / Follow row */}
@@ -2177,14 +2207,72 @@ export default function StoreProfileModal({
             </View>
           )}
 
-          {/* Promo image (theme aware) */}
+          {/* Promotional banners carousel */}
           <View style={{ marginHorizontal: 16, marginTop: 12 }}>
             {hasPromoBanner ? (
-              <View style={{ borderRadius: 20, overflow: "hidden" }}>
-                <Image
-                  source={{ uri: promoUrl }}
-                  style={{ width: "100%", height: 170 }}
+              <View style={styles.promoCarouselContainer}>
+                <FlatList
+                  ref={bannerCarouselRef}
+                  data={promoBanners}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={bannerItemWidth}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  keyExtractor={(item, index) => `banner-${item.id || index}`}
+                  getItemLayout={(data, index) => ({
+                    length: bannerItemWidth,
+                    offset: bannerItemWidth * index,
+                    index,
+                  })}
+                  onMomentumScrollEnd={(event) => {
+                    const index = Math.round(
+                      event.nativeEvent.contentOffset.x / bannerItemWidth
+                    );
+                    setCurrentBannerIndex(index);
+                  }}
+                  renderItem={({ item }) => {
+                    const bannerUrl = getPromoUrl(item);
+                    const bannerLink = item.link || item.url || null;
+                    
+                    return (
+                      <TouchableOpacity
+                        style={[styles.promoBannerItem, { width: bannerItemWidth }]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          if (bannerLink) {
+                            Linking.openURL(bannerLink).catch((err) => {
+                              console.error("Failed to open URL:", err);
+                              Alert.alert("Error", "Could not open the link");
+                            });
+                          }
+                        }}
+                        disabled={!bannerLink}
+                      >
+                        <Image
+                          source={{ uri: bannerUrl }}
+                          style={styles.promoBannerImage}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
+                {/* Pagination dots */}
+                {promoBanners.length > 1 && (
+                  <View style={styles.paginationDots}>
+                    {promoBanners.map((_, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.paginationDot,
+                          index === currentBannerIndex && styles.paginationDotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                )}
               </View>
             ) : (
               <TouchableOpacity
@@ -2477,6 +2565,34 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     textAlign: "center",
   },
+  promoCarouselContainer: {
+    position: "relative",
+  },
+  promoBannerItem: {
+    height: 170,
+  },
+  promoBannerImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
+  },
+  paginationDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 12,
+    gap: 6,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#D1D5DB",
+  },
+  paginationDotActive: {
+    backgroundColor: "#E53E3E",
+    width: 20,
+  },
   promoPlaceholder: {
     width: "100%",
     height: 170,
@@ -2526,6 +2642,24 @@ const styles = StyleSheet.create({
     height: AVATAR,
     borderRadius: AVATAR / 2,
     backgroundColor: "#fff",
+  },
+  avatarPlaceholder: {
+    position: "absolute",
+    left: 16,
+    bottom: -AVATAR / 2,
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    backgroundColor: "#E53E3E",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+  avatarInitials: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "700",
   },
 
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },

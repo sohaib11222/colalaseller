@@ -624,13 +624,31 @@ export default function SubscriptionScreen() {
         "Success", 
         isFreeTrial 
           ? "Free trial activated successfully! Enjoy 30 days of premium features." 
-          : "Subscription activated successfully!"
+          : "Subscription activated successfully!",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Navigate to home after free trial claim
+              if (isFreeTrial) {
+                navigation.navigate("MainNavigator", { screen: "Home" });
+              }
+            }
+          }
+        ]
       );
       refetchUserPlan(); // Refetch to update is_free_trial_claimed
       refetchSubscription();
       refetchBalance();
       setShowPay(false);
       setSelectedPaymentMethod(null);
+      
+      // Auto-navigate to home after free trial (without waiting for alert)
+      if (isFreeTrial) {
+        setTimeout(() => {
+          navigation.navigate("MainNavigator", { screen: "Home" });
+        }, 500);
+      }
     },
     onError: (error) => {
       Alert.alert("Error", error.message || "Failed to subscribe. Please try again.");
@@ -818,7 +836,7 @@ export default function SubscriptionScreen() {
             onPress={() =>
               navigation.canGoBack()
                 ? navigation.goBack()
-                : navigation.navigate("Home")
+                : navigation.navigate("MainNavigator", { screen: "Home" })
             }
           style={styles.backButton}
           >
@@ -1079,6 +1097,17 @@ export default function SubscriptionScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* Done Button */}
+        <TouchableOpacity
+          style={styles.doneButton}
+          activeOpacity={0.8}
+          onPress={() => {
+            navigation.navigate("MainNavigator", { screen: "Home" });
+          }}
+        >
+          <ThemedText style={styles.doneButtonText}>Done</ThemedText>
+        </TouchableOpacity>
 
         {/* CTA Button */}
         {selectedPlan && (
@@ -1439,7 +1468,7 @@ const styles = StyleSheet.create({
   },
   featuresHeader: {
     backgroundColor: "#E53E3E",
-    height: 40,
+    height: 50,
     paddingHorizontal: 18,
     justifyContent: "center",
     borderTopLeftRadius: 15,
@@ -1450,16 +1479,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   featureRow: {
-    minHeight: 40,
+    height: 50,
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingVertical: 0,
     borderBottomWidth: 0.3,
     borderBottomColor: "#cdcdcd",
     justifyContent: "center",
+    alignItems: "flex-start",
   },
   featureLabel: {
     fontSize: 12,
     color: "rgba(0,0,0,0.5)",
+    lineHeight: 16,
   },
   planColumn: {
     backgroundColor: "#fff",
@@ -1470,9 +1501,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F5",
   },
   planPriceHeaderRow: {
-    minHeight: 40,
+    height: 50,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 0,
     borderBottomWidth: 0.3,
     borderBottomColor: "#cdcdcd",
     justifyContent: "center",
@@ -1482,11 +1513,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#000",
     fontWeight: "600",
+    textAlign: "center",
   },
   planFeatureRow: {
-    minHeight: 40,
+    height: 50,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 0,
     borderBottomWidth: 0.3,
     borderBottomColor: "#cdcdcd",
     justifyContent: "center",
@@ -1499,6 +1531,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#000",
     textAlign: "center",
+    lineHeight: 14,
   },
   checkIcon: {
     width: 18,
@@ -1533,6 +1566,23 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "400",
+  },
+  doneButton: {
+    marginHorizontal: 15,
+    marginTop: 16,
+    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: "#000",
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 50,
+  },
+  doneButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   loadingContainer: {
     padding: 40,

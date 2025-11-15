@@ -602,8 +602,14 @@ export default function StoreBuilderScreen() {
           {/* save */}
           <TouchableOpacity
             activeOpacity={0.9}
-            style={[styles.saveBtn, { backgroundColor: C.primary }, shadow(10)]}
+            style={[
+              styles.saveBtn, 
+              { backgroundColor: C.primary }, 
+              shadow(10),
+              saving && { opacity: 0.6 }
+            ]}
             onPress={() => {
+              if (saving) return; // Prevent multiple clicks
               console.log("🔘 StoreBuilder - Save button pressed");
               console.log("🔘 StoreBuilder - Selected category IDs:", selectedCatIds);
               console.log("🔘 StoreBuilder - Selected category IDs type:", typeof selectedCatIds, Array.isArray(selectedCatIds));
@@ -625,7 +631,10 @@ export default function StoreBuilderScreen() {
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <ActivityIndicator color="#fff" size="small" />
+                <ThemedText style={styles.saveTxt}>Saving...</ThemedText>
+              </View>
             ) : (
               <ThemedText style={styles.saveTxt}>Save Details</ThemedText>
             )}

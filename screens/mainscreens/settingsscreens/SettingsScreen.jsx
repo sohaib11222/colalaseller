@@ -29,6 +29,40 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useRoleAccess } from "../../../hooks/useRoleAccess";
 import AccessDeniedModal from "../../../components/AccessDeniedModal";
 import { getProgress } from "../../../utils/queries/seller";
+import { API_DOMAIN } from "../../../apiConfig";
+
+// Helper function to convert relative image paths to absolute URLs
+const API_BASE = API_DOMAIN.replace(/\/api\/?$/, ""); // -> https://colala.hmstech.xyz
+const toAbs = (p) => {
+  if (!p) return "";
+  if (typeof p !== "string") p = String(p || "");
+
+  // already absolute
+  if (/^https?:\/\//i.test(p)) return p;
+
+  // normalize (strip leading slashes)
+  const clean = p.replace(/^\/+/, "");
+
+  // common backend returns:
+  //   - "stores/profile_images/…"
+  //   - "storage/…"
+  // public URLs live under /storage/*
+  if (
+    clean.startsWith("banners/") ||
+    clean.startsWith("stores/") ||
+    clean.startsWith("store/")
+  ) {
+    return `${API_BASE}/storage/${clean}`;
+  }
+
+  // if backend already included "storage/…"
+  if (clean.startsWith("storage/")) {
+    return `${API_BASE}/${clean}`;
+  }
+
+  // last resort
+  return `${API_BASE}/${clean}`;
+};
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
@@ -621,9 +655,8 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.white }}>
-      {/* RED TOP */}
-      <View style={[styles.redTop, { backgroundColor: C.primary }]}>
-        {/* Header row */}
+      {/* HEADER ONLY - Fixed at top */}
+      <View style={[styles.headerOnly, { backgroundColor: C.primary }]}>
         <View style={styles.headerRow}>
           <ThemedText
             font="oleo"
@@ -649,141 +682,6 @@ const SettingsScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Profile row */}
-        <View style={styles.profileRow}>
-          <Image
-            source={
-              user?.store?.profile_image
-                ? {
-                    uri: `https://colala.hmstech.xyz/storage/${user.store.profile_image}`,
-                  }
-                : require("../../../assets/profile_placeholder.png")
-            }
-            style={[styles.profileImg, { borderColor: "#ffffff66" }]}
-          />
-          <View style={{ flex: 1 }}>
-            <View style={styles.nameRow}>
-              <ThemedText style={[styles.name, { color: C.white }]}>
-                {user?.store?.store_name || user?.full_name || "Store Name"}
-              </ThemedText>
-              {isOnboardingComplete && (
-                <View style={styles.verifyPill}>
-                  <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
-                </View>
-              )}
-            </View>
-            <View style={styles.locationRow}>
-              <ThemedText style={[styles.locationText, { color: C.white }]}>
-                {user?.store?.store_location || user?.state || "Location"}
-              </ThemedText>
-              <Ionicons name="caret-down" size={12} color={C.white} />
-            </View>
-          </View>
-        </View>
-
-        {/* Wallet card (top + bottom bar as one piece) */}
-        <View style={[styles.walletCard, { backgroundColor: C.white }]}>
-          <View style={{ flex: 1 }}>
-            <ThemedText style={[styles.walletLabel, { color: C.sub }]}>
-              Main Wallet
-            </ThemedText>
-            {isLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={C.primary} />
-                <ThemedText
-                  style={[
-                    styles.walletAmount,
-                    { marginLeft: 8, color: C.text },
-                  ]}
-                >
-                  Loading...
-                </ThemedText>
-              </View>
-            ) : error ? (
-              <ThemedText style={[styles.walletAmount, { color: C.danger }]}>
-                Error loading
-              </ThemedText>
-            ) : (
-              <ThemedText style={[styles.walletAmount, { color: C.text }]}>
-                ₦{parseFloat(shoppingBalance).toLocaleString()}
-                {parseFloat(shoppingBalance) === 0 && (
-                  <ThemedText style={{ fontSize: 14, opacity: 0.8 }}>
-                    {" "}
-                    (No funds)
-                  </ThemedText>
-                )}
-              </ThemedText>
-            )}
-          </View>
-          <TouchableOpacity
-            style={[styles.viewWalletBtn, { backgroundColor: C.primary }]}
-            onPress={() => onPressRow("wallet")}
-          >
-            <ThemedText style={styles.viewWalletText}>View Wallet</ThemedText>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Ad Credit and Plan Name */}
-        <View style={[styles.adCreditCard, { backgroundColor: C.white }]}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.adCreditRow}>
-              <ThemedText style={[styles.adCreditLabel, { color: C.sub }]}>
-                Ad Credit
-              </ThemedText>
-              {isLoading ? (
-                <ActivityIndicator size="small" color={C.primary} />
-              ) : error ? (
-                <ThemedText style={[styles.adCreditValue, { color: C.danger }]}>
-                  Error
-                </ThemedText>
-              ) : (
-                <ThemedText style={[styles.adCreditValue, { color: C.text }]}>
-                  ₦{parseFloat(adCredit).toLocaleString()}
-                </ThemedText>
-              )}
-            </View>
-            <View style={[styles.planNameRow, { marginTop: 8 }]}>
-              <ThemedText style={[styles.planNameLabel, { color: C.sub }]}>
-                Plan
-              </ThemedText>
-              {userPlanLoading ? (
-                <ActivityIndicator size="small" color={C.primary} />
-              ) : (
-                <ThemedText style={[styles.planNameValue, { color: C.text }]}>
-                  {userPlanName || "Basic"}
-                </ThemedText>
-              )}
-            </View>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={[styles.holdingBar, { backgroundColor: "#FF6B6B" }]}
-          onPress={() => onPressRow("holdingWallet")}
-        >
-          <ThemedText style={styles.holdingText}>
-            {isLoading ? (
-              "Loading escrow balance..."
-            ) : error ? (
-              "Error loading escrow balance"
-            ) : parseFloat(escrowBalance) === 0 ? (
-              <>
-                No funds locked in holding wallet{" "}
-                <ThemedText style={{ color: "#640505", fontSize: 13 }}>
-                  · Click to view
-                </ThemedText>
-              </>
-            ) : (
-              <>
-                ₦{parseFloat(escrowBalance).toLocaleString()} locked in holding
-                wallet{" "}
-                <ThemedText style={{ color: "#640505", fontSize: 13 }}>
-                  · Click to view
-                </ThemedText>
-              </>
-            )}
-          </ThemedText>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -801,6 +699,146 @@ const SettingsScreen = () => {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Combined Profile and Wallet section with red background */}
+        <View style={[styles.profileWalletContainer, { backgroundColor: C.primary }]}>
+          {/* Profile row */}
+          <View style={[styles.profileRow, { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }]}>
+            <Image
+              source={
+                user?.store?.profile_image
+                  ? {
+                      uri: toAbs(user.store.profile_image),
+                    }
+                  : require("../../../assets/profile_placeholder.png")
+              }
+              style={[styles.profileImg, { borderColor: "#ffffff66" }]}
+            />
+            <View style={{ flex: 1 }}>
+              <View style={styles.nameRow}>
+                <ThemedText style={[styles.name, { color: C.white }]}>
+                  {user?.store?.store_name || user?.full_name || "Store Name"}
+                </ThemedText>
+                {isOnboardingComplete && (
+                  <View style={styles.verifyPill}>
+                    <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.locationRow}>
+                <ThemedText style={[styles.locationText, { color: C.white }]}>
+                  {user?.store?.store_location || user?.state || "Location"}
+                </ThemedText>
+                <Ionicons name="caret-down" size={12} color={C.white} />
+              </View>
+            </View>
+          </View>
+
+          {/* Wallet section */}
+          {/* Wallet card (top + bottom bar as one piece) */}
+          <View style={[styles.walletCard, { backgroundColor: C.white, marginTop: 0, marginHorizontal: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[styles.walletLabel, { color: C.sub }]}>
+                Main Wallet
+              </ThemedText>
+              {isLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={C.primary} />
+                  <ThemedText
+                    style={[
+                      styles.walletAmount,
+                      { marginLeft: 8, color: C.text },
+                    ]}
+                  >
+                    Loading...
+                  </ThemedText>
+                </View>
+              ) : error ? (
+                <ThemedText style={[styles.walletAmount, { color: C.danger }]}>
+                  Error loading
+                </ThemedText>
+              ) : (
+                <ThemedText style={[styles.walletAmount, { color: C.text }]}>
+                  ₦{parseFloat(shoppingBalance).toLocaleString()}
+                  {parseFloat(shoppingBalance) === 0 && (
+                    <ThemedText style={{ fontSize: 14, opacity: 0.8 }}>
+                      {" "}
+                      (No funds)
+                    </ThemedText>
+                  )}
+                </ThemedText>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.viewWalletBtn, { backgroundColor: C.primary }]}
+              onPress={() => onPressRow("wallet")}
+            >
+              <ThemedText style={styles.viewWalletText}>View Wallet</ThemedText>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Ad Credit and Plan Name */}
+          <View style={[styles.adCreditCard, { backgroundColor: C.white, marginTop: -10, marginHorizontal: 16 }]}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.adCreditRow}>
+                <ThemedText style={[styles.adCreditLabel, { color: C.sub }]}>
+                  Ad Credit
+                </ThemedText>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={C.primary} />
+                ) : error ? (
+                  <ThemedText style={[styles.adCreditValue, { color: C.danger }]}>
+                    Error
+                  </ThemedText>
+                ) : (
+                  <ThemedText style={[styles.adCreditValue, { color: C.text }]}>
+                    ₦{parseFloat(adCredit).toLocaleString()}
+                  </ThemedText>
+                )}
+              </View>
+              <View style={[styles.planNameRow, { marginTop: 8 }]}>
+                <ThemedText style={[styles.planNameLabel, { color: C.sub }]}>
+                  Plan
+                </ThemedText>
+                {userPlanLoading ? (
+                  <ActivityIndicator size="small" color={C.primary} />
+                ) : (
+                  <ThemedText style={[styles.planNameValue, { color: C.text }]}>
+                    {userPlanName || "Basic"}
+                  </ThemedText>
+                )}
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.holdingBar, { backgroundColor: "#FF6B6B", marginTop: -10, marginHorizontal: 16, marginBottom: 0 }]}
+            onPress={() => onPressRow("holdingWallet")}
+          >
+            <ThemedText style={styles.holdingText}>
+              {isLoading ? (
+                "Loading escrow balance..."
+              ) : error ? (
+                "Error loading escrow balance"
+              ) : parseFloat(escrowBalance) === 0 ? (
+                <>
+                  No funds locked in holding wallet{" "}
+                  <ThemedText style={{ color: "#640505", fontSize: 13 }}>
+                    · Click to view
+                  </ThemedText>
+                </>
+              ) : (
+                <>
+                  ₦{parseFloat(escrowBalance).toLocaleString()} locked in holding
+                  wallet{" "}
+                  <ThemedText style={{ color: "#640505", fontSize: 13 }}>
+                    · Click to view
+                  </ThemedText>
+                </>
+              )}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+        {/* End of Combined Profile and Wallet section */}
+
         {/* Error State - Non-blocking banner */}
         {error && !isLoading && !errorDismissed && (
           <View style={styles.errorBanner}>
@@ -1284,10 +1322,17 @@ const OptionPillCard = ({
 
 /* ---------------- styles ---------------- */
 const styles = StyleSheet.create({
-  /* Red top */
+  /* Header only - Fixed at top */
+  headerOnly: {
+    paddingHorizontal: 16,
+    paddingTop: 32,
+    paddingBottom: 8,
+  },
+
+  /* Red top - deprecated, keeping for reference */
   redTop: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 0,
     paddingTop: 32,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
@@ -1487,6 +1532,24 @@ const styles = StyleSheet.create({
   errorRetryButtonText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  /* Combined Profile and Wallet container */
+  profileWalletContainer: {
+    paddingTop: 0,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
+  },
+
+  /* Old walletBackgroundSection - deprecated, keeping for reference */
+  walletBackgroundSection: {
+    paddingTop: 0,
+    paddingBottom: 16,
+    marginTop: -31,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: "hidden",
   },
   holdingBar: {
     opacity: 0.95,

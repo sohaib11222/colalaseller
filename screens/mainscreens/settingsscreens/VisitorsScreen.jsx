@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Alert,
   Image,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -22,6 +23,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
 import * as VisitorQueries from "../../../utils/queries/visitors";
 import * as ChatQueries from "../../../utils/queries/chats";
+import { getUserPlan } from "../../../utils/queries/settings";
 
 export default function VisitorsScreen() {
   const navigation = useNavigation();
@@ -36,6 +38,24 @@ export default function VisitorsScreen() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Fetch user plan to check if VIP or Pro
+  const { data: userPlanData } = useQuery({
+    queryKey: ["userPlan"],
+    queryFn: async () => {
+      const token = await getToken();
+      return await getUserPlan(token);
+    },
+    staleTime: 60_000, // Cache for 1 minute
+  });
+
+  // Check if user has VIP or Pro plan
+  const hasAccess = React.useMemo(() => {
+    if (!userPlanData?.data) return false;
+    const plan = (userPlanData?.data?.plan || "").toLowerCase();
+    return plan === "vip" || plan === "pro";
+  }, [userPlanData]);
 
   // Fetch visitors
   const {
@@ -166,6 +186,12 @@ export default function VisitorsScreen() {
   };
 
   const handleStartChat = async (visitor) => {
+    // Check plan access
+    if (!hasAccess) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     const userId = visitor?.visitor?.id;
     if (!userId) {
       Alert.alert("Error", "Visitor ID not found");
@@ -234,6 +260,12 @@ export default function VisitorsScreen() {
   };
 
   const handleViewHistory = (visitor) => {
+    // Check plan access
+    if (!hasAccess) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
     const visitorId = visitor?.visitor?.id;
     if (!visitorId) {
       Alert.alert("Error", "Visitor ID not found");
@@ -293,11 +325,18 @@ export default function VisitorsScreen() {
             <TouchableOpacity
               style={[
                 styles.viewHistoryButton,
-                { borderColor: C.primary },
+                { 
+                  borderColor: C.primary,
+                  opacity: hasAccess ? 1 : 0.6,
+                },
               ]}
               onPress={() => handleViewHistory(item)}
             >
-              <Ionicons name="time-outline" size={16} color={C.primary} />
+              {hasAccess ? (
+                <Ionicons name="time-outline" size={16} color={C.primary} />
+              ) : (
+                <Ionicons name="lock-closed" size={16} color={C.primary} />
+              )}
               <ThemedText style={[styles.viewHistoryButtonText, { color: C.primary }]}>
                 History
               </ThemedText>
@@ -306,7 +345,10 @@ export default function VisitorsScreen() {
               style={[
                 styles.chatButton,
                 {
-                  backgroundColor: hasChat ? C.line : C.primary,
+                  backgroundColor: hasAccess 
+                    ? (hasChat ? C.line : C.primary)
+                    : C.sub,
+                  opacity: hasAccess ? 1 : 0.6,
                 },
               ]}
               onPress={(e) => {
@@ -315,18 +357,26 @@ export default function VisitorsScreen() {
               }}
               disabled={startChatMutation.isPending}
             >
-              <Ionicons
-                name={hasChat ? "chatbubbles" : "chatbubble-outline"}
-                size={16}
-                color={hasChat ? C.sub : "#fff"}
-              />
+              {hasAccess ? (
+                <Ionicons
+                  name={hasChat ? "chatbubbles" : "chatbubble-outline"}
+                  size={16}
+                  color={hasChat ? C.sub : "#fff"}
+                />
+              ) : (
+                <Ionicons
+                  name="lock-closed"
+                  size={16}
+                  color="#fff"
+                />
+              )}
               <ThemedText
                 style={[
                   styles.chatButtonText,
-                  { color: hasChat ? C.sub : "#fff" },
+                  { color: hasAccess ? (hasChat ? C.sub : "#fff") : "#fff" },
                 ]}
               >
-                {hasChat ? "Chat" : "Start Chat"}
+                {hasAccess ? (hasChat ? "Chat" : "Start Chat") : "Locked"}
               </ThemedText>
             </TouchableOpacity>
           </View>
@@ -428,6 +478,53 @@ export default function VisitorsScreen() {
           )}
         />
       )}
+
+      {/* Upgrade Modal */}
+      <Modal
+        visible={showUpgradeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowUpgradeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: C.card }]}>
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalIconContainer, { backgroundColor: C.primary + "22" }]}>
+                <Ionicons name="lock-closed" size={32} color={C.primary} />
+              </View>
+              <ThemedText style={[styles.modalTitle, { color: C.text }]}>
+                Upgrade Required
+              </ThemedText>
+              <ThemedText style={[styles.modalMessage, { color: C.sub }]}>
+                Please upgrade your plan to VIP or Pro to access visitor details and start chatting with visitors.
+              </ThemedText>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, { borderColor: C.line }]}
+                onPress={() => setShowUpgradeModal(false)}
+              >
+                <ThemedText style={[styles.modalCancelText, { color: C.sub }]}>
+                  Cancel
+                </ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalUpgradeButton, { backgroundColor: C.primary }]}
+                onPress={() => {
+                  setShowUpgradeModal(false);
+                  navigation.navigate("ChatNavigator", {
+                    screen: "Subscription",
+                  });
+                }}
+              >
+                <ThemedText style={[styles.modalUpgradeText, { color: "#fff" }]}>
+                  Upgrade Plan
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -610,6 +707,72 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
     lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+  },
+  modalHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalMessage: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalUpgradeButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalUpgradeText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

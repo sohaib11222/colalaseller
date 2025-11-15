@@ -14,6 +14,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -107,10 +108,7 @@ const BRAND_COLORS = [
   "#0000FF",
   "#800080",
   "#008000",
-  "#FFA500",
-  "#00FF48",
   "#4C1066",
-  "#FBFF00",
   "#FF0066",
   "#374F23",
 ];
@@ -247,6 +245,7 @@ export default function RegisterStoreScreen() {
   const [storeName, setStoreName] = useState("");
   const [storeEmail, setStoreEmail] = useState("");
   const [storePhone, setStorePhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
@@ -274,6 +273,102 @@ export default function RegisterStoreScreen() {
   const [ninSlipUri, setNinSlipUri] = useState("");
   const [cacCertUri, setCacCertUri] = useState("");
 
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState({
+    ninNumber: "",
+    bnNumber: "",
+    cacNumber: "",
+  });
+
+  // Validation functions
+  const validateNIN = (value) => {
+    // NIN should be digits only
+    if (value && !/^\d+$/.test(value)) {
+      return "NIN number must contain only digits";
+    }
+    return "";
+  };
+
+  const validateRC = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Must start with RC followed by exactly 7 digits
+    if (!/^RC\d{0,7}$/.test(upperValue)) {
+      if (!upperValue.startsWith("RC")) {
+        return "RC Number must start with 'RC'";
+      }
+      const digits = upperValue.replace("RC", "");
+      if (digits.length < 7) {
+        return "RC Number must have exactly 7 digits after 'RC'";
+      }
+      if (digits.length > 7) {
+        return "RC Number must have exactly 7 digits after 'RC'";
+      }
+    }
+    return "";
+  };
+
+  const validateBN = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Must start with BN followed by exactly 7 digits
+    if (!/^BN\d{0,7}$/.test(upperValue)) {
+      if (!upperValue.startsWith("BN")) {
+        return "BN Number must start with 'BN'";
+      }
+      const digits = upperValue.replace("BN", "");
+      if (digits.length < 7) {
+        return "BN Number must have exactly 7 digits after 'BN'";
+      }
+      if (digits.length > 7) {
+        return "BN Number must have exactly 7 digits after 'BN'";
+      }
+    }
+    return "";
+  };
+
+  // Format RC number (uppercase prefix, digits only)
+  const formatRC = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Remove all non-alphanumeric except RC prefix
+    const cleaned = upperValue.replace(/[^RC\d]/g, "");
+    // Ensure RC prefix
+    if (!cleaned.startsWith("RC")) {
+      // If it starts with digits, add RC prefix
+      if (/^\d/.test(cleaned)) {
+        return "RC" + cleaned.replace(/\D/g, "").slice(0, 7);
+      }
+      // Otherwise, add RC and keep only digits
+      return "RC" + cleaned.replace(/\D/g, "").slice(0, 7);
+    }
+    // Keep RC prefix and only digits after it, max 7 digits
+    const prefix = "RC";
+    const digits = cleaned.replace("RC", "").replace(/\D/g, "").slice(0, 7);
+    return prefix + digits;
+  };
+
+  // Format BN number (uppercase prefix, digits only)
+  const formatBN = (value) => {
+    if (!value) return "";
+    const upperValue = value.toUpperCase();
+    // Remove all non-alphanumeric except BN prefix
+    const cleaned = upperValue.replace(/[^BN\d]/g, "");
+    // Ensure BN prefix
+    if (!cleaned.startsWith("BN")) {
+      // If it starts with digits, add BN prefix
+      if (/^\d/.test(cleaned)) {
+        return "BN" + cleaned.replace(/\D/g, "").slice(0, 7);
+      }
+      // Otherwise, add BN and keep only digits
+      return "BN" + cleaned.replace(/\D/g, "").slice(0, 7);
+    }
+    // Keep BN prefix and only digits after it, max 7 digits
+    const prefix = "BN";
+    const digits = cleaned.replace("BN", "").replace(/\D/g, "").slice(0, 7);
+    return prefix + digits;
+  };
+
   // ------------ Level 3 ------------
   const [showPhysicalModal, setShowPhysicalModal] = useState(false);
   const [physicalChoice, setPhysicalChoice] = useState("");
@@ -287,6 +382,7 @@ export default function RegisterStoreScreen() {
 
   // ------------ Misc ------------
   const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showHelpForm, setShowHelpForm] = useState(false);
   const [showBenefitsModal, setShowBenefitsModal] = useState(false);
   const [selectedService, setSelectedService] = useState("");
@@ -328,8 +424,10 @@ export default function RegisterStoreScreen() {
   useEffect(() => {
     if (businessType === "BN") {
       setCacNumber(""); // Clear RC Number if switching to BN
+      setValidationErrors(prev => ({ ...prev, cacNumber: "" })); // Clear RC validation error
     } else if (businessType === "LTD") {
       setBnNumber(""); // Clear BN Number if switching to LTD
+      setValidationErrors(prev => ({ ...prev, bnNumber: "" })); // Clear BN validation error
     }
   }, [businessType]);
 
@@ -645,6 +743,12 @@ export default function RegisterStoreScreen() {
       return;
     }
 
+    // Validate phone number (must be exactly 11 digits)
+    if (storePhone.trim().length !== 11) {
+      setPhoneError("Phone number must be exactly 11 digits");
+      return;
+    }
+
     // Check password strength
     const passwordStrength = getPasswordStrength(password.trim());
     if (passwordStrength.label === "Weak") {
@@ -656,11 +760,12 @@ export default function RegisterStoreScreen() {
       return;
     }
 
+    // Send only 11 digits to backend (without country code)
     startOnboardingMutation.mutate({
       full_name: fullName.trim(),
       store_name: storeName.trim(),
       store_email: storeEmail.trim(),
-      store_phone: storePhone.trim(),
+      store_phone: storePhone.trim(), // Already 11 digits only
       store_location: selectedLocation.trim(),
       password: password.trim(),
       referral_code: referralCode.trim() || null,
@@ -669,6 +774,13 @@ export default function RegisterStoreScreen() {
 
   const handleUploadProfileMedia = () => {
     // Profile photo and banner are now optional
+    // Check if any media is provided
+    if (!avatarUri && !bannerUri) {
+      // No media to upload - skip API call and proceed to next step
+      goNext();
+      return;
+    }
+
     const formData = new FormData();
     
     // Only append profile image if provided
@@ -689,7 +801,7 @@ export default function RegisterStoreScreen() {
       });
     }
 
-    // Submit even if no images are provided
+    // Only call API if there's actual data to send
     uploadProfileMediaMutation.mutate(formData);
   };
 
@@ -715,6 +827,17 @@ export default function RegisterStoreScreen() {
       }
     });
 
+    // Check if there's any data to send
+    const hasCategories = categoryIds.length > 0;
+    const hasSocialLinks = socialLinks.length > 0;
+
+    if (!hasCategories && !hasSocialLinks) {
+      // No data to send - skip API call and proceed to next step
+      goNext();
+      return;
+    }
+
+    // Only call API if there's actual data to send
     setCategoriesSocialMutation.mutate({
       categories: categoryIds.length > 0 ? categoryIds : [],
       social_links: socialLinks,
@@ -722,7 +845,21 @@ export default function RegisterStoreScreen() {
   };
 
   const handleSetBusinessDetails = () => {
-    // All fields are optional - allow submission with empty fields
+    // All fields are optional - skip API call if no data provided
+    const hasData = 
+      businessName.trim() || 
+      businessType.trim() || 
+      ninNumber.trim() || 
+      (businessType === "BN" && bnNumber.trim()) || 
+      (businessType === "LTD" && cacNumber.trim());
+    
+    if (!hasData) {
+      // No data to send - skip API call and proceed to next step
+      goNext();
+      return;
+    }
+
+    // Only call API if there's actual data to send
     setBusinessDetailsMutation.mutate({
       registered_name: businessName.trim() || null,
       business_type: businessType.trim() || null,
@@ -733,7 +870,15 @@ export default function RegisterStoreScreen() {
   };
 
   const handleUploadDocuments = () => {
-    // All documents are optional - allow submission without any documents
+    // All documents are optional - skip API call if no documents provided
+    // Check if any documents are provided
+    if (!ninSlipUri && !cacCertUri) {
+      // No documents to upload - skip API call and proceed to next step
+      goNext();
+      return;
+    }
+
+    // Only call API if there's actual data to send
     const formData = new FormData();
     
     // NIN document is optional - only append if provided
@@ -754,23 +899,28 @@ export default function RegisterStoreScreen() {
       });
     }
 
-    // Submit even if no documents are provided
+    // Only call API if there's actual data to send
     uploadDocumentsMutation.mutate(formData);
   };
 
   const handleUploadPhysicalStore = () => {
-    if (!physicalChoice) {
-      Alert.alert("Error", "Please select if you have a physical store");
+    // Physical store selection is optional - skip API call if no data provided
+    if (!physicalChoice && !videoUri) {
+      // No data to send - skip API call and proceed to next step
+      goNext();
       return;
     }
 
+    // Only call API if there's actual data to send
     const formData = new FormData();
     
-    // Add has_physical_store as string (1 or 0)
-    formData.append(
-      "has_physical_store",
-      physicalChoice === "Yes i have a physical store" ? "1" : "0"
-    );
+    // Add has_physical_store only if physicalChoice is provided
+    if (physicalChoice) {
+      formData.append(
+        "has_physical_store",
+        physicalChoice === "Yes i have a physical store" ? "1" : "0"
+      );
+    }
 
     // Add store_video if available - handle React Native FormData limitation
     if (videoUri) {
@@ -962,17 +1112,28 @@ export default function RegisterStoreScreen() {
   }, [otpTimer, showOtpModal]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: "#B91919" }]}>
-      <ScrollView>
-        {/* Top banner */}
-        <Image
-          source={require("../../assets/registermain3.png")}
-          style={styles.topBanner}
-          resizeMode="cover"
-        />
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Top Image Banner */}
+          <View style={styles.topRedSection}>
+            <Image
+              source={require("../../assets/registermain3.png")}
+              style={styles.topBanner}
+              resizeMode="cover"
+            />
+          </View>
 
-        {/* Card */}
-        <View style={styles.card}>
+          {/* Card */}
+          <View style={styles.card}>
           <ThemedText style={[styles.title, { color: theme.colors.primary }]}>
             Register
           </ThemedText>
@@ -1066,11 +1227,12 @@ export default function RegisterStoreScreen() {
                     value={storeEmail}
                     onChangeText={setStoreEmail}
                   />
-                  <Field
+                  <PhoneField
                     placeholder="Store Phone Number"
-                    keyboardType="phone-pad"
                     value={storePhone}
                     onChangeText={setStorePhone}
+                    error={phoneError}
+                    onErrorChange={setPhoneError}
                   />
                   <PickerRow
                     label={selectedLocation || "Store Location"}
@@ -1238,24 +1400,64 @@ export default function RegisterStoreScreen() {
                     onPress={() => setShowBusinessType(true)}
                     filled={!!businessType}
                   />
-                  <Field
-                    placeholder="NIN Number (Optional)"
-                    value={ninNumber}
-                    onChangeText={setNinNumber}
-                  />
-                  {businessType === "BN" && (
+                  <View>
                     <Field
-                      placeholder="BN Number (Optional)"
-                      value={bnNumber}
-                      onChangeText={setBnNumber}
+                      placeholder="NIN Number (Optional)"
+                      value={ninNumber}
+                      onChangeText={(text) => {
+                        // Only allow digits
+                        const digitsOnly = text.replace(/\D/g, "");
+                        setNinNumber(digitsOnly);
+                        // Validate
+                        const error = validateNIN(digitsOnly);
+                        setValidationErrors(prev => ({ ...prev, ninNumber: error }));
+                      }}
                     />
+                    {validationErrors.ninNumber ? (
+                      <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                        {validationErrors.ninNumber}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                  {businessType === "BN" && (
+                    <View>
+                      <Field
+                        placeholder="BN Number (Optional, e.g., BN1234567)"
+                        value={bnNumber}
+                        onChangeText={(text) => {
+                          const formatted = formatBN(text);
+                          setBnNumber(formatted);
+                          // Validate
+                          const error = validateBN(formatted);
+                          setValidationErrors(prev => ({ ...prev, bnNumber: error }));
+                        }}
+                      />
+                      {validationErrors.bnNumber ? (
+                        <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                          {validationErrors.bnNumber}
+                        </ThemedText>
+                      ) : null}
+                    </View>
                   )}
                   {businessType === "LTD" && (
-                    <Field
-                      placeholder="RC Number (Optional)"
-                      value={cacNumber}
-                      onChangeText={setCacNumber}
-                    />
+                    <View>
+                      <Field
+                        placeholder="RC Number (Optional, e.g., RC1234567)"
+                        value={cacNumber}
+                        onChangeText={(text) => {
+                          const formatted = formatRC(text);
+                          setCacNumber(formatted);
+                          // Validate
+                          const error = validateRC(formatted);
+                          setValidationErrors(prev => ({ ...prev, cacNumber: error }));
+                        }}
+                      />
+                      {validationErrors.cacNumber ? (
+                        <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                          {validationErrors.cacNumber}
+                        </ThemedText>
+                      ) : null}
+                    </View>
                   )}
                 </>
               )}
@@ -1431,7 +1633,7 @@ export default function RegisterStoreScreen() {
             // Last step: Single full-width button
             <TouchableOpacity
               style={[
-                styles.proceedBtnFull,
+                styles.submitCompleteBtn,
                 { backgroundColor: theme.colors.primary },
                 getCurrentMutation()?.isPending && styles.buttonDisabled,
               ]}
@@ -1497,14 +1699,6 @@ export default function RegisterStoreScreen() {
             </View>
           )}
 
-          {/* Login (disabled look) */}
-          <TouchableOpacity
-            style={styles.loginDisabled}
-            onPress={() => navigation.replace("Login")}
-          >
-            <ThemedText style={styles.loginDisabledText}>Login</ThemedText>
-          </TouchableOpacity>
-
           {/* Promo image inside card (no colored bg) */}
           {/* <Image
             source={require("../../assets/Frame 231.png")}
@@ -1513,24 +1707,24 @@ export default function RegisterStoreScreen() {
           /> */}
 
           {/* Terms */}
-          <ThemedText style={styles.footerText}>
-            By proceeding you agree to Colala’s{" "}
-            <TouchableOpacity onPress={() => setShowTerms(true)}>
+          <View style={styles.footerTextContainer}>
+            <ThemedText style={styles.footerText}>
+              By proceeding you agree to Colala's{" "}
               <ThemedText
-                style={[styles.linkText, { color: theme.colors.primary }]}
+                style={[styles.footerText, { color: theme.colors.primary }]}
+                onPress={() => setShowTerms(true)}
               >
                 terms of use
               </ThemedText>
-            </TouchableOpacity>{" "}
-            and{" "}
-            <TouchableOpacity>
+              {" "}and{" "}
               <ThemedText
-                style={[styles.linkText, { color: theme.colors.primary }]}
+                style={[styles.footerText, { color: theme.colors.primary }]}
+                onPress={() => setShowPrivacyPolicy(true)}
               >
                 privacy policy
               </ThemedText>
-            </TouchableOpacity>
-          </ThemedText>
+            </ThemedText>
+          </View>
         </View>
 
         {/* ---- Sheets & Modals ---- */}
@@ -1710,33 +1904,289 @@ export default function RegisterStoreScreen() {
           />
         </BottomSheet>
 
-        {/* Terms */}
-        <BottomSheet
+        {/* Terms Modal */}
+        <Modal
           visible={showTerms}
-          title="Terms of use"
-          onClose={() => setShowTerms(false)}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowTerms(false)}
         >
-          <ThemedText style={{ marginBottom: 8, color: "#333" }}>
-            Kindly read the Colala mall terms of use
-          </ThemedText>
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 16,
-              borderRadius: 14,
-              elevation: 2,
-            }}
-          >
-            <ThemedText style={{ fontWeight: "700", marginBottom: 6 }}>
-              Terms of Use for Colala Mall
-            </ThemedText>
-            <ThemedText style={{ marginBottom: 6 }}>
-              Welcome to Colala Mall. By using this app you confirm that you are
-              at least 18 years old or have parental consent, and that you have
-              the legal capacity to enter into this agreement.
-            </ThemedText>
+          <View style={styles.policyModalOverlay}>
+            <View style={styles.policyModalContent}>
+              <View style={styles.policyModalHeader}>
+                <ThemedText style={styles.policyModalTitle}>
+                  Colala Mall Seller Policy
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => setShowTerms(false)}
+                  style={styles.policyModalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={styles.policyModalScroll}
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.policyModalScrollContent}
+                nestedScrollEnabled={true}
+              >
+                <ThemedText style={[styles.policySectionTitle, { marginTop: 0 }]}>A. Introduction</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  This policy outlines the terms, conditions, and operational framework governing the use of colala mall by registered sellers. By subscribing to any plan and using the platform, sellers agree to comply with these policies to maintain a safe, transparent, and efficient marketplace.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>B. Platform overview</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Colala mall is a digital marketplace that connects buyers and sellers for the purpose of trading products and services. Colala mall does not warehouse inventory, charge commissions, or take possession of goods. The platform serves as a facilitator, enabling sellers to list, promote, and sell their products through subscription-based access.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>C. Seller subscription plans</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Sellers can select from three subscription tiers:{"\n"}
+                  1. Basic plan (₦5,000 / 30 days){"\n"}
+                  2. Pro plan (₦15,000 / 30 days){"\n"}
+                  3. VIP (₦35,000 / 30 days){"\n"}
+                  4. Gold Partner (Custom){"\n\n"}
+                  Please see Pricing pdf for detailed plan features{"\n\n"}
+                  Subscription fees are non-refundable once activated. Sellers must renew plans to retain access to store features and visibility on the platform.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>D. Vendor onboarding and store setup</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Colala offers a 3-minute seller ready application, allowing quick sign-up and store creation. Sellers can begin listing products immediately while completing their full verification later.{"\n\n"}
+                  Each seller is required to:{"\n"}
+                  • Provide accurate business and contact details.{"\n"}
+                  • Upload valid identification and store information and complete KYC Level 3{"\n"}
+                  • Agree to colala's terms of service and code of conduct.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>E. Product listing and management</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Sellers are solely responsible for the accuracy, legality, and authenticity of products listed.{"\n"}
+                  2. Misleading descriptions, counterfeit goods, or prohibited/illegal items are strictly forbidden.{"\n"}
+                  3. Sellers may upload bulk product data through csv files for efficiency and bulk/whole sales price list{"\n"}
+                  4. Sellers can assign multiple store locations and indicate product availability by location.{"\n"}
+                  5. Feeds and promotions: sellers may post promotional updates, discounts, and sales through the colala feeds feature.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>F. Payments and transactions</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala mall integrates a payment gateway in both the buyer and seller applications to facilitate seamless transactions.{"\n"}
+                  2. Colala does not receive, hold, or control buyer funds. Payments made through the platform are processed directly through third-party gateways to the seller's designated account.{"\n"}
+                  3. The cart and checkout features exist solely for order management buyer convenience and do not imply financial control or participation by colala.{"\n"}
+                  4. Colala provides escrow or buyer protection features in the future, governed by updated terms.{"\n"}
+                  5. Sellers are responsible for ensuring payment receipt and verifying orders and quality of product before dispatch.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>G. Logistics and delivery</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala mall does not provide or manage logistics services.{"\n"}
+                  2. Sellers are free to use their preferred domestic or third-party delivery providers.{"\n"}
+                  3. Sellers bear full responsibility for product delivery, condition, and buyer satisfaction.{"\n"}
+                  4. Colala monitors transaction patterns to ensure platform integrity and prevent fraud.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>H. Customer engagement and communication</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala provides an in-app chat system enabling buyers and sellers to communicate directly regarding inquiries or orders.{"\n"}
+                  2. Sellers must maintain professionalism, avoid spam or harassment, and use chat solely for legitimate business purposes.{"\n"}
+                  3. Sellers can award reward points or discounts to loyal customers or through referral programs.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>I. Seller conduct and compliance</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Sellers must adhere to all applicable laws and regulations.{"\n"}
+                  2. Fraudulent activity, sale of illegal goods, or misrepresentation will result in account suspension or termination.{"\n"}
+                  3. Sellers must not attempt to bypass colala's systems or engage in external solicitation that undermines platform integrity.{"\n"}
+                  4. Colala reserves the right to verify seller authenticity at any time.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>J. Intellectual property and content rights</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Sellers retain ownership of their product images, descriptions, and brand materials but grant colala a license to display them on the platform.{"\n"}
+                  2. Use of copyrighted material without authorization is prohibited.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>K. Limitation of liability</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala provides its platform on an "as-is" basis and makes no guarantees regarding transaction outcomes, product quality, or buyer behavior.{"\n"}
+                  2. Colala is not liable for disputes between buyers and sellers.{"\n"}
+                  3. Sellers are responsible for resolving customer complaints directly.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>L. Suspension and termination</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Colala reserves the right to suspend or terminate a seller's account without notice for violations of this policy, fraudulent behavior, or repeated customer complaints.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>M. Policy review and updates</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  This policy may be reviewed and updated periodically. Sellers will be notified of major changes via email or in-app alerts. Continued use of the platform implies acceptance of any updated terms.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>N. Account security and access control</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Each seller is responsible for maintaining the confidentiality and security of their login credentials, including username, password, and authentication details.{"\n"}
+                  2. Sellers agree not to share, transfer, or authorize others to access their colala mall account.{"\n"}
+                  3. Any activity performed through a seller's account shall be deemed to have been carried out by the account owner. Colala shall not be held liable for losses or damages resulting from unauthorized access or misuse.{"\n"}
+                  4. Sellers must immediately notify colala mall if they suspect any unauthorized use of their account or breach of security.{"\n"}
+                  5. Colala reserves the right to suspend or terminate accounts found to have compromised security or been accessed fraudulently.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>O. Disclaimer of warranties and limitation of liability</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala mall provides its platform and all related services "as is" and "as available." The company makes no express or implied warranties or representations regarding the reliability, accuracy, or availability of its services.{"\n"}
+                  2. Colala does not warrant that the platform will operate without interruption, errors, or security vulnerabilities, nor does it guarantee any specific outcomes from the use of its services.{"\n"}
+                  3. Colala mall is not responsible for the quality, safety, legality, or authenticity of products listed by sellers, nor for buyer behavior, delivery outcomes, or payment disputes.{"\n"}
+                  4. To the fullest extent permitted by law, colala disclaims all warranties, whether statutory, express, or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.{"\n"}
+                  5. Under no circumstances shall colala mall, its affiliates, employees, or agents be liable for any indirect, incidental, consequential, or punitive damages arising out of or related to the use of the platform.
+                </ThemedText>
+              </ScrollView>
+            </View>
           </View>
-        </BottomSheet>
+        </Modal>
+
+        {/* Privacy Policy Modal */}
+        <Modal
+          visible={showPrivacyPolicy}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowPrivacyPolicy(false)}
+        >
+          <View style={styles.policyModalOverlay}>
+            <View style={styles.policyModalContent}>
+              <View style={styles.policyModalHeader}>
+                <ThemedText style={styles.policyModalTitle}>
+                  Colala Mall Seller Policy
+                </ThemedText>
+                <TouchableOpacity
+                  onPress={() => setShowPrivacyPolicy(false)}
+                  style={styles.policyModalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                style={styles.policyModalScroll}
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.policyModalScrollContent}
+                nestedScrollEnabled={true}
+              >
+                <ThemedText style={[styles.policySectionTitle, { marginTop: 0 }]}>A. Introduction</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  This policy outlines the terms, conditions, and operational framework governing the use of colala mall by registered sellers. By subscribing to any plan and using the platform, sellers agree to comply with these policies to maintain a safe, transparent, and efficient marketplace.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>B. Platform overview</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Colala mall is a digital marketplace that connects buyers and sellers for the purpose of trading products and services. Colala mall does not warehouse inventory, charge commissions, or take possession of goods. The platform serves as a facilitator, enabling sellers to list, promote, and sell their products through subscription-based access.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>C. Seller subscription plans</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Sellers can select from three subscription tiers:{"\n"}
+                  1. Basic plan (₦5,000 / 30 days){"\n"}
+                  2. Pro plan (₦15,000 / 30 days){"\n"}
+                  3. VIP (₦35,000 / 30 days){"\n"}
+                  4. Gold Partner (Custom){"\n\n"}
+                  Please see Pricing pdf for detailed plan features{"\n\n"}
+                  Subscription fees are non-refundable once activated. Sellers must renew plans to retain access to store features and visibility on the platform.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>D. Vendor onboarding and store setup</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Colala offers a 3-minute seller ready application, allowing quick sign-up and store creation. Sellers can begin listing products immediately while completing their full verification later.{"\n\n"}
+                  Each seller is required to:{"\n"}
+                  • Provide accurate business and contact details.{"\n"}
+                  • Upload valid identification and store information and complete KYC Level 3{"\n"}
+                  • Agree to colala's terms of service and code of conduct.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>E. Product listing and management</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Sellers are solely responsible for the accuracy, legality, and authenticity of products listed.{"\n"}
+                  2. Misleading descriptions, counterfeit goods, or prohibited/illegal items are strictly forbidden.{"\n"}
+                  3. Sellers may upload bulk product data through csv files for efficiency and bulk/whole sales price list{"\n"}
+                  4. Sellers can assign multiple store locations and indicate product availability by location.{"\n"}
+                  5. Feeds and promotions: sellers may post promotional updates, discounts, and sales through the colala feeds feature.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>F. Payments and transactions</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala mall integrates a payment gateway in both the buyer and seller applications to facilitate seamless transactions.{"\n"}
+                  2. Colala does not receive, hold, or control buyer funds. Payments made through the platform are processed directly through third-party gateways to the seller's designated account.{"\n"}
+                  3. The cart and checkout features exist solely for order management buyer convenience and do not imply financial control or participation by colala.{"\n"}
+                  4. Colala provides escrow or buyer protection features in the future, governed by updated terms.{"\n"}
+                  5. Sellers are responsible for ensuring payment receipt and verifying orders and quality of product before dispatch.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>G. Logistics and delivery</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala mall does not provide or manage logistics services.{"\n"}
+                  2. Sellers are free to use their preferred domestic or third-party delivery providers.{"\n"}
+                  3. Sellers bear full responsibility for product delivery, condition, and buyer satisfaction.{"\n"}
+                  4. Colala monitors transaction patterns to ensure platform integrity and prevent fraud.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>H. Customer engagement and communication</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala provides an in-app chat system enabling buyers and sellers to communicate directly regarding inquiries or orders.{"\n"}
+                  2. Sellers must maintain professionalism, avoid spam or harassment, and use chat solely for legitimate business purposes.{"\n"}
+                  3. Sellers can award reward points or discounts to loyal customers or through referral programs.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>I. Seller conduct and compliance</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Sellers must adhere to all applicable laws and regulations.{"\n"}
+                  2. Fraudulent activity, sale of illegal goods, or misrepresentation will result in account suspension or termination.{"\n"}
+                  3. Sellers must not attempt to bypass colala's systems or engage in external solicitation that undermines platform integrity.{"\n"}
+                  4. Colala reserves the right to verify seller authenticity at any time.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>J. Intellectual property and content rights</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Sellers retain ownership of their product images, descriptions, and brand materials but grant colala a license to display them on the platform.{"\n"}
+                  2. Use of copyrighted material without authorization is prohibited.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>K. Limitation of liability</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala provides its platform on an "as-is" basis and makes no guarantees regarding transaction outcomes, product quality, or buyer behavior.{"\n"}
+                  2. Colala is not liable for disputes between buyers and sellers.{"\n"}
+                  3. Sellers are responsible for resolving customer complaints directly.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>L. Suspension and termination</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  Colala reserves the right to suspend or terminate a seller's account without notice for violations of this policy, fraudulent behavior, or repeated customer complaints.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>M. Policy review and updates</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  This policy may be reviewed and updated periodically. Sellers will be notified of major changes via email or in-app alerts. Continued use of the platform implies acceptance of any updated terms.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>N. Account security and access control</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Each seller is responsible for maintaining the confidentiality and security of their login credentials, including username, password, and authentication details.{"\n"}
+                  2. Sellers agree not to share, transfer, or authorize others to access their colala mall account.{"\n"}
+                  3. Any activity performed through a seller's account shall be deemed to have been carried out by the account owner. Colala shall not be held liable for losses or damages resulting from unauthorized access or misuse.{"\n"}
+                  4. Sellers must immediately notify colala mall if they suspect any unauthorized use of their account or breach of security.{"\n"}
+                  5. Colala reserves the right to suspend or terminate accounts found to have compromised security or been accessed fraudulently.
+                </ThemedText>
+
+                <ThemedText style={styles.policySectionTitle}>O. Disclaimer of warranties and limitation of liability</ThemedText>
+                <ThemedText style={styles.policyText}>
+                  1. Colala mall provides its platform and all related services "as is" and "as available." The company makes no express or implied warranties or representations regarding the reliability, accuracy, or availability of its services.{"\n"}
+                  2. Colala does not warrant that the platform will operate without interruption, errors, or security vulnerabilities, nor does it guarantee any specific outcomes from the use of its services.{"\n"}
+                  3. Colala mall is not responsible for the quality, safety, legality, or authenticity of products listed by sellers, nor for buyer behavior, delivery outcomes, or payment disputes.{"\n"}
+                  4. To the fullest extent permitted by law, colala disclaims all warranties, whether statutory, express, or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, or non-infringement.{"\n"}
+                  5. Under no circumstances shall colala mall, its affiliates, employees, or agents be liable for any indirect, incidental, consequential, or punitive damages arising out of or related to the use of the platform.
+                </ThemedText>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         {/* Need Help Signing Up Form */}
         <NeedHelpFormModal
@@ -1762,7 +2212,8 @@ export default function RegisterStoreScreen() {
           level={level}
           theme={theme}
         />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* OTP Verification Modal */}
       <Modal
@@ -1940,6 +2391,46 @@ function PasswordField({ placeholder, value, onChangeText, showPassword, onToggl
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+function PhoneField({ placeholder, value, onChangeText, error, onErrorChange }) {
+  const handlePhoneChange = (text) => {
+    // Remove all non-digit characters
+    const digitsOnly = text.replace(/\D/g, "");
+    
+    // Limit to 11 digits
+    const limitedDigits = digitsOnly.slice(0, 11);
+    
+    // Clear error when user starts typing
+    if (onErrorChange && error) {
+      onErrorChange("");
+    }
+    
+    // Update the state with only digits (no country code stored)
+    onChangeText(limitedDigits);
+  };
+
+  return (
+    <View>
+      <View style={[styles.inputWrapper, { flexDirection: "row", alignItems: "center" }]}>
+        <ThemedText style={styles.phonePrefix}>+234</ThemedText>
+        <TextInput
+          placeholder={placeholder}
+          placeholderTextColor="#9AA0A6"
+          style={[styles.input, { flex: 1, paddingLeft: 8 }]}
+          keyboardType="phone-pad"
+          value={value}
+          onChangeText={handlePhoneChange}
+          maxLength={11}
+        />
+      </View>
+      {error ? (
+        <ThemedText style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+          {error}
+        </ThemedText>
+      ) : null}
     </View>
   );
 }
@@ -2440,11 +2931,18 @@ function ModalItem({ label, onPress }) {
 }
 
 /* styles */
-const CARD_RADIUS = 28;
+const CARD_RADIUS = 20;
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topBanner: { width, height: 140, marginTop: 8 },
+  container: { flex: 1, backgroundColor: "#F9F9F9" },
+  topRedSection: {
+    backgroundColor: "#B91919",
+    paddingTop:20
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  topBanner: { width, height: 140 },
 
   card: {
     backgroundColor: "#F9F9F9",
@@ -2452,6 +2950,15 @@ const styles = StyleSheet.create({
     borderTopRightRadius: CARD_RADIUS,
     padding: 18,
     minHeight: height * 0.66,
+    flex: 1,
+    marginTop: -10,
+    overflow: "hidden",
+  },
+  phonePrefix: {
+    fontSize: 15,
+    color: "#101318",
+    fontWeight: "600",
+    paddingRight: 4,
   },
 
   title: {
@@ -2651,6 +3158,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
+  submitCompleteBtn: {
+    width: "100%",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+    marginBottom: 12,
+  },
   buttonDisabled: { backgroundColor: "#ccc", opacity: 0.6 },
   proceedText: { color: "#fff", fontSize: 14, fontWeight: "600" },
   saveSkipBtn: {
@@ -2673,13 +3190,73 @@ const styles = StyleSheet.create({
   },
   loginDisabledText: { color: "#9B9B9B", fontSize: 14, fontWeight: "600" },
 
+  footerTextContainer: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
   footerText: {
     fontSize: 11,
     color: "#999",
+    lineHeight: 16,
     textAlign: "center",
-    marginTop: 8,
   },
-  linkText: { fontSize: 12 },
+  policyModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  policyModalContent: {
+    width: "100%",
+    maxWidth: 500,
+    height: height * 0.85,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    overflow: "hidden",
+  },
+  policyModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  policyModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+    flex: 1,
+  },
+  policyModalCloseButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  policyModalScroll: {
+    flex: 1,
+    width: "100%",
+  },
+  policyModalScrollContent: {
+    padding: 20,
+    paddingBottom: 30,
+  },
+  policySectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  policyText: {
+    fontSize: 14,
+    color: "#4B5563",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
 
   /* bottom sheet */
   modalContainer: {
