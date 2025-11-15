@@ -966,7 +966,7 @@ export default function RegisterStoreScreen() {
       <ScrollView>
         {/* Top banner */}
         <Image
-          source={require("../../assets/registermain1.png")}
+          source={require("../../assets/registermain3.png")}
           style={styles.topBanner}
           resizeMode="cover"
         />

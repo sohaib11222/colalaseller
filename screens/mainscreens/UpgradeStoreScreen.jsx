@@ -727,53 +727,44 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
   };
 
   const handleStartOnboarding = () => {
-    // Validate required fields
-    if (!formData.store_name.trim()) {
-      Alert.alert("Error", "Store name is required");
-      return;
-    }
-    if (!formData.store_email.trim()) {
-      Alert.alert("Error", "Store email is required");
-      return;
-    }
-    if (!formData.store_phone.trim()) {
-      Alert.alert("Error", "Store phone is required");
-      return;
-    }
-    if (!formData.store_location.trim()) {
-      Alert.alert("Error", "Store location is required");
-      return;
-    }
+    // Only call API if at least one field is filled
+    const hasData = (formData.store_name?.trim() || "") || 
+                    (formData.store_email?.trim() || "") || 
+                    (formData.store_phone?.trim() || "") || 
+                    (formData.store_location?.trim() || "") || 
+                    (formData.referral_code?.trim() || "");
     
-    startOnboardingMutation.mutate(formData);
+    if (hasData) {
+      startOnboardingMutation.mutate(formData);
+    }
   };
 
   const handleUploadProfileMedia = () => {
-    if (!avatar || !banner) {
-      Alert.alert("Error", "Please upload both profile image and banner image");
-      return;
+    // Only call API if at least one image is uploaded
+    if (!avatar && !banner) {
+      return; // Don't call API if no images
     }
-
+    
     const formData = new FormData();
-    formData.append('profile_image', {
-      uri: avatar,
-      type: 'image/jpeg',
-      name: 'profile.jpg',
-    });
-    formData.append('banner_image', {
-      uri: banner,
-      type: 'image/jpeg',
-      name: 'banner.jpg',
-    });
+    if (avatar) {
+      formData.append('profile_image', {
+        uri: avatar,
+        type: 'image/jpeg',
+        name: 'profile.jpg',
+      });
+    }
+    if (banner) {
+      formData.append('banner_image', {
+        uri: banner,
+        type: 'image/jpeg',
+        name: 'banner.jpg',
+      });
+    }
     uploadProfileMediaMutation.mutate(formData);
   };
 
   const handleSetCategoriesSocial = () => {
-    if (selectedCats.length === 0) {
-      Alert.alert("Error", "Please select at least one category");
-      return;
-    }
-
+    // Only call API if at least one category or social link is provided
     const socialLinks = Object.entries(links)
       .filter(([key, value]) => value.trim())
       .map(([type, url]) => {
@@ -785,8 +776,16 @@ function LevelOneModal({ visible, onClose, onOpenLevel2, C, token, refetchProgre
         return { type, url: formattedUrl };
       });
     
+    // Check if there's any data to send
+    const hasCategories = selectedCats.length > 0;
+    const hasSocialLinks = socialLinks.length > 0;
+    
+    if (!hasCategories && !hasSocialLinks) {
+      return; // Don't call API if nothing is selected
+    }
+    
     const payload = {
-      categories: selectedCats.map(id => Number(id)), // Ensure IDs are numbers
+      categories: selectedCats.map(id => Number(id)),
       social_links: socialLinks,
     };
     
@@ -1360,58 +1359,48 @@ function LevelTwoModal({ visible, onClose, onOpenLevel3, C, token, refetchProgre
   };
 
   const handleSetBusinessDetails = () => {
-    // Validate required fields
-    if (!businessData.registered_name.trim()) {
-      Alert.alert("Error", "Business name is required");
-      return;
-    }
-    if (!businessData.business_type.trim()) {
-      Alert.alert("Error", "Business type is required");
-      return;
-    }
-    if (!businessData.nin_number.trim()) {
-      Alert.alert("Error", "NIN number is required");
-      return;
-    }
-
-    // Validate based on business type
-    if (businessData.business_type === "BN" && !businessData.bn_number.trim()) {
-      Alert.alert("Error", "BN Number is required");
-      return;
-    }
-
-    if (businessData.business_type === "LTD" && !businessData.cac_number.trim()) {
-      Alert.alert("Error", "RC Number is required");
-      return;
+    // Only call API if at least one field is filled
+    const hasData = (businessData.registered_name?.trim() || "") || 
+                    (businessData.business_type?.trim() || "") || 
+                    (businessData.nin_number?.trim() || "") || 
+                    (businessData.bn_number?.trim() || "") || 
+                    (businessData.cac_number?.trim() || "");
+    
+    if (!hasData) {
+      return; // Don't call API if no data
     }
     
     const payload = {
-      registered_name: businessData.registered_name,
-      business_type: businessData.business_type,
-      nin_number: businessData.nin_number,
-      bn_number: businessData.business_type === "BN" ? businessData.bn_number : null,
-      cac_number: businessData.business_type === "LTD" ? businessData.cac_number : null,
+      registered_name: businessData.registered_name || "",
+      business_type: businessData.business_type || "",
+      nin_number: businessData.nin_number || "",
+      bn_number: businessData.business_type === "BN" ? (businessData.bn_number || "") : null,
+      cac_number: businessData.business_type === "LTD" ? (businessData.cac_number || "") : null,
     };
     setBusinessDetailsMutation.mutate(payload);
   };
 
   const handleUploadDocuments = () => {
-    if (!ninDocument || !cacDocument) {
-      Alert.alert("Error", "Please upload both NIN slip and CAC certificate");
-      return;
+    // Only call API if at least one document is uploaded
+    if (!ninDocument && !cacDocument) {
+      return; // Don't call API if no documents
     }
-
+    
     const formData = new FormData();
-    formData.append('nin_document', {
-      uri: ninDocument,
-      type: 'image/jpeg',
-      name: 'nin_document.jpg',
-    });
-    formData.append('cac_document', {
-      uri: cacDocument,
-      type: 'image/jpeg',
-      name: 'cac_document.jpg',
-    });
+    if (ninDocument) {
+      formData.append('nin_document', {
+        uri: ninDocument,
+        type: 'image/jpeg',
+        name: 'nin_document.jpg',
+      });
+    }
+    if (cacDocument) {
+      formData.append('cac_document', {
+        uri: cacDocument,
+        type: 'image/jpeg',
+        name: 'cac_document.jpg',
+      });
+    }
     uploadDocumentsMutation.mutate(formData);
   };
 
@@ -1888,22 +1877,15 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
   };
 
   const handleUploadPhysicalStore = () => {
-    // Validate required fields
-    if (!physicalAns) {
-      Alert.alert("Error", "Please select whether you have a physical store");
-      return;
+    // Only call API if physical store answer is selected or video is uploaded
+    if (!physicalAns && !videoUri) {
+      return; // Don't call API if nothing is provided
     }
     
     const hasPhysicalStore = physicalAns === "Yes i have a physical store";
     
-    // If user has a physical store, video is required
-    if (hasPhysicalStore && !videoUri) {
-      Alert.alert("Error", "Please upload a video of your place of business");
-      return;
-    }
-    
     const formData = new FormData();
-    formData.append('has_physical_store', hasPhysicalStore ? 1 : 0);
+    formData.append('has_physical_store', physicalAns ? (hasPhysicalStore ? 1 : 0) : 0);
     if (videoUri) {
       formData.append('store_video', {
         uri: videoUri,
@@ -1915,17 +1897,17 @@ function LevelThreeModal({ visible, onClose, C, token, refetchProgress, navigati
   };
 
   const handleSetTheme = () => {
+    // Only call API if theme color is provided
     if (!themeColor || !themeColor.trim()) {
-      Alert.alert("Error", "Please select a theme color");
-      return;
+      return; // Don't call API if no theme color
     }
     setThemeMutation.mutate({ theme_color: themeColor });
   };
 
   const handleUploadUtilityBill = () => {
+    // Only call API if utility bill is uploaded
     if (!utilityBillUri) {
-      Alert.alert("Error", "Please upload a utility bill");
-      return;
+      return; // Don't call API if no utility bill
     }
     
     const formData = new FormData();

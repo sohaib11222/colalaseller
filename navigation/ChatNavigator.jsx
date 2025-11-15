@@ -29,6 +29,7 @@ import HelpScreen from "../screens/mainscreens/settingsscreens/HelpScreen";
 import OrdersScreen from "../screens/mainscreens/orderscreen/OrdersScreen";
 import TransactionDetailScreen from "../screens/mainscreens/settingsscreens/TransactionDetailScreen";
 import VisitorsScreen from "../screens/mainscreens/settingsscreens/VisitorsScreen";
+import VisitorActivityScreen from "../screens/mainscreens/settingsscreens/VisitorActivityScreen";
 import PhoneRequestsScreen from "../screens/mainscreens/settingsscreens/PhoneRequestsScreen";
 import InventoryScreen from "../screens/mainscreens/settingsscreens/InventoryScreen";
 import DisputesListScreen from "../screens/mainscreens/settingsscreens/DisputesListScreen";
@@ -71,6 +72,7 @@ export default function ChatNavigator() {
       <Stack.Screen name="Orders" component={OrdersScreen} />
       <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
       <Stack.Screen name="Visitors" component={VisitorsScreen} />
+      <Stack.Screen name="VisitorActivity" component={VisitorActivityScreen} />
       <Stack.Screen name="PhoneRequests" component={PhoneRequestsScreen} />
       <Stack.Screen name="Inventory" component={InventoryScreen} />
       <Stack.Screen name="DisputesList" component={DisputesListScreen} />

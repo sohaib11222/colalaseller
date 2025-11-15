@@ -606,7 +606,7 @@ export default function StoreHomeScreen() {
                   Store banner goes here
                 </ThemedText>
                 <ThemedText style={styles.bannerPlaceholderSubtitle}>
-                  Go announcements to create one
+                  {/* Go announcements to create one */}
                 </ThemedText>
               </TouchableOpacity>
             )}

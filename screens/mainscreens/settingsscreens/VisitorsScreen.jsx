@@ -119,17 +119,42 @@ export default function VisitorsScreen() {
 
   const visitors = visitorsData ?? [];
 
+  // Group visitors by unique visitor ID and keep the most recent visit
+  const uniqueVisitors = useMemo(() => {
+    const visitorMap = new Map();
+    
+    visitors.forEach((visit) => {
+      const visitorId = visit?.visitor?.id;
+      if (!visitorId) return;
+      
+      // If visitor not in map, add them
+      // If visitor exists, keep the one with the most recent visit
+      if (!visitorMap.has(visitorId)) {
+        visitorMap.set(visitorId, visit);
+      } else {
+        const existing = visitorMap.get(visitorId);
+        const existingDate = new Date(existing?.last_visit || 0);
+        const currentDate = new Date(visit?.last_visit || 0);
+        if (currentDate > existingDate) {
+          visitorMap.set(visitorId, visit);
+        }
+      }
+    });
+    
+    return Array.from(visitorMap.values());
+  }, [visitors]);
+
   // Filter visitors by search query
   const filteredVisitors = useMemo(() => {
-    if (!searchQuery.trim()) return visitors;
+    if (!searchQuery.trim()) return uniqueVisitors;
     const query = searchQuery.trim().toLowerCase();
-    return visitors.filter(
+    return uniqueVisitors.filter(
       (visitor) =>
         visitor?.visitor?.name?.toLowerCase().includes(query) ||
         visitor?.visitor?.email?.toLowerCase().includes(query) ||
         visitor?.visitor?.phone?.includes(query)
     );
-  }, [visitors, searchQuery]);
+  }, [uniqueVisitors, searchQuery]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -208,6 +233,18 @@ export default function VisitorsScreen() {
     );
   };
 
+  const handleViewHistory = (visitor) => {
+    const visitorId = visitor?.visitor?.id;
+    if (!visitorId) {
+      Alert.alert("Error", "Visitor ID not found");
+      return;
+    }
+    navigation.navigate("VisitorActivity", {
+      visitorId: visitorId,
+      visitorName: visitor?.visitor?.name || "Visitor",
+    });
+  };
+
   const renderVisitor = ({ item }) => {
     const visitor = item?.visitor ?? {};
     const hasChat = visitor?.has_chat ?? false;
@@ -216,6 +253,7 @@ export default function VisitorsScreen() {
       <TouchableOpacity
         style={[styles.visitorCard, { backgroundColor: C.card, borderColor: C.line }]}
         activeOpacity={0.85}
+        onPress={() => handleViewHistory(item)}
       >
         <View style={styles.visitorHeader}>
           <View style={[styles.avatar, { backgroundColor: C.primary + "22" }]}>
@@ -251,30 +289,47 @@ export default function VisitorsScreen() {
               {item?.visit_type === "product" ? "Product Visit" : "Store Visit"}
             </ThemedText>
           </View>
-          <TouchableOpacity
-            style={[
-              styles.chatButton,
-              {
-                backgroundColor: hasChat ? C.line : C.primary,
-              },
-            ]}
-            onPress={() => handleStartChat(item)}
-            disabled={startChatMutation.isPending}
-          >
-            <Ionicons
-              name={hasChat ? "chatbubbles" : "chatbubble-outline"}
-              size={16}
-              color={hasChat ? C.sub : "#fff"}
-            />
-            <ThemedText
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
               style={[
-                styles.chatButtonText,
-                { color: hasChat ? C.sub : "#fff" },
+                styles.viewHistoryButton,
+                { borderColor: C.primary },
               ]}
+              onPress={() => handleViewHistory(item)}
             >
-              {hasChat ? "Chat" : "Start Chat"}
-            </ThemedText>
-          </TouchableOpacity>
+              <Ionicons name="time-outline" size={16} color={C.primary} />
+              <ThemedText style={[styles.viewHistoryButtonText, { color: C.primary }]}>
+                History
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.chatButton,
+                {
+                  backgroundColor: hasChat ? C.line : C.primary,
+                },
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleStartChat(item);
+              }}
+              disabled={startChatMutation.isPending}
+            >
+              <Ionicons
+                name={hasChat ? "chatbubbles" : "chatbubble-outline"}
+                size={16}
+                color={hasChat ? C.sub : "#fff"}
+              />
+              <ThemedText
+                style={[
+                  styles.chatButtonText,
+                  { color: hasChat ? C.sub : "#fff" },
+                ]}
+              >
+                {hasChat ? "Chat" : "Start Chat"}
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -469,6 +524,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   visitTypeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  viewHistoryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  viewHistoryButtonText: {
     fontSize: 12,
     fontWeight: "600",
   },

@@ -62,6 +62,45 @@ function OpeningHours({ hours }) {
     sunday: "Sunday",
   };
 
+  // Helper function to format time display from range value
+  const formatTimeRange = (range) => {
+    if (!range) return "Closed";
+    
+    // If it's a string
+    if (typeof range === "string") {
+      const trimmed = range.trim();
+      if (trimmed === "" || trimmed === "null" || trimmed.toLowerCase() === "closed") {
+        return "Closed";
+      }
+      return trimmed;
+    }
+    
+    // If it's an object with from/to
+    if (typeof range === "object" && range !== null) {
+      if (range.from && range.to) {
+        const from = String(range.from).trim();
+        const to = String(range.to).trim();
+        if (from && to && from !== "null" && to !== "null") {
+          return `${from} - ${to}`;
+        }
+      } else if (range.open && range.close) {
+        const open = String(range.open).trim();
+        const close = String(range.close).trim();
+        if (open && close && open !== "null" && close !== "null") {
+          return `${open} - ${close}`;
+        }
+      } else if (range.open_time && range.close_time) {
+        const open = String(range.open_time).trim();
+        const close = String(range.close_time).trim();
+        if (open && close && open !== "null" && close !== "null") {
+          return `${open} - ${close}`;
+        }
+      }
+    }
+    
+    return "Closed";
+  };
+
   // Check if hours data exists and is not empty
   if (
     !hours ||
@@ -81,6 +120,59 @@ function OpeningHours({ hours }) {
     );
   }
 
+  // Parse hours similar to StoreProfileModal
+  let hoursMap = {};
+  
+  // If hours is an object (not array), use Object.entries like profile modal
+  if (hours && typeof hours === "object" && !Array.isArray(hours)) {
+    Object.entries(hours).forEach(([day, range]) => {
+      const dayLower = day.toLowerCase();
+      hoursMap[dayLower] = range;
+    });
+  } 
+  // If hours is an array
+  else if (Array.isArray(hours)) {
+    hours.forEach((item, i) => {
+      if (typeof item === 'object' && item !== null) {
+        const dayName = (item.day || `Day ${i + 1}`).toLowerCase();
+        const timeRange = item.open_time && item.close_time 
+          ? `${item.open_time} - ${item.close_time}`
+          : item.open_time || item.close_time || null;
+        hoursMap[dayName] = timeRange;
+      } else {
+        const dayName = days[i] || `day${i + 1}`;
+        hoursMap[dayName] = String(item);
+      }
+    });
+  }
+  // If hours is a JSON string, try to parse it
+  else if (typeof hours === "string") {
+    try {
+      const parsed = JSON.parse(hours);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item, i) => {
+          if (typeof item === 'object' && item !== null) {
+            const dayName = (item.day || `Day ${i + 1}`).toLowerCase();
+            const timeRange = item.open_time && item.close_time 
+              ? `${item.open_time} - ${item.close_time}`
+              : item.open_time || item.close_time || null;
+            hoursMap[dayName] = timeRange;
+          } else {
+            const dayName = days[i] || `day${i + 1}`;
+            hoursMap[dayName] = String(item);
+          }
+        });
+      } else if (typeof parsed === "object" && parsed !== null) {
+        Object.entries(parsed).forEach(([day, range]) => {
+          const dayLower = day.toLowerCase();
+          hoursMap[dayLower] = range;
+        });
+      }
+    } catch (e) {
+      // If parsing fails, ignore
+    }
+  }
+
   return (
     <View style={styles.ohWrap}>
       <View style={styles.ohHeader}>
@@ -92,20 +184,9 @@ function OpeningHours({ hours }) {
       </View>
 
       {days.map((day) => {
-        const dayHours = hours?.[day];
+        const dayHours = hoursMap[day];
         const displayLabel = dayLabels[day];
-
-        // Handle different hour formats from API
-        let timeDisplay = "Closed";
-        if (dayHours) {
-          if (typeof dayHours === "string") {
-            // Format: "06:00 AM-06:00 AM" or "9:00-18:00"
-            timeDisplay = dayHours;
-          } else if (dayHours.from && dayHours.to) {
-            // Format: {from: "9:00", to: "18:00"}
-            timeDisplay = `${dayHours.from} - ${dayHours.to}`;
-          }
-        }
+        const timeDisplay = formatTimeRange(dayHours);
 
         return (
           <View key={day} style={styles.ohRow}>

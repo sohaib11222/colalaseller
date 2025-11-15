@@ -101,7 +101,7 @@ const LoginScreen = () => {
         >
           {/* Top Image Banner */}
           <Image
-            source={require("../../assets/mainimage.png")} // Replace with your combined top image
+            source={require("../../assets/mainimage2.png")}
             style={styles.topImage}
           />
 

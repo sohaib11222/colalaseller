@@ -20,17 +20,17 @@ const features = [
   {
     id: 1,
     image: require("../../assets/Rectangle 157.png"),
-    text: "Shop from variety of unique stores nationwide across several categories",
+    text: "Post your products and reach a wide range of sellers easily",
   },
   {
     id: 2,
     image: require("../../assets/Rectangle 157 (1).png"),
-    text: "Chat and communicate easily with stores via the in‑app chat",
+    text: "Chat and communicate easily with buyers via the in-app chat",
   },
   {
     id: 3,
     image: require("../../assets/Rectangle 157 (2).png"),
-    text: "Personalized social feeds to see latest posts from stores across Colala",
+    text: "Personalized social media feeds to see latest posts from stores across colala",
   },
 ];
 
