@@ -201,6 +201,9 @@ const API_ENDPOINTS = {
     Decline_Phone_Request: (id) => `${API_DOMAIN}/seller/phone-requests/${id}/decline`, // POST
     Phone_Visibility: `${API_DOMAIN}/seller/settings/phone-visibility`, // GET, POST
 
+    // Push Notifications
+    Save_Expo_Push_Token: `${API_DOMAIN}/seller/save-expo-push-token`, // POST
+
   },
   GENERAL: {
     Categories: `${API_DOMAIN}/categories`, // GET
@@ -208,6 +211,8 @@ const API_ENDPOINTS = {
     Brands: `${API_DOMAIN}/brands`, // GET
     Wallet_TopUp: `${API_DOMAIN}/wallet/top-up`, // POST
     Wallet_Withdraw: `${API_DOMAIN}/wallet/withdraw`, // POST
+    Wallet_Withdraw_Banks: (country = 'ng') => `${API_DOMAIN}/wallet/withdraw/banks?country=${country}`, // GET
+    Wallet_Validate_Account: `${API_DOMAIN}/wallet/withdraw/validate-account`, // POST
   },
   ORDERS: {
     Get_All_Orders: `${API_DOMAIN}/seller/orders`, // GET

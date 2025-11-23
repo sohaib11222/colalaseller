@@ -6,6 +6,7 @@ import { View, Text, ActivityIndicator } from "react-native";
 import RootNavigator from "./navigation/RootNavigator";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AuthProvider } from "./contexts/AuthContext";
+import NotificationManager from "./components/NotificationManager";
 
 SplashScreen.preventAutoHideAsync(); // keep splash up while fonts load
 
@@ -79,6 +80,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
+          <NotificationManager />
           <NavigationContainer>
             <RootNavigator />
           </NavigationContainer>

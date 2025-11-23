@@ -47,28 +47,70 @@ export default function VisitorActivityScreen() {
     queryFn: async () => {
       const token = await getToken();
       const res = await VisitorQueries.getVisitorActivity(visitorId, token);
-      console.log("Visitor Activity API Response:", JSON.stringify(res, null, 2));
+      console.log("🔍 Visitor Activity API Raw Response:", JSON.stringify(res, null, 2));
       
-      // Handle different possible response structures
-      if (Array.isArray(res?.data)) {
-        return res.data;
-      }
-      if (Array.isArray(res?.data?.visits)) {
-        return res.data.visits;
-      }
-      if (Array.isArray(res?.data?.data)) {
-        return res.data.data;
-      }
+      // Handle different possible response structures - check in order of likelihood
+      let visits = [];
+      
+      // 1. Direct array response
       if (Array.isArray(res)) {
-        return res;
+        visits = res;
+        console.log("✅ Found visits as direct array:", visits.length);
+      }
+      // 2. res.data is an array
+      else if (Array.isArray(res?.data)) {
+        visits = res.data;
+        console.log("✅ Found visits in res.data array:", visits.length);
+      }
+      // 3. res.data.visits is an array
+      else if (Array.isArray(res?.data?.visits)) {
+        visits = res.data.visits;
+        console.log("✅ Found visits in res.data.visits:", visits.length);
+      }
+      // 4. res.data.data is an array
+      else if (Array.isArray(res?.data?.data)) {
+        visits = res.data.data;
+        console.log("✅ Found visits in res.data.data:", visits.length);
+      }
+      // 5. res.data.visitors is an array (similar to visitors endpoint)
+      else if (Array.isArray(res?.data?.visitors)) {
+        visits = res.data.visitors;
+        console.log("✅ Found visits in res.data.visitors:", visits.length);
+      }
+      // 6. res.data.activity is an array
+      else if (Array.isArray(res?.data?.activity)) {
+        visits = res.data.activity;
+        console.log("✅ Found visits in res.data.activity:", visits.length);
+      }
+      // 7. res.data.history is an array
+      else if (Array.isArray(res?.data?.history)) {
+        visits = res.data.history;
+        console.log("✅ Found visits in res.data.history:", visits.length);
+      }
+      // 8. Check if res.data exists and has any array property
+      else if (res?.data && typeof res.data === 'object') {
+        // Look for any array property in res.data
+        const dataKeys = Object.keys(res.data);
+        for (const key of dataKeys) {
+          if (Array.isArray(res.data[key])) {
+            visits = res.data[key];
+            console.log(`✅ Found visits in res.data.${key}:`, visits.length);
+            break;
+          }
+        }
       }
       
-      // If response has a data object with visitors array (similar to visitors endpoint)
-      if (res?.data?.visitors && Array.isArray(res.data.visitors)) {
-        return res.data.visitors;
+      if (visits.length === 0) {
+        console.warn("⚠️ No visits found in response. Response structure:", {
+          isArray: Array.isArray(res),
+          hasData: !!res?.data,
+          dataType: typeof res?.data,
+          dataKeys: res?.data ? Object.keys(res.data) : [],
+          fullResponse: res
+        });
       }
       
-      return [];
+      return visits;
     },
     enabled: !!visitorId,
     staleTime: 30_000,
@@ -76,7 +118,10 @@ export default function VisitorActivityScreen() {
 
   const visits = Array.isArray(activityData) ? activityData : [];
   
-  console.log("Processed visits:", visits.length, visits);
+  console.log("📊 Final processed visits count:", visits.length);
+  if (visits.length > 0) {
+    console.log("📊 Sample visit:", JSON.stringify(visits[0], null, 2));
+  }
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -91,13 +136,15 @@ export default function VisitorActivityScreen() {
     if (!dateString) return "Recently";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      // Format as "DD MMM YYYY, HH:MM AM/PM" to match API formatted_date format
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = date.toLocaleDateString("en-GB", { month: "short" });
+      const year = date.getFullYear();
+      const hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      const displayHours = hours % 12 || 12;
+      return `${day} ${month} ${year}, ${displayHours}:${minutes} ${ampm}`;
     } catch {
       return dateString;
     }

@@ -54,7 +54,7 @@ const OrdersScreen = ({ navigation }) => {
     card: "#fff",
   };
 
-  const [tab, setTab] = useState("pending"); // 'pending' | 'in_process' | 'all' | 'rejected'
+  const [tab, setTab] = useState("pending"); // 'pending' | 'in_process' | 'completed' | 'all' | 'rejected'
   const [q, setQ] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -206,7 +206,7 @@ const OrdersScreen = ({ navigation }) => {
 
       return { newRows, completedRows, rejectedRows: uniqueRejectedRows, inProcessRows: uniqueInProcessRows };
     },
-    enabled: tab === "all" || tab === "rejected" || tab === "in_process",
+    enabled: tab === "all" || tab === "rejected" || tab === "in_process" || tab === "completed",
     staleTime: 30_000,
   });
 
@@ -220,7 +220,7 @@ const OrdersScreen = ({ navigation }) => {
         await refetchPending();
       } else {
         await refetch();
-        if (tab === "rejected" || tab === "in_process") {
+        if (tab === "rejected" || tab === "in_process" || tab === "completed") {
           await refetchPending(); // Also refresh pending to get any rejected/in-process orders
         }
       }
@@ -247,6 +247,8 @@ const OrdersScreen = ({ navigation }) => {
     ? listRejected 
     : tab === "in_process"
     ? listInProcess
+    : tab === "completed"
+    ? listCompleted
     : allOrders;
   const orders = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -417,6 +419,18 @@ const OrdersScreen = ({ navigation }) => {
         </TouchableOpacity>
 
         <TouchableOpacity
+          onPress={() => setTab("completed")}
+          style={[
+            styles.tabBtn,
+            tab === "completed" ? { backgroundColor: C.primary } : { backgroundColor: "#EFEFEF" },
+          ]}
+        >
+          <ThemedText style={[styles.tabTxt, { color: tab === "completed" ? "#fff" : "#6B7280" }]}>
+            Completed
+          </ThemedText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           onPress={() => setTab("all")}
           style={[
             styles.tabBtn,
@@ -443,9 +457,9 @@ const OrdersScreen = ({ navigation }) => {
       </View>
 
       {/* List */}
-      {(tab === "pending" ? pendingLoading : tab === "rejected" || tab === "in_process" ? isLoading : isLoading) && !(tab === "pending" ? pendingData : tab === "rejected" || tab === "in_process" ? apiData : apiData) ? (
+      {(tab === "pending" ? pendingLoading : tab === "rejected" || tab === "in_process" || tab === "completed" ? isLoading : isLoading) && !(tab === "pending" ? pendingData : tab === "rejected" || tab === "in_process" || tab === "completed" ? apiData : apiData) ? (
         <LoadingState />
-      ) : (tab === "pending" ? pendingError : tab === "rejected" || tab === "in_process" ? error : error) ? (
+      ) : (tab === "pending" ? pendingError : tab === "rejected" || tab === "in_process" || tab === "completed" ? error : error) ? (
         <ErrorState />
       ) : (
         <FlatList
@@ -478,6 +492,8 @@ const OrdersScreen = ({ navigation }) => {
                   ? "No rejected orders found."
                   : tab === "in_process"
                   ? "No orders in process at the moment."
+                  : tab === "completed"
+                  ? "No completed orders yet. Completed orders will appear here."
                   : "No orders yet. Complete some orders to see them here!"
               }
             />

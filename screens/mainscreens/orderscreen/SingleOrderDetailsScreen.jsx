@@ -765,6 +765,30 @@ function TrackOrderModal({
                   </ThemedText>
                 </View>
                 )}
+                {detail?.estimated_delivery_date && (
+                <View
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderTopWidth: 1,
+                      borderTopColor: C.line,
+                      marginTop: 8,
+                      paddingTop: 8,
+                    },
+                  ]}
+                >
+                  <ThemedText style={{ color: C.text }}>
+                    Estimated Delivery Date
+                  </ThemedText>
+                  <ThemedText style={{ color: C.text }}>
+                    {new Date(detail.estimated_delivery_date).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </ThemedText>
+                </View>
+                )}
                 <View
                   style={[
                     styles.infoRow,
@@ -1691,6 +1715,17 @@ function StoreBlock({ C, detail, onOpenTracker, isPending, onAccept, onReject })
               />
               {!isPending && fee !== null && (
               <InfoRow left="Delivery fee" right={currency(fee)} topBorder />
+              )}
+              {detail?.estimated_delivery_date && (
+              <InfoRow
+                left="Estimated Delivery Date"
+                right={new Date(detail.estimated_delivery_date).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+                topBorder
+              />
               )}
               <InfoRow
                 left="Total to pay"

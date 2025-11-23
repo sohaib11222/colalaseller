@@ -151,7 +151,7 @@ export default function AddServiceScreen({ navigation, route }) {
   // Create service mutation with direct axios call
   const createServiceMutation = useMutation({
     mutationFn: async (formData) => {
-      console.log("🚀 Making direct axios call to create service");
+      // console.log("🚀 Making direct axios call to create service");
       console.log("🌐 API Endpoint: https://colala.hmstech.xyz/api/seller/service/create");
       console.log("🔑 Token present:", !!token);
       

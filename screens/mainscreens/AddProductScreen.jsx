@@ -2235,45 +2235,130 @@ function CategoriesSheet({
   selectedCategoryId,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
 
-  // Reset search when modal closes - MUST be before any conditional returns
+  // Reset search and expanded state when modal closes - MUST be before any conditional returns
   useEffect(() => {
     if (!visible) {
       setSearchQuery("");
+      setExpandedCategories(new Set());
     }
   }, [visible]);
 
-  // Helper function to flatten nested categories with depth
-  const flattenCategories = (categories, depth = 0, result = []) => {
-    if (!Array.isArray(categories)) return result;
+  // Get categories tree - MUST be before any conditional returns
+  const categoriesTree = useMemo(() => {
+    return categoriesData?.data || [];
+  }, [categoriesData]);
+
+  // Helper function to recursively flatten categories for search
+  const flattenCategoriesForSearch = (categories, results = []) => {
+    if (!Array.isArray(categories)) return results;
     categories.forEach(category => {
-      result.push({ ...category, depth });
+      results.push(category);
       if (category.children && category.children.length > 0) {
-        flattenCategories(category.children, depth + 1, result);
+        flattenCategoriesForSearch(category.children, results);
       }
     });
-    return result;
+    return results;
   };
-
-  // Get flattened categories - MUST be before any conditional returns
-  const categories = useMemo(() => {
-    const categoriesTree = categoriesData?.data || [];
-    return flattenCategories(categoriesTree);
-  }, [categoriesData]);
 
   // Filter categories based on search query - MUST be before any conditional returns
   const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return categories;
-    const query = searchQuery.toLowerCase().trim();
-    return categories.filter((category) =>
-      category.title?.toLowerCase().includes(query)
+    if (!searchQuery.trim()) return categoriesTree;
+    const lowerQuery = searchQuery.toLowerCase().trim();
+    const allCategories = flattenCategoriesForSearch(categoriesTree);
+    return allCategories.filter(category => 
+      category.title?.toLowerCase().includes(lowerQuery)
     );
-  }, [categories, searchQuery]);
+  }, [categoriesTree, searchQuery]);
 
-  // Helper to format category label with indentation
-  const getCategoryLabel = (category) => {
-    const indent = "   ".repeat(category.depth || 0);
-    return `${indent}${category.title}`;
+  // Toggle expand/collapse for a category
+  const toggleExpand = (categoryId) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
+
+  // Check if category is expanded
+  const isExpanded = (categoryId) => expandedCategories.has(categoryId);
+
+  // Render a category item (recursive for children)
+  const renderCategory = (category, isChild = false) => {
+    const categoryId = Number(category.id);
+    const hasChildren = category.children && category.children.length > 0;
+    const expanded = isExpanded(categoryId);
+    const isSelected = selectedCategoryId !== null && categoryId === selectedCategoryId;
+
+    return (
+      <View key={category.id}>
+        <TouchableOpacity
+          onPress={() => {
+            if (hasChildren) {
+              toggleExpand(categoryId);
+            } else {
+              onSelect(category.id);
+            }
+          }}
+          style={[
+            styles.categoryRow,
+            {
+              borderColor: C.line,
+              backgroundColor: isSelected ? C.primary + "20" : isChild ? "#F9FAFB" : "#FFFFFF",
+              paddingLeft: isChild ? 20 : 12,
+              borderLeftWidth: isChild ? 3 : 0,
+              borderLeftColor: isChild ? C.primary : "transparent",
+            },
+          ]}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            {hasChildren && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  toggleExpand(categoryId);
+                }}
+                style={styles.expandButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name={expanded ? "chevron-down" : "chevron-forward"}
+                  size={18}
+                  color={C.text}
+                />
+              </TouchableOpacity>
+            )}
+            {!hasChildren && <View style={{ width: 18 }} />}
+            <ThemedText
+              style={{
+                color: isSelected ? C.primary : C.text,
+                fontWeight: isSelected ? "600" : isChild ? "400" : "500",
+                fontSize: isChild ? 14 : 15,
+                flex: 1,
+              }}
+            >
+              {category.title}
+            </ThemedText>
+          </View>
+          {isSelected && (
+            <Ionicons name="checkmark-circle" size={20} color={C.primary} />
+          )}
+        </TouchableOpacity>
+
+        {/* Render children when expanded */}
+        {hasChildren && expanded && (
+          <View style={styles.childrenContainer}>
+            {category.children.map((child) => renderCategory(child, true))}
+          </View>
+        )}
+      </View>
+    );
   };
 
   console.log(
@@ -2413,39 +2498,45 @@ function CategoriesSheet({
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
-              {filteredCategories.map((category) => {
-                const categoryId = Number(category.id);
-                const isSelected = selectedCategoryId !== null && categoryId === selectedCategoryId;
-                return (
-                  <TouchableOpacity
-                    key={category.id}
-                    onPress={() => onSelect(category.id)}
-                    style={[
-                      styles.sheetRow,
-                      { 
-                        borderColor: C.line, 
-                        backgroundColor: isSelected ? C.primary + "20" : "#F3F4F6",
-                        borderLeftWidth: category.depth > 0 ? 3 : 0,
-                        borderLeftColor: category.depth > 0 ? C.primary : "transparent",
-                        paddingLeft: 12 + (category.depth || 0) * 16,
-                      },
-                    ]}
-                    activeOpacity={0.9}
-                  >
-                    <ThemedText 
-                      style={{ 
-                        color: isSelected ? C.primary : C.text,
-                        fontWeight: isSelected ? "600" : "400",
-                      }}
+              {searchQuery.trim() ? (
+                // When searching, show flat list
+                filteredCategories.map((category) => {
+                  const categoryId = Number(category.id);
+                  const isSelected = selectedCategoryId !== null && categoryId === selectedCategoryId;
+                  return (
+                    <TouchableOpacity
+                      key={category.id}
+                      onPress={() => onSelect(category.id)}
+                      style={[
+                        styles.categoryRow,
+                        {
+                          borderColor: C.line,
+                          backgroundColor: isSelected ? C.primary + "20" : "#FFFFFF",
+                          paddingLeft: 12,
+                        },
+                      ]}
+                      activeOpacity={0.7}
                     >
-                      {getCategoryLabel(category)}
-                    </ThemedText>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={C.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
+                      <ThemedText
+                        style={{
+                          color: isSelected ? C.primary : C.text,
+                          fontWeight: isSelected ? "600" : "400",
+                          fontSize: 15,
+                          flex: 1,
+                        }}
+                      >
+                        {category.title}
+                      </ThemedText>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={20} color={C.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                // When not searching, show tree with dropdowns
+                filteredCategories.map((category) => renderCategory(category))
+              )}
             </ScrollView>
           )}
         </View>
@@ -4623,6 +4714,32 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
+  },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    minHeight: 50,
+  },
+  expandButton: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  childrenContainer: {
+    marginLeft: 8,
+    marginTop: 4,
+    marginBottom: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: "#E5E7EB",
+    paddingLeft: 8,
   },
 
   // available locations UI

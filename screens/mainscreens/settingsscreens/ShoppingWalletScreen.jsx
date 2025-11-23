@@ -13,6 +13,8 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -22,7 +24,7 @@ import { STATIC_COLORS } from "../../../components/ThemeProvider";
 import { StatusBar } from "expo-status-bar";
 
 //Code Related to the integration
-import { getTransactionHistory } from "../../../utils/queries/settings";
+import { getTransactionHistory, getWithdrawBanks, validateBankAccount } from "../../../utils/queries/settings";
 import { withdrawWallet } from "../../../utils/mutations/settings";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getToken } from "../../../utils/tokenStorage";
@@ -129,9 +131,14 @@ export default function ShoppingWalletScreen() {
   const [withdrawVisible, setWithdrawVisible] = useState(false);
   const [wAmount, setWAmount] = useState("");
   const [wAccNumber, setWAccNumber] = useState("");
-  const [wBankName, setWBankName] = useState("");
+  const [selectedBank, setSelectedBank] = useState(null);
   const [wAccName, setWAccName] = useState("");
+  const [bankSearchQuery, setBankSearchQuery] = useState("");
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const [accountValidated, setAccountValidated] = useState(false);
+  const [validatedAccountData, setValidatedAccountData] = useState(null);
   const [saveDetails, setSaveDetails] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Get authentication token
   useEffect(() => {
@@ -171,6 +178,34 @@ export default function ShoppingWalletScreen() {
     },
   });
 
+  // Fetch banks list
+  const {
+    data: banksData,
+    isLoading: banksLoading,
+    error: banksError,
+  } = useQuery({
+    queryKey: ["withdrawBanks", authToken],
+    queryFn: () => {
+      console.log("🚀 Fetching banks list...");
+      return getWithdrawBanks(authToken, 'ng');
+    },
+    enabled: !!authToken && withdrawVisible,
+    onSuccess: (data) => {
+      console.log("✅ Banks list fetched successfully:", data);
+    },
+    onError: (error) => {
+      console.error("❌ Failed to fetch banks:", error);
+    },
+  });
+
+  const banks = banksData?.data || [];
+  
+  // Filter banks based on search query
+  const filteredBanks = banks.filter(bank =>
+    bank.name.toLowerCase().includes(bankSearchQuery.toLowerCase()) ||
+    bank.code.includes(bankSearchQuery)
+  );
+
   // Handle pull-to-refresh
   const onRefresh = async () => {
     console.log("🔄 Starting transaction history pull-to-refresh...");
@@ -186,6 +221,32 @@ export default function ShoppingWalletScreen() {
       console.log("🔄 Transaction history pull-to-refresh completed");
     }
   };
+
+  // Account validation mutation
+  const validateAccountMutation = useMutation({
+    mutationFn: async (payload) => {
+      const token = await getToken();
+      return await validateBankAccount(payload, token);
+    },
+    onSuccess: (data) => {
+      console.log("✅ Account validated successfully:", data);
+      if (data?.data?.valid) {
+        setAccountValidated(true);
+        setValidatedAccountData(data.data);
+        setWAccName(data.data.account_name);
+      } else {
+        setAccountValidated(false);
+        setValidatedAccountData(null);
+        Alert.alert("Error", "Invalid account number. Please check and try again.");
+      }
+    },
+    onError: (error) => {
+      console.error("❌ Account validation failed:", error);
+      setAccountValidated(false);
+      setValidatedAccountData(null);
+      // Don't show alert on auto-validation, just show error state in UI
+    },
+  });
 
   // Withdrawal mutation
   const withdrawMutation = useMutation({
@@ -205,8 +266,11 @@ export default function ShoppingWalletScreen() {
               // Reset form
               setWAmount("");
               setWAccNumber("");
-              setWBankName("");
+              setSelectedBank(null);
               setWAccName("");
+              setBankSearchQuery("");
+              setAccountValidated(false);
+              setValidatedAccountData(null);
               setSaveDetails(false);
               // Close modal
               setWithdrawVisible(false);
@@ -221,10 +285,74 @@ export default function ShoppingWalletScreen() {
       console.error("❌ Withdrawal failed:", error);
       Alert.alert(
         "Error",
-        error?.message || "Failed to process withdrawal. Please try again."
+        error?.message || error?.data?.message || "Failed to process withdrawal. Please try again."
       );
     },
   });
+
+  // Auto-validate account when user stops typing (debounced)
+  useEffect(() => {
+    // Reset validation state when bank or account number changes
+    if (accountValidated) {
+      setAccountValidated(false);
+      setValidatedAccountData(null);
+      setWAccName("");
+    }
+
+    // Only validate if we have both bank and account number
+    if (!selectedBank || !wAccNumber || wAccNumber.trim().length < 10) {
+      setIsValidating(false);
+      return;
+    }
+
+    // Debounce validation - wait 1 second after user stops typing
+    setIsValidating(true);
+    const timeoutId = setTimeout(() => {
+      const payload = {
+        bank_code: selectedBank.code,
+        account_number: wAccNumber.trim(),
+      };
+
+      console.log("🚀 Auto-validating account:", payload);
+      validateAccountMutation.mutate(payload);
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+      setIsValidating(false);
+    };
+  }, [wAccNumber, selectedBank?.code]);
+
+  // Handle validation success/error state
+  useEffect(() => {
+    if (validateAccountMutation.isSuccess || validateAccountMutation.isError) {
+      setIsValidating(false);
+    }
+  }, [validateAccountMutation.isSuccess, validateAccountMutation.isError]);
+
+  // Handle bank selection
+  const handleBankSelect = (bank) => {
+    setSelectedBank(bank);
+    setBankDropdownOpen(false);
+    setBankSearchQuery(bank.name);
+    // Reset validation when bank changes
+    if (accountValidated) {
+      setAccountValidated(false);
+      setValidatedAccountData(null);
+      setWAccName("");
+    }
+  };
+
+  // Handle account number change
+  const handleAccountNumberChange = (text) => {
+    setWAccNumber(text);
+    // Reset validation when account number changes
+    if (accountValidated) {
+      setAccountValidated(false);
+      setValidatedAccountData(null);
+      setWAccName("");
+    }
+  };
 
   // Handle withdrawal submission
   const handleWithdraw = () => {
@@ -234,18 +362,23 @@ export default function ShoppingWalletScreen() {
       return;
     }
 
-    if (!wAccNumber || wAccNumber.trim().length === 0) {
-      Alert.alert("Error", "Please enter your account number.");
+    if (!selectedBank) {
+      Alert.alert("Error", "Please select a bank.");
       return;
     }
 
-    if (!wBankName || wBankName.trim().length === 0) {
-      Alert.alert("Error", "Please enter your bank name.");
+    if (!wAccNumber || wAccNumber.trim().length < 10) {
+      Alert.alert("Error", "Please enter a valid account number.");
+      return;
+    }
+
+    if (!accountValidated || !validatedAccountData) {
+      Alert.alert("Error", "Please validate your account number first.");
       return;
     }
 
     if (!wAccName || wAccName.trim().length === 0) {
-      Alert.alert("Error", "Please enter your account name.");
+      Alert.alert("Error", "Account name is required.");
       return;
     }
 
@@ -263,10 +396,11 @@ export default function ShoppingWalletScreen() {
 
     // Prepare payload
     const payload = {
-      amount: wAmount,
-      bank_name: wBankName.trim(),
+      bank_code: selectedBank.code,
       account_number: wAccNumber.trim(),
+      bank_name: selectedBank.name,
       account_name: wAccName.trim(),
+      amount: wAmount,
     };
 
     console.log("🚀 Submitting withdrawal request:", payload);
@@ -587,7 +721,19 @@ export default function ShoppingWalletScreen() {
       <Modal
         visible={withdrawVisible}
         animationType="slide"
-        onRequestClose={() => setWithdrawVisible(false)}
+        onRequestClose={() => {
+          setWithdrawVisible(false);
+          // Reset form when closing
+          setWAmount("");
+          setWAccNumber("");
+          setSelectedBank(null);
+          setWAccName("");
+          setBankSearchQuery("");
+          setAccountValidated(false);
+          setValidatedAccountData(null);
+          setBankDropdownOpen(false);
+          setIsValidating(false);
+        }}
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: C.card }}>
           {/* top bar */}
@@ -598,7 +744,19 @@ export default function ShoppingWalletScreen() {
             ]}
           >
             <TouchableOpacity
-              onPress={() => setWithdrawVisible(false)}
+              onPress={() => {
+                setWithdrawVisible(false);
+                // Reset form when closing
+                setWAmount("");
+                setWAccNumber("");
+                setSelectedBank(null);
+                setWAccName("");
+                setBankSearchQuery("");
+                setAccountValidated(false);
+                setValidatedAccountData(null);
+                setBankDropdownOpen(false);
+                setIsValidating(false);
+              }}
               style={[
                 styles.iconBtn,
                 { borderColor: C.line, backgroundColor: C.card },
@@ -618,65 +776,325 @@ export default function ShoppingWalletScreen() {
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={{ flex: 1 }}
           >
-            <View style={{ padding: 16, backgroundColor: C.bg, flex: 1 }}>
-              <Input
-                C={C}
-                placeholder="Amount to withdraw"
-                keyboardType="numeric"
-                value={wAmount}
-                onChangeText={setWAmount}
-              />
-              <Input
-                C={C}
-                placeholder="Account Number"
-                keyboardType="number-pad"
-                value={wAccNumber}
-                onChangeText={setWAccNumber}
-              />
-              <Input
-                C={C}
-                placeholder="Bank Name"
-                value={wBankName}
-                onChangeText={setWBankName}
-              />
-              <Input
-                C={C}
-                placeholder="Account Name"
-                value={wAccName}
-                onChangeText={setWAccName}
-              />
-
-              <TouchableOpacity
-                style={styles.saveRow}
-                onPress={() => setSaveDetails((p) => !p)}
+            <TouchableWithoutFeedback
+              onPress={() => setBankDropdownOpen(false)}
+            >
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 16, backgroundColor: C.bg }}
+                keyboardShouldPersistTaps="handled"
               >
+                {/* Bank Selection Dropdown */}
+                <View style={{ marginBottom: 12, zIndex: 1000 }}>
+                  <ThemedText style={[styles.label, { color: C.text }]}>
+                    Select Bank
+                  </ThemedText>
+                  <TouchableOpacity
+                    style={[
+                      styles.input,
+                      styles.dropdownTrigger,
+                      { borderColor: C.line, backgroundColor: C.card },
+                    ]}
+                    onPress={() => setBankDropdownOpen(!bankDropdownOpen)}
+                  >
+                    <ThemedText
+                      style={[
+                        { color: selectedBank ? C.text : C.sub },
+                        { flex: 1 },
+                      ]}
+                    >
+                      {selectedBank ? selectedBank.name : "Select Bank"}
+                    </ThemedText>
+                    <Ionicons
+                      name={bankDropdownOpen ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color={C.text}
+                    />
+                  </TouchableOpacity>
+
+                  {bankDropdownOpen && (
+                    <View
+                      style={[
+                        styles.dropdown,
+                        { borderColor: C.line, backgroundColor: C.card },
+                      ]}
+                    >
+                      {/* Search Input */}
+                      <TextInput
+                        style={[
+                          styles.searchInput,
+                          { borderColor: C.line, backgroundColor: C.bg, color: C.text },
+                        ]}
+                        placeholder="Search banks..."
+                        placeholderTextColor={C.sub}
+                        value={bankSearchQuery}
+                        onChangeText={setBankSearchQuery}
+                        onPressIn={(e) => e.stopPropagation()}
+                      />
+
+                      {/* Banks List */}
+                      {banksLoading ? (
+                        <View style={styles.dropdownLoading}>
+                          <ActivityIndicator size="small" color={C.primary} />
+                          <ThemedText style={{ color: C.sub, marginLeft: 8 }}>
+                            Loading banks...
+                          </ThemedText>
+                        </View>
+                      ) : banksError ? (
+                        <View style={styles.dropdownError}>
+                          <ThemedText style={{ color: "#E11D48" }}>
+                            Failed to load banks. Please try again.
+                          </ThemedText>
+                        </View>
+                      ) : filteredBanks.length === 0 ? (
+                        <View style={styles.dropdownEmpty}>
+                          <ThemedText style={{ color: C.sub }}>
+                            No banks found
+                          </ThemedText>
+                        </View>
+                      ) : (
+                        <FlatList
+                          data={filteredBanks}
+                          keyExtractor={(item) => item.id.toString()}
+                          style={{ maxHeight: 200 }}
+                          renderItem={({ item }) => (
+                            <TouchableOpacity
+                              style={[
+                                styles.dropdownItem,
+                                {
+                                  backgroundColor:
+                                    selectedBank?.id === item.id
+                                      ? C.primary + "20"
+                                      : "transparent",
+                                },
+                              ]}
+                              onPress={() => handleBankSelect(item)}
+                            >
+                              <ThemedText style={{ color: C.text }}>
+                                {item.name}
+                              </ThemedText>
+                              <ThemedText
+                                style={{ color: C.sub, fontSize: 12 }}
+                              >
+                                {item.code}
+                              </ThemedText>
+                            </TouchableOpacity>
+                          )}
+                        />
+                      )}
+                    </View>
+                  )}
+                </View>
+
+              {/* Account Number */}
+              <View style={{ marginBottom: 12 }}>
+                <ThemedText style={[styles.label, { color: C.text }]}>
+                  Account Number
+                </ThemedText>
+                <View style={{ position: "relative" }}>
+                  <Input
+                    C={C}
+                    placeholder="Enter account number"
+                    keyboardType="number-pad"
+                    value={wAccNumber}
+                    onChangeText={handleAccountNumberChange}
+                  />
+                  {/* Validation indicator */}
+                  {isValidating && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        top: 0,
+                        bottom: 0,
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ActivityIndicator size="small" color={C.primary} />
+                    </View>
+                  )}
+                  {!isValidating && accountValidated && validatedAccountData && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        top: 0,
+                        bottom: 0,
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle" size={20} color="#18A957" />
+                    </View>
+                  )}
+                  {!isValidating &&
+                    !accountValidated &&
+                    selectedBank &&
+                    wAccNumber.length >= 10 &&
+                    validateAccountMutation.isError && (
+                      <View
+                        style={{
+                          position: "absolute",
+                          right: 12,
+                          top: 0,
+                          bottom: 0,
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Ionicons name="close-circle" size={20} color="#E11D48" />
+                      </View>
+                    )}
+                </View>
+                {/* Validation status message */}
+                {isValidating && (
+                  <ThemedText
+                    style={{ color: C.primary, fontSize: 12, marginTop: 4 }}
+                  >
+                    Validating account...
+                  </ThemedText>
+                )}
+                {!isValidating &&
+                  !accountValidated &&
+                  selectedBank &&
+                  wAccNumber.length >= 10 &&
+                  validateAccountMutation.isError && (
+                    <ThemedText
+                      style={{ color: "#E11D48", fontSize: 12, marginTop: 4 }}
+                    >
+                      {validateAccountMutation.error?.message ||
+                        validateAccountMutation.error?.data?.message ||
+                        "Invalid account number. Please check and try again."}
+                    </ThemedText>
+                  )}
+              </View>
+
+              {/* Account Validation Response - Show after validation */}
+              {accountValidated && validatedAccountData && (
                 <View
                   style={[
-                    styles.checkbox,
+                    styles.validatedCard,
+                    { borderColor: "#18A957", backgroundColor: "#18A95710" },
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Ionicons name="checkmark-circle" size={20} color="#18A957" />
+                    <ThemedText
+                      style={{ color: "#18A957", marginLeft: 8, fontWeight: "600" }}
+                    >
+                      Account Validated Successfully
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={[styles.validatedText, { color: C.text }]}>
+                    Account Name: {validatedAccountData.account_name}
+                  </ThemedText>
+                  <ThemedText style={[styles.validatedText, { color: C.text }]}>
+                    Bank: {selectedBank?.name}
+                  </ThemedText>
+                  <ThemedText style={[styles.validatedText, { color: C.text }]}>
+                    Account Number: {validatedAccountData.account_number}
+                  </ThemedText>
+                </View>
+              )}
+
+              {/* Only show amount and other fields after account is validated */}
+              {accountValidated && validatedAccountData ? (
+                <>
+                  <Input
+                    C={C}
+                    placeholder="Account Name"
+                    value={wAccName}
+                    editable={false}
+                    style={{
+                      opacity: 0.6,
+                      marginBottom: 12,
+                    }}
+                  />
+
+                  {/* Amount */}
+                  <Input
+                    C={C}
+                    placeholder="Amount to withdraw"
+                    keyboardType="numeric"
+                    value={wAmount}
+                    onChangeText={setWAmount}
+                  />
+                </>
+              ) : selectedBank && wAccNumber.length >= 10 ? (
+                <View
+                  style={[
+                    styles.infoCard,
                     {
-                      borderColor: C.primary,
-                      backgroundColor: saveDetails ? C.primary : "#fff",
+                      borderColor: C.line,
+                      backgroundColor: C.bg,
+                      marginBottom: 12,
                     },
                   ]}
                 >
-                  {saveDetails ? (
-                    <Ionicons name="checkmark" size={14} color="#fff" />
-                  ) : null}
+                  <ThemedText style={[styles.infoText, { color: C.sub }]}>
+                    {isValidating
+                      ? "Validating account number..."
+                      : "Please wait for account validation to complete"}
+                  </ThemedText>
                 </View>
-                <ThemedText style={{ color: C.text }}>
-                  Save account details
-                </ThemedText>
-              </TouchableOpacity>
+              ) : (
+                <View
+                  style={[
+                    styles.infoCard,
+                    {
+                      borderColor: C.line,
+                      backgroundColor: C.bg,
+                      marginBottom: 12,
+                    },
+                  ]}
+                >
+                  <ThemedText style={[styles.infoText, { color: C.sub }]}>
+                    {!selectedBank
+                      ? "Please select a bank first"
+                      : wAccNumber.length < 10
+                      ? "Enter account number (minimum 10 digits)"
+                      : "Account will be validated automatically"}
+                  </ThemedText>
+                </View>
+              )}
 
-              <View style={{ flex: 1 }} />
+              {/* Only show save details checkbox after validation */}
+              {accountValidated && validatedAccountData && (
+                <TouchableOpacity
+                  style={styles.saveRow}
+                  onPress={() => setSaveDetails((p) => !p)}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      {
+                        borderColor: C.primary,
+                        backgroundColor: saveDetails ? C.primary : "#fff",
+                      },
+                    ]}
+                  >
+                    {saveDetails ? (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    ) : null}
+                  </View>
+                  <ThemedText style={{ color: C.text }}>
+                    Save account details
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
+
+              <View style={{ marginTop: 20 }} />
               <TouchableOpacity
                 style={[
                   styles.withdrawBtn,
                   { backgroundColor: C.primary },
-                  withdrawMutation.isPending && styles.withdrawBtnDisabled,
+                  (withdrawMutation.isPending ||
+                    !accountValidated ||
+                    !wAmount) &&
+                    styles.withdrawBtnDisabled,
                 ]}
                 onPress={handleWithdraw}
-                disabled={withdrawMutation.isPending}
+                disabled={
+                  withdrawMutation.isPending || !accountValidated || !wAmount
+                }
               >
                 {withdrawMutation.isPending ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -686,7 +1104,8 @@ export default function ShoppingWalletScreen() {
                   </ThemedText>
                 )}
               </TouchableOpacity>
-            </View>
+              </ScrollView>
+            </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
@@ -972,6 +1391,85 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     marginBottom: 12,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  dropdownTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dropdown: {
+    position: "absolute",
+    top: 55,
+    left: 0,
+    right: 0,
+    borderRadius: 15,
+    borderWidth: 1,
+    maxHeight: 300,
+    ...shadow(8),
+    zIndex: 1000,
+    elevation: 24,
+  },
+  searchInput: {
+    height: 45,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    margin: 8,
+  },
+  dropdownLoading: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropdownError: {
+    padding: 16,
+    alignItems: "center",
+  },
+  dropdownEmpty: {
+    padding: 16,
+    alignItems: "center",
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECEDEF",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  validateBtn: {
+    height: 55,
+    paddingHorizontal: 16,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 100,
+  },
+  validatedCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  validatedText: {
+    marginTop: 8,
+    fontSize: 14,
+  },
+  infoCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  infoText: {
+    fontSize: 13,
+    textAlign: "center",
   },
   saveRow: {
     flexDirection: "row",

@@ -19,7 +19,7 @@ import { StatusBar } from "expo-status-bar";
 import ThemedText from "../../components/ThemedText";
 import { useTheme } from "../../components/ThemeProvider";
 import StoreProfileModal from "../../components/StoreProfileModal";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { API_DOMAIN } from "../../apiConfig"; // add this import
 
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -511,7 +511,7 @@ export default function StoreHomeScreen() {
   const bannerItemWidth = width - 32;
 
   /* -------- fetch latest orders (show only 3) -------- */
-  const { data: latest3, isLoading: ordersLoading } = useQuery({
+  const { data: latest3, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ["orders", "latest3"],
     queryFn: async () => {
       const token = await getToken();

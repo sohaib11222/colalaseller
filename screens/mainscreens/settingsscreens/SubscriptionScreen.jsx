@@ -1098,17 +1098,6 @@ export default function SubscriptionScreen() {
           </View>
         )}
 
-        {/* Done Button */}
-        <TouchableOpacity
-          style={styles.doneButton}
-          activeOpacity={0.8}
-          onPress={() => {
-            navigation.navigate("MainNavigator", { screen: "Home" });
-          }}
-        >
-          <ThemedText style={styles.doneButtonText}>Done</ThemedText>
-        </TouchableOpacity>
-
         {/* CTA Button */}
         {selectedPlan && (
           <TouchableOpacity
@@ -1566,23 +1555,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "400",
-  },
-  doneButton: {
-    marginHorizontal: 15,
-    marginTop: 16,
-    marginBottom: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: "#000",
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 50,
-  },
-  doneButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
   },
   loadingContainer: {
     padding: 40,

@@ -252,7 +252,7 @@ export default function StoreBuilderScreen() {
   const [catOpen, setCatOpen] = useState(false);
 
   /* ---------- Save (POST /seller/store/builder) ---------- */
-  const { mutate: saveBuilder, isLoading: saving } = useMutation({
+  const { mutate: saveBuilder, isPending: saving } = useMutation({
     mutationFn: async () => {
       const token = await getToken();
 

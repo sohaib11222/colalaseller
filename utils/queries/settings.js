@@ -129,3 +129,11 @@ export const getKnowledgeBase = async (token, params = {}) => {
 export const getUserPlan = async (token) =>
   await apiCall(API_ENDPOINTS.AUTH.GetPlan, "GET", undefined, token);
 
+// Wallet Withdrawal - Get Banks List
+export const getWithdrawBanks = async (token, country = 'ng') =>
+  await apiCall(API_ENDPOINTS.GENERAL.Wallet_Withdraw_Banks(country), "GET", undefined, token);
+
+// Wallet Withdrawal - Validate Account
+export const validateBankAccount = async (payload, token) =>
+  await apiCall(API_ENDPOINTS.GENERAL.Wallet_Validate_Account, "POST", payload, token);
+

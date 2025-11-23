@@ -26,9 +26,9 @@ const apiCall = async (url, method, data, token) => {
   }
 
   try {
-    console.log(`Making ${method} request to:`, url);
-    console.log("Headers:", headers);
-    console.log("Data:", data);
+    // console.log(`Making ${method} request to:`, url);
+    // console.log("Headers:", headers);
+    // console.log("Data:", data);
     
     let response;
     switch (method) {
